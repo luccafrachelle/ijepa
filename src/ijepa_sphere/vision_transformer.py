@@ -1,12 +1,18 @@
 # Copied verbatim from facebookresearch/ijepa @ 52c1ae9, src/models/vision_transformer.py.
 # License: CC BY-NC 4.0 (see third_party/ijepa/LICENSE).
-# Only change: imports point to ijepa_sphere.tensors instead of src.utils / src.masks.
+# Changes: (1) imports point to ijepa_sphere.tensors instead of src.utils / src.masks;
+# (2) modified: SDPA -- Attention.forward uses torch.nn.functional.scaled_dot_product_attention
+#     (same math: softmax(q k^T * scale) v, scale = qk_scale or head_dim**-0.5, dropout = attn_drop
+#     in training, 0 here) instead of the manual q @ k^T path. The official manual path is kept
+#     and used when attention weights are requested (Block(return_attention=True)) or when
+#     `Attention.use_sdpa` is False (tests compare both).
 import math
 from functools import partial
 import numpy as np
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from ijepa_sphere.tensors import (
     trunc_normal_,
@@ -131,10 +137,20 @@ class Attention(nn.Module):
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
 
-    def forward(self, x):
+    use_sdpa = True  # modified: SDPA (class-level switch; False = official manual path)
+
+    def forward(self, x, need_weights=False):
         B, N, C = x.shape
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]
+
+        if self.use_sdpa and not need_weights:
+            x = F.scaled_dot_product_attention(
+                q, k, v, dropout_p=self.attn_drop.p if self.training else 0.0, scale=self.scale)
+            x = x.transpose(1, 2).reshape(B, N, C)
+            x = self.proj(x)
+            x = self.proj_drop(x)
+            return x, None
 
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)
@@ -159,7 +175,7 @@ class Block(nn.Module):
         self.mlp = MLP(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
 
     def forward(self, x, return_attention=False):
-        y, attn = self.attn(self.norm1(x))
+        y, attn = self.attn(self.norm1(x), need_weights=return_attention)
         if return_attention:
             return attn
         x = x + self.drop_path(y)

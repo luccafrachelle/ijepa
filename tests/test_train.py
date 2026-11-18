@@ -10,7 +10,8 @@ from torch import nn
 from ijepa_sphere import schedulers as S
 from ijepa_sphere.evaluation import linear_probe, weighted_knn
 from ijepa_sphere.metrics import alignment, effective_rank, mean_std_normalized, uniformity
-from ijepa_sphere.trainer import load_config, main
+from ijepa_sphere import trainer as T
+from ijepa_sphere.trainer import load_config, main, parse_args, resolve_config
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -142,7 +143,7 @@ def test_train_smoke_and_resume(tmp_path, ema, reg):
     assert ev["metrics"]["n_train"] == 24 and ev["metrics"]["n_eval"] == 6
     assert set(ev["collapse_final"]) >= {"std_norm", "erank_pooled", "erank_tokens",
                                          "uniformity", "alignment"}
-    assert ev["epochs_completed"] == 2 and ev["gpu_hours"] > 0
+    assert ev["epochs_completed"] == 2 and ev["gpu_hours"] > 0 and ev["status"] == "ok"
     assert res["metrics"] == ev["metrics"]
 
     # interrupted after epoch 1, then resumed automatically -> identical result
@@ -170,3 +171,100 @@ def test_max_steps_bench(capsys):
     assert res["steps"] == 4 and res["img_per_s"] > 0
     line = capsys.readouterr().out.strip().splitlines()[-1]
     assert json.loads(line)["steps"] == 4
+
+
+# ---------------------------------------------------------------- run identity
+def _cfg(*extra):
+    return resolve_config(parse_args(["--config", str(ROOT / "configs/c1.yaml"), *extra]))
+
+
+def test_default_out_depends_on_split_and_overrides():
+    base = _cfg("--seed", "0")["out"]
+    assert base.startswith("runs/c1_interno_seed0_")
+    outs = {base, _cfg("--seed", "0", "--eval-split", "oficial")["out"],
+            _cfg("--seed", "0", "--lr", "1e-3")["out"], _cfg("--seed", "0", "--epochs", "30")["out"],
+            _cfg("--seed", "0", "--lambda", "0.2")["out"], _cfg("--seed", "0", "--ema", "off")["out"],
+            _cfg("--seed", "0", "--reg", "susreg")["out"], _cfg("--seed", "1")["out"]}
+    assert len(outs) == 8
+    assert "_oficial_seed0_" in _cfg("--seed", "0", "--eval-split", "oficial")["out"]
+    # stable, and not affected by workers / device
+    assert _cfg("--seed", "0", "--workers", "4", "--set", "device=cpu")["out"] == base
+
+
+def test_mismatch_on_skip_and_resume(tmp_path):
+    common = ["--config", str(ROOT / "configs/c1.yaml"), "--epochs", "2", *FAKE]
+    a, b = tmp_path / "a", tmp_path / "b"
+    main(common + ["--out", str(a)])
+    for bad in (["--eval-split", "oficial"], ["--epochs", "3"], ["--lr", "1e-3"],
+                ["--lambda", "0.2"], ["--ema", "off"], ["--reg", "susreg"], ["--seed", "1"]):
+        with pytest.raises(RuntimeError, match="config mismatch"):
+            main(common + bad + ["--out", str(a)])
+    assert main(common + ["--out", str(a)]) == 0  # identical config: skipped
+    main(common + ["--out", str(b), "--stop-after-epoch", "1"])
+    for bad in (["--epochs", "3"], ["--eval-split", "oficial"], ["--lr", "1e-3"]):
+        with pytest.raises(RuntimeError, match="config mismatch"):
+            main(common + bad + ["--out", str(b)])
+    assert not (b / "evaluation.json").exists()
+
+
+# ---------------------------------------------------------------- terminal statuses
+def test_diverged_writes_terminal_evaluation(tmp_path):
+    out = tmp_path / "d"
+    args = ["--config", str(ROOT / "configs/c6.yaml"), "--epochs", "2", *FAKE,
+            "--set", "model.lambda_reg=.nan", "--out", str(out)]
+    res = main(args)
+    ev = json.loads((out / "evaluation.json").read_text())
+    assert ev["status"] == "diverged" == res["status"] and ev["diverged_epoch"] == 1
+    assert ev["last_metrics"]["epoch"] == 1 and "metrics" not in ev
+    assert main(args) == 0  # queue / rerun skips it
+
+
+def test_c2_collapse_stop_status_and_no_duplicate_passes(tmp_path, monkeypatch):
+    calls = {"collapse": 0, "eval": 0}
+    real_c, real_e = T.collapse_report, T.evaluate
+
+    def cnt_c(*a, **k):
+        calls["collapse"] += 1
+        return real_c(*a, **k)
+
+    def cnt_e(*a, **k):
+        calls["eval"] += 1
+        return real_e(*a, **k)
+    monkeypatch.setattr(T, "collapse_report", cnt_c)
+    monkeypatch.setattr(T, "evaluate", cnt_e)
+    out = tmp_path / "c2"
+    main(["--config", str(ROOT / "configs/c2.yaml"), "--epochs", "3", *FAKE,
+          "--set", "logging.collapse_rank_threshold=1000", "--set", "logging.collapse_patience=1",
+          "--out", str(out)])
+    ev = json.loads((out / "evaluation.json").read_text())
+    assert ev["status"] == "collapsed" and ev["stopped_early"] and ev["collapse_epoch"] == 1
+    assert ev["epochs_completed"] == 1 and "linear_top1" in ev["metrics"]
+    # one collapse pass (reused as final) and one evaluate (final; interno quick kNN skipped)
+    assert calls == {"collapse": 1, "eval": 1}
+    assert len(_rows(out / "collapse.csv")) == 1 and len(_rows(out / "knn.csv")) == 1
+    assert ev["collapse_final"]["epoch"] == 1
+    assert ev["eval_hours"] <= ev["gpu_hours"]
+
+
+# ---------------------------------------------------------------- GPU: regularizer generator
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
+def test_reg_generator_survives_resume_on_gpu():
+    from ijepa_sphere.jepa import IJEPA
+    from ijepa_sphere.masks import make_mask_collator
+    from ijepa_sphere.trainer import capture_state, restore_state
+    torch.manual_seed(0)
+    model = IJEPA(ema=False, reg="susreg").cuda()
+    opt = torch.optim.AdamW(model.param_groups())
+    coll = make_mask_collator(224)
+    z = torch.randn(32, 256, device="cuda")
+    model.regularizer(z)  # generator moves to cuda (official forward)
+    ck = capture_state(model, opt, coll, {"global_step": 5})
+    assert ck["reg_generator"]["device"] == "cuda:0"
+    expected = model.regularizer(z)
+    model2 = IJEPA(ema=False, reg="susreg").cuda()
+    opt2 = torch.optim.AdamW(model2.param_groups())
+    restore_state(ck, model2, opt2, make_mask_collator(224))
+    g = model2.regularizer.stat._generator
+    assert g.device == z.device  # so _official_regs.py:98 does not reseed it
+    assert torch.equal(model2.regularizer(z), expected)
+    assert model2.regularizer.stat._generator is g

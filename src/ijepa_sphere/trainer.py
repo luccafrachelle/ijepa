@@ -15,6 +15,14 @@ Data splits (`data.eval_split`, PLAN §6):
 Collapse metrics: fixed 10k subset of the full train split (`collapse_subset_ids`,
 seed 0), eval transform, same images in both modes and in all cells.
 
+Run folder: --out, else runs/[smoke_]<config>_<eval_split>_seed<k>_<hash8>, hash of the
+resolved config (excluding out/name/device/workers). On skip (evaluation.json exists) or
+resume (last.pt exists) the stored config must match the requested one on IDENTITY_KEYS
+(seed, eval_split, source, epochs, lr, batch_size, lambda, ema, reg, smoke), else RuntimeError.
+
+evaluation.json `status`: ok | collapsed (C2 stopping rule fired; full eval still run) |
+diverged (non-finite epoch-mean loss/grad norm; no eval, terminal so the queue skips it).
+
 Official ijepa train.py details reproduced: schedulers stepped at the start of every
 iteration; AdamW with the official wd/no-wd groups; EMA momentum generator;
 no gradient clipping (the official loop has none; we only log the total grad norm).
@@ -135,8 +143,68 @@ def resolve_config(args):
     if args.out:
         cfg["out"] = args.out
     elif not cfg.get("out"):
-        cfg["out"] = f"runs/{'smoke_' if cfg.get('smoke') else ''}{name}_seed{cfg['seed']}"
+        cfg["out"] = default_out(cfg)
     return cfg
+
+
+# Keys that do not change what is trained/evaluated: excluded from the run hash.
+_HASH_EXCLUDE = {("out",), ("name",), ("device",), ("data", "num_workers"),
+                 ("data", "prefetch_factor"), ("data", "val_interno_sha256")}
+# Keys that must match between the resolved config and a stored run on skip/resume.
+IDENTITY_KEYS = [("seed",), ("data", "eval_split"), ("data", "source"),
+                 ("optimization", "epochs"), ("optimization", "lr"),
+                 ("optimization", "batch_size"), ("model", "lambda_reg"),
+                 ("model", "ema"), ("model", "reg"), ("smoke",)]
+
+
+def _strip(cfg, prefix=()):
+    out = {}
+    for k, v in cfg.items():
+        key = prefix + (k,)
+        if key in _HASH_EXCLUDE:
+            continue
+        out[k] = _strip(v, key) if isinstance(v, dict) else v
+    return out
+
+
+def config_hash(cfg, n=8):
+    blob = json.dumps(_strip(cfg), sort_keys=True, default=str)
+    return hashlib.sha256(blob.encode()).hexdigest()[:n]
+
+
+def default_out(cfg):
+    """runs/[smoke_]<name>_<eval_split>_seed<k>_<hash8 of the resolved config>."""
+    split = cfg.get("data", {}).get("eval_split", "interno")
+    return (f"runs/{'smoke_' if cfg.get('smoke') else ''}{cfg['name']}_{split}"
+            f"_seed{cfg['seed']}_{config_hash(cfg)}")
+
+
+def _get(cfg, key):
+    for k in key:
+        if not isinstance(cfg, dict) or k not in cfg:
+            return None
+        cfg = cfg[k]
+    return cfg
+
+
+def check_same_run(resolved, stored, where):
+    """Fail loudly if a stored run (evaluation.json / last.pt) was made with a
+    different identity config than the one requested now."""
+    diffs = []
+    for key in IDENTITY_KEYS:
+        a, b = _get(resolved, key), _get(stored, key)
+        if key == ("smoke",):
+            a, b = bool(a), bool(b)
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)) and not isinstance(a, bool):
+            same = (math.isclose(float(a), float(b), rel_tol=1e-12, abs_tol=0.0)
+                    or (math.isnan(float(a)) and math.isnan(float(b))))
+        else:
+            same = a == b
+        if not same:
+            diffs.append(f"{'.'.join(key)}: stored={b!r} requested={a!r}")
+    if diffs:
+        raise RuntimeError(f"config mismatch with existing run in {where}:\n  " + "\n  ".join(diffs)
+                           + "\nUse a different --out (or the default run folder).")
 
 
 # ------------------------------------------------------------------ utils
@@ -303,6 +371,8 @@ def main(argv=None):
     bench = args.max_steps is not None
     if not bench:
         if (out / "evaluation.json").exists():
+            with open(out / "evaluation.json") as f:
+                check_same_run(cfg, json.load(f).get("config", {}), out / "evaluation.json")
             print(f"[train] {out}/evaluation.json exists, skipping", flush=True)
             return 0
         out.mkdir(parents=True, exist_ok=True)
@@ -365,10 +435,11 @@ def main(argv=None):
     state = {"epoch": 0, "global_step": 0, "best_knn": -1.0, "best_epoch": None,
              "rank_low": 0, "rank_low_first": None, "collapse_epoch": None,
              "stopped_early": False, "train_seconds": 0.0, "eval_seconds": 0.0,
-             "img_per_s": [], "peak_mem_gb": 0.0}
+             "img_per_s": [], "peak_mem_gb": 0.0, "last_collapse": None}
     last_path = out / "last.pt"
     if not bench and last_path.exists():
         ck = torch.load(last_path, map_location="cpu", weights_only=False)
+        check_same_run(cfg, ck.get("config", {}), last_path)
         restore_state(ck, model, opt, coll)
         state.update(ck["state"])
         for _ in range(state["global_step"]):  # official resume: replay schedules
@@ -392,6 +463,27 @@ def main(argv=None):
         model.train()
         state["eval_seconds"] += time.time() - t0
         return {"epoch": epoch, "step": state["global_step"], **r}
+
+    def build_result(status, final_eval_s=0.0, **extra):
+        commit, dirty = git_info()
+        return {
+            "status": status,  # ok | collapsed (C2 stopping rule) | diverged (non-finite loss)
+            "run": cfg["name"], "out": str(out), "smoke": smoke,
+            "config": cfg, "git_commit": commit, "git_dirty": dirty, "seed": seed,
+            "eval_split": "oficial" if oficial else "interno",
+            **extra,
+            "collapse_epoch": state["collapse_epoch"], "stopped_early": state["stopped_early"],
+            "epochs_completed": state["epoch"], "global_step": state["global_step"],
+            "best_quick_knn": {"epoch": state["best_epoch"], "knn_top1": state["best_knn"]},
+            "train_hours": state["train_seconds"] / 3600,
+            "eval_hours": (state["eval_seconds"] + final_eval_s) / 3600,
+            "gpu_hours": (state["train_seconds"] + state["eval_seconds"] + final_eval_s) / 3600,
+            "throughput_img_per_s": float(np.mean(state["img_per_s"])) if state["img_per_s"] else None,
+            "peak_mem_gb": state["peak_mem_gb"],
+            "torch": torch.__version__,
+            "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else "cpu",
+            "finished_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        }
 
     # ---- training
     model.train()
@@ -461,8 +553,6 @@ def main(argv=None):
         ep_time = time.time() - t_ep
         state["train_seconds"] += ep_time
         a = (acc / max(n_steps, 1)).tolist()
-        if not all(math.isfinite(x) for x in a[:3]):
-            raise RuntimeError(f"non-finite loss at epoch {epoch + 1}: {a}")
         ips = n_steps * oc.get("batch_size", 256) / ep_time
         peak = torch.cuda.max_memory_allocated(device) / 2**30 if device.type == "cuda" else 0.0
         state["img_per_s"].append(ips)
@@ -478,9 +568,18 @@ def main(argv=None):
                 writer.add_scalar(f"train/{k}", v, ep1)
         print("[train] " + " ".join(f"{k}={v:.4g}" if isinstance(v, float) else f"{k}={v}"
                                     for k, v in row.items()), flush=True)
+        if not all(math.isfinite(x) for x in a[:4]):
+            # Terminal state: the queue must not retry a diverged run forever.
+            result = build_result("diverged", diverged_epoch=ep1, last_metrics=row)
+            writer.close()
+            atomic_write_json(result, out / "evaluation.json")
+            print(f"[train] non-finite loss/grad at epoch {ep1}: {row}; wrote status=diverged",
+                  flush=True)
+            return result
 
         if ep1 % lc.get("collapse_every", 5) == 0 or ep1 == epochs or smoke:
             cr = run_collapse(ep1)
+            state["last_collapse"] = cr
             append_csv(out / "collapse.csv", COLLAPSE_FIELDS, cr)
             for k in COLLAPSE_FIELDS[3:]:
                 if k in cr:
@@ -500,7 +599,9 @@ def main(argv=None):
                     print(f"[train] C2 stopping rule: collapsed since epoch "
                           f"{state['collapse_epoch']}, stopping at epoch {ep1}", flush=True)
 
-        if ep1 % lc.get("knn_every", 10) == 0 or ep1 == epochs or smoke or stop:
+        final_epoch = ep1 == epochs or stop
+        if ((ep1 % lc.get("knn_every", 10) == 0 or smoke or final_epoch)
+                and not (final_epoch and not oficial)):  # interno: final eval gives this kNN
             t0 = time.time()
             kr = evaluate(model, knn_bank, knn_query, eval_cfg, device=device,
                           smoke=smoke, probe=False)
@@ -525,49 +626,45 @@ def main(argv=None):
             return None
 
     # ---- final evaluation (weights at the end of training)
-    t0 = time.time()
-    cr = run_collapse(state["epoch"])
+    cr = state["last_collapse"]
+    if cr is None or cr["epoch"] != state["epoch"]:  # reuse the pass of the last epoch
+        cr = run_collapse(state["epoch"])            # (run_collapse counts its own time)
     if oficial:
         bank = TransformDataset(dsets["train_full"], et)
         query = TransformDataset(dsets["val_oficial"], et)
     else:
         bank, query = knn_bank, knn_query
+    t0 = time.time()
     ev = evaluate(model, bank, query, eval_cfg, device=device, smoke=smoke, probe=True)
     final_eval_s = time.time() - t0
-    commit, dirty = git_info()
-    result = {
-        "run": cfg["name"], "out": str(out), "smoke": smoke,
-        "config": cfg, "git_commit": commit, "git_dirty": dirty, "seed": seed,
-        "eval_split": "oficial" if oficial else "interno",
-        "eval_sets": {"bank": "train_full" if oficial else "train_minus_val_interno",
-                      "query": "val_oficial" if oficial else "val_interno"},
-        "metrics": {**ev, "protocol": {"features": "avg-pool target encoder tokens",
-                                       "knn_k": ec.get("knn_k", 20),
-                                       "knn_temperature": ec.get("knn_temperature", 0.07),
-                                       "linear_probe_epochs": 1 if smoke else ec.get("linear_probe_epochs", 90),
-                                       "linear_probe_lr_effective": ec.get("linear_probe_lr", 0.1)
-                                       * ec.get("batch_size", 256) / 256}},
-        "collapse_final": cr,
-        "collapse_epoch": state["collapse_epoch"], "stopped_early": state["stopped_early"],
-        "epochs_completed": state["epoch"], "global_step": state["global_step"],
-        "best_quick_knn": {"epoch": state["best_epoch"], "knn_top1": state["best_knn"]},
-        "train_hours": state["train_seconds"] / 3600,
-        "eval_hours": (state["eval_seconds"] + final_eval_s) / 3600,
-        "gpu_hours": (state["train_seconds"] + state["eval_seconds"] + final_eval_s) / 3600,
-        "throughput_img_per_s": float(np.mean(state["img_per_s"])) if state["img_per_s"] else None,
-        "peak_mem_gb": state["peak_mem_gb"],
-        "torch": torch.__version__,
-        "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else "cpu",
-        "finished_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-    }
+    if not oficial:
+        # The final interno kNN IS the last-epoch quick kNN (same bank/query/weights).
+        append_csv(out / "knn.csv", KNN_FIELDS, {"epoch": state["epoch"], "step": state["global_step"],
+                                                 "knn_top1": ev["knn_top1"], "n_train": ev["n_train"],
+                                                 "n_eval": ev["n_eval"]})
+        if ev["knn_top1"] > state["best_knn"]:
+            state["best_knn"], state["best_epoch"] = ev["knn_top1"], state["epoch"]
+            atomic_torch_save({"model": model.state_dict(), "epoch": state["epoch"],
+                               "knn_top1": ev["knn_top1"], "config": cfg}, out / "best.pt")
+    result = build_result(
+        "collapsed" if state["stopped_early"] else "ok", final_eval_s=final_eval_s,
+        eval_sets={"bank": "train_full" if oficial else "train_minus_val_interno",
+                   "query": "val_oficial" if oficial else "val_interno"},
+        metrics={**ev, "protocol": {"features": "avg-pool target encoder tokens",
+                                    "knn_k": ec.get("knn_k", 20),
+                                    "knn_temperature": ec.get("knn_temperature", 0.07),
+                                    "linear_probe_epochs": 1 if smoke else ec.get("linear_probe_epochs", 90),
+                                    "linear_probe_lr_effective": ec.get("linear_probe_lr", 0.1)
+                                    * ec.get("batch_size", 256) / 256}},
+        collapse_final=cr)
     if writer is not None:
         writer.add_scalar("final/knn_top1", ev["knn_top1"], state["epoch"])
         writer.add_scalar("final/linear_top1", ev["linear_top1"], state["epoch"])
         writer.close()
     atomic_write_json(result, out / "evaluation.json")  # last, atomic
-    print(f"[eval] {json.dumps(result['metrics'])} gpu_hours={result['gpu_hours']:.3f}", flush=True)
+    print(f"[eval] status={result['status']} {json.dumps(result['metrics'])} "
+          f"gpu_hours={result['gpu_hours']:.3f}", flush=True)
     return result
-
 
 if __name__ == "__main__":
     main()
