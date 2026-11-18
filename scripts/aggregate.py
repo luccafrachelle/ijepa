@@ -14,9 +14,15 @@ import math
 import re
 from pathlib import Path
 
+import sys
+
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+from ijepa_sphere.metrics import is_collapsed  # noqa: E402  (single collapse criterion)
+
+DEFAULT_DIM = 192   # ViT-Tiny embedding dim, for runs whose collapse_final lacks "dim"
 CELLS = ["c1", "c2", "c3", "c4", "c5", "c6"]
 CELL_DESC = {"c1": "EMA, sin reg (I-JEPA)", "c2": "sin EMA, sin reg (control)",
              "c3": "EMA + SIGReg", "c4": "sin EMA + SIGReg",
@@ -62,17 +68,28 @@ def load_runs(runs_dir):
     return out
 
 
-def grid_runs(runs):
-    """-> {cell: [run with .seed, .status, .linear, .knn, ...]} for runs named grid_c<n>_seed<k>."""
+def grid_runs(runs, warnings=None):
+    """-> {cell: [run with .seed, .status, .linear, .knn, ...]} for runs named grid_c<n>_seed<k>.
+
+    Validation (messages appended to `warnings` if given): runs with eval_split != "oficial" are
+    excluded; epochs differing within a cell are flagged. Diverged runs are kept (shown in the table)."""
     cells = {}
+    warnings = warnings if warnings is not None else []
     for r in runs:
         m = re.fullmatch(r"grid_(c[1-6])_seed(\d+)", r["name"])
         if not m:
             continue
         ev = r["ev"]
+        if ev.get("eval_split") != "oficial":
+            warnings.append(f"Excluida {r['name']}: eval_split={ev.get('eval_split')!r} (la grilla usa solo 'oficial')")
+            continue
         met = ev.get("metrics") or {}
         cf = ev.get("collapse_final") or {}
-        d = {"cell": m.group(1), "seed": int(m.group(2)), "name": r["name"], "dir": r["dir"],
+        st = ev.get("status", "ok")
+        crit = is_collapsed(cf.get("uniformity"), cf.get("std_norm"), cf.get("dim") or DEFAULT_DIM,
+                            *(ev.get("config", {}).get("logging", {}).get(k) or dflt for k, dflt in
+                              (("collapse_uniformity_threshold", -0.2), ("collapse_std_factor", 0.25))))
+        d = {"collapsed": st == "collapsed" or crit,"cell": m.group(1), "seed": int(m.group(2)), "name": r["name"], "dir": r["dir"],
              "status": ev.get("status", "ok"),
              "linear": met["linear_top1"] * 100 if "linear_top1" in met else None,
              "knn": met["knn_top1"] * 100 if "knn_top1" in met else None,
@@ -81,8 +98,11 @@ def grid_runs(runs):
              "epochs": ev.get("epochs_completed"), "collapse_epoch": ev.get("collapse_epoch"),
              "eval_split": ev.get("eval_split")}
         cells.setdefault(m.group(1), []).append(d)
-    for v in cells.values():
+    for c, v in sorted(cells.items()):
         v.sort(key=lambda d: d["seed"])
+        eps = sorted({d["epochs"] for d in v if d["epochs"] is not None and d["status"] == "ok"})
+        if len(eps) > 1:
+            warnings.append(f"Celda {c.upper()}: épocas distintas entre corridas ok ({', '.join(map(str, eps))})")
     return cells
 
 
@@ -154,16 +174,20 @@ def cell_summary(rs):
             "alignment": mean_sd([r["alignment"] for r in rs])[0],
             "gpu_h_mean": mean_sd([r["gpu_h"] for r in rs])[0],
             "gpu_h_total": float(sum(r["gpu_h"] for r in rs if r["gpu_h"] is not None)),
+            "collapsed": any(r["collapsed"] for r in rs),
             "status": status, "epochs": sorted({r["epochs"] for r in rs if r["epochs"] is not None})}
 
 
 def status_str(s):
     bad = {k: v for k, v in s["status"].items() if k != "ok"}
-    return "ok" if not bad else ", ".join(f"{k} {v}/{s['n']}" for k, v in sorted(bad.items()))
+    out = "ok" if not bad else ", ".join(f"{k} {v}/{s['n']}" for k, v in sorted(bad.items()))
+    if s["collapsed"] and "collapsed" not in bad:
+        out = ("colapsa" if out == "ok" else f"{out}, colapsa")   # criterion met on final metrics
+    return out
 
 
 # ---------------------------------------------------------------- tables
-def grid_tables(cells):
+def grid_tables(cells, warnings=None):
     """-> (csv_rows, md_text, combined_rows) from grid_runs() output."""
     rows, summ = [], {}
     for c in CELLS:
@@ -213,6 +237,8 @@ def grid_tables(cells):
     for name, lin, knn, note in combined:
         L.append(f"| {name} | {fmt_cell(lin, note)} | {fmt_cell(knn, note)} | {note} |")
     L += ["", FOOTNOTE, ""]
+    if warnings:
+        L += ["## Advertencias de validación", ""] + [f"- {w}" for w in warnings] + [""]
     return rows, "\n".join(L), combined
 
 
@@ -269,7 +295,7 @@ def sweep_tables(runs):
         if "λ sweep (C6)" in picks:
             parts.append(f"--var LAMBDA_SUSREG={picks['λ sweep (C6)']:g}")
         L += ["## Para la cola de la grilla", "", "`" + " ".join(parts) + "`"
-              " (o editar LR / LAMBDA_* en queues/fase3_grid.txt)", ""]
+              " (obligatorio: la cola no tiene valores por defecto)", ""]
     return "\n".join(L)
 
 
@@ -277,8 +303,9 @@ def sweep_tables(runs):
 def write_grid(runs_dir, out_dir):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    cells = grid_runs(load_runs(runs_dir))
-    rows, md, _ = grid_tables(cells)
+    warnings = []
+    cells = grid_runs(load_runs(runs_dir), warnings)
+    rows, md, _ = grid_tables(cells, warnings)
     cols = ["cell", "description", "n_seeds", "status", "epochs", "linear_mean", "linear_sd", "knn_mean",
             "knn_sd", "erank_pooled", "uniformity", "alignment", "gpu_h_per_run", "gpu_h_total"]
     with open(out_dir / "tabla_grilla.csv", "w", newline="") as f:

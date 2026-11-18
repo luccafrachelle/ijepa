@@ -234,7 +234,8 @@ def test_c2_collapse_stop_status_and_no_duplicate_passes(tmp_path, monkeypatch):
     monkeypatch.setattr(T, "evaluate", cnt_e)
     out = tmp_path / "c2"
     main(["--config", str(ROOT / "configs/c2.yaml"), "--epochs", "3", *FAKE,
-          "--set", "logging.collapse_rank_threshold=1000", "--set", "logging.collapse_patience=1",
+          "--set", "logging.collapse_uniformity_threshold=-1000", "--set", "logging.collapse_std_factor=1000",
+          "--set", "logging.collapse_patience=1",
           "--out", str(out)])
     ev = json.loads((out / "evaluation.json").read_text())
     assert ev["status"] == "collapsed" and ev["stopped_early"] and ev["collapse_epoch"] == 1
@@ -268,3 +269,40 @@ def test_reg_generator_survives_resume_on_gpu():
     assert g.device == z.device  # so _official_regs.py:98 does not reseed it
     assert torch.equal(model2.regularizer(z), expected)
     assert model2.regularizer.stat._generator is g
+
+
+def test_is_collapsed_criterion_and_check_run_data():
+    from ijepa_sphere.metrics import is_collapsed
+    d = 192
+    # real check_c2_5ep final point: std .0105, uniformity -.11 -> collapsed
+    assert is_collapsed(-0.11, 0.0105, d)
+    # first eval of that run (std .0186 > .25/sqrt(192)=.01804) and random init: not collapsed
+    assert not is_collapsed(-0.33, 0.0186, d) and not is_collapsed(-0.79, 0.035, d)
+    assert not is_collapsed(-0.11, 0.05, d) and not is_collapsed(-0.5, 0.001, d)
+    assert not is_collapsed(None, 0.001, d)
+    cfg = load_config(ROOT / "configs" / "base.yaml")["logging"]
+    assert (cfg["collapse_uniformity_threshold"], cfg["collapse_std_factor"], cfg["collapse_patience"]) == (-0.2, 0.25, 3)
+    assert "collapse_rank_threshold" not in cfg
+
+
+def test_trainer_passes_seed_to_regularizer(tmp_path, monkeypatch):
+    import ijepa_sphere.trainer as T
+    seen = []
+    real = T.IJEPA
+
+    def spy(*a, **k):
+        seen.append(k.get("reg_kwargs"))
+        return real(*a, **k)
+    monkeypatch.setattr(T, "IJEPA", spy)
+    for sd in (0, 1):
+        main(["--config", str(ROOT / "configs/c6.yaml"), "--epochs", "1", "--seed", str(sd), *FAKE,
+              "--out", str(tmp_path / f"s{sd}")])
+    assert [k["seed"] for k in seen] == [0, 1]
+
+
+def test_regularizer_seed_changes_projections():
+    from ijepa_sphere.regularizers import build_regularizer
+    z = torch.randn(64, 256, generator=torch.Generator().manual_seed(3))
+    for kind in ("susreg", "sigreg"):
+        l0, l0b, l1 = (build_regularizer(kind, dim=256, seed=s)(z) for s in (0, 0, 1))
+        assert torch.allclose(l0, l0b) and not torch.allclose(l0, l1)

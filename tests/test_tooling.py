@@ -21,6 +21,9 @@ def _load(name):
 agg, figs, rq, bench = (_load(n) for n in ("aggregate", "figures", "run_queue", "bench_throughput"))
 
 
+GRID_VARS = {"LR": "5e-4", "LAMBDA_SIGREG": "0.05", "LAMBDA_SUSREG": "0.05"}   # no defaults in the queue file
+
+
 def make_run(runs, name, lin, knn, status="ok", erank=50.0, epochs=3, gpu_h=1.0, cfg=None, dup=False, split=None):
     d = runs / name
     d.mkdir(parents=True)
@@ -151,14 +154,13 @@ def test_shipped_queue_files_resolve():
     assert len(a) == 3 and len(b) == 6
     assert all("--eval-split" not in r for r in a + b)
     assert all(r[r.index("--lr") + 1] == "1e-3" for r in b)
-    _, g = rq.parse_queue((root / "queues" / "fase3_grid.txt").read_text(), {"EPOCHS": "50"})
+    _, g = rq.parse_queue((root / "queues" / "fase3_grid.txt").read_text(), {"EPOCHS": "50", **GRID_VARS})
     outs = [rq.out_dir_of(r).name for r in g]
     assert len(g) == 16 and outs[:6] == [f"grid_c{i}_seed0" for i in range(1, 7)]
     assert "grid_c2_seed1" not in outs and "grid_c2_seed2" not in outs
     assert all(r[r.index("--eval-split") + 1] == "oficial" for r in g)
     assert all("--epochs" in r and r[r.index("--epochs") + 1] == "50" for r in g)
-    for c in ("c3", "c4"):
-        assert rq.parse_queue((root / "queues" / "fase3_grid.txt").read_text())[0]["LAMBDA_SIGREG"]
+    assert rq.parse_queue((root / "queues" / "fase3_grid.txt").read_text(), GRID_VARS)[0]["LAMBDA_SIGREG"]
     assert [r for r in g if "c5" in r[0] or "c6" in r[0]][0].count("--lambda") == 1
 
 
@@ -243,7 +245,7 @@ def test_sweeps_stage_by_stage_and_exclusions(tmp_path):
 def test_queue_conflict_on_changed_config(tmp_path):
     """A finished run whose stored config differs from the (re)launched line is CONFLICT, not skipped."""
     root = SCRIPTS.parent
-    _, lines = rq.parse_queue((root / "queues" / "fase3_grid.txt").read_text(), {"EPOCHS": "100", "LR": "5e-4"})
+    _, lines = rq.parse_queue((root / "queues" / "fase3_grid.txt").read_text(), {"EPOCHS": "100", **GRID_VARS})
     line = lines[0]                                    # grid_c1_seed0
     trainer = sys.modules.get("ijepa_sphere.trainer") or __import__("ijepa_sphere.trainer", fromlist=["x"])
     cfg = trainer.resolve_config(trainer.parse_args(["--config", str(root / line[0])] + line[1:]))
@@ -257,10 +259,42 @@ def test_queue_conflict_on_changed_config(tmp_path):
     res = rq.run_queue([line], **kw)
     assert res["skipped"] == ["runs/grid_c1_seed0"] and not res["conflict"]
     # relaunch with other EPOCHS / LR / lambda-irrelevant seed: conflict, never skipped, never run
-    for var in ({"EPOCHS": "150", "LR": "5e-4"}, {"EPOCHS": "100", "LR": "1e-3"}):
+    for var in ({**GRID_VARS, "EPOCHS": "150"}, {**GRID_VARS, "EPOCHS": "100", "LR": "1e-3"}):
         _, l2 = rq.parse_queue((root / "queues" / "fase3_grid.txt").read_text(), var)
         assert "optimization.epochs" in rq.check_conflict(l2[0], tmp_path) or "optimization.lr" in rq.check_conflict(l2[0], tmp_path)
         res = rq.run_queue([l2[0]], **kw)
         assert res["conflict"] == ["runs/grid_c1_seed0"] and not res["skipped"] and not res["failed"]
     assert "CONFLICT runs/grid_c1_seed0" in (tmp_path / "logs" / "queue.log").read_text()
     assert (out / "evaluation.json").exists() and not (out / "train.log").exists()
+
+
+def test_queue_without_var_fails_and_headers_have_no_defaults():
+    qdir = Path(__file__).resolve().parents[1] / "queues"
+    for name, needed in (("fase2b_lambda.txt", {"LR"}), ("fase3_grid.txt", {"LR", "LAMBDA_SIGREG", "LAMBDA_SUSREG"})):
+        text = (qdir / name).read_text()
+        v, _ = rq.parse_queue(text, {k: "1" for k in needed})   # resolves with --var
+        v0 = {k for k in needed if f"\n{k}=" in "\n" + text}
+        assert not v0
+        with pytest.raises(ValueError, match="unresolved"):
+            rq.parse_queue(text)
+
+
+def test_grid_runs_validation_and_collapse_label(tmp_path):
+    runs = tmp_path / "runs"
+    make_run(runs, "grid_c1_seed0", 70, 65, epochs=100)
+    make_run(runs, "grid_c1_seed1", 71, 66, epochs=50)                      # epochs differ
+    make_run(runs, "grid_c3_seed0", 60, 55, split="interno")                # excluded
+    make_run(runs, "grid_c4_seed0", None, None, status="diverged")          # kept, reported
+    make_run(runs, "grid_c2_seed0", 5, 5)                                   # criterion on final metrics
+    ev = json.loads((runs / "grid_c2_seed0/evaluation.json").read_text())
+    ev["collapse_final"].update(uniformity=-0.1, std_norm=0.01, dim=192)
+    (runs / "grid_c2_seed0/evaluation.json").write_text(json.dumps(ev))
+    w = []
+    cells = agg.grid_runs(agg.load_runs(runs), w)
+    assert "c3" not in cells and any("grid_c3_seed0" in x and "interno" in x for x in w)
+    assert any("C1" in x and "épocas" in x for x in w)
+    assert cells["c2"][0]["collapsed"] and not cells["c1"][0]["collapsed"]
+    rows, md, _ = agg.grid_tables(cells, w)
+    by = {r["cell"]: r for r in rows}
+    assert "colapsa" in by["C2"]["status"] and by["C4"]["status"] == "diverged 1/1"
+    assert "Advertencias" in md

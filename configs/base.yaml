@@ -39,7 +39,8 @@ logging:
   alignment_n: 2000
   tokens_per_img: 4
   early_stop_collapse: false
-  collapse_rank_threshold: 1.5
+  collapse_uniformity_threshold: -0.2   # collapsed iff uniformity > this AND std_norm < factor/sqrt(d)
+  collapse_std_factor: 0.25
   collapse_patience: 3
   smoke_steps: 20
   smoke_collapse_subset: 512

@@ -87,6 +87,14 @@ def _embed(model, loader, device, max_tokens_per_img, seed, bf16):
     return torch.cat(pooled), torch.cat(tokens)
 
 
+def is_collapsed(uniformity, std_norm, dim, uniformity_threshold=-0.2, std_factor=0.25):
+    """Collapse criterion (controller ruling): uniformity > thr AND std_norm < std_factor/sqrt(dim).
+    `dim` = embedding dim of the measured embeddings (192 for ViT-Tiny -> 0.018)."""
+    if uniformity is None or std_norm is None or not dim:
+        return False
+    return bool(uniformity > uniformity_threshold and std_norm < std_factor / math.sqrt(dim))
+
+
 @torch.no_grad()
 def collapse_report(model, subset_loader, pair_loader=None, device=None,
                     max_tokens_per_img=4, max_tokens=50000, seed=0, bf16=False):
@@ -103,7 +111,7 @@ def collapse_report(model, subset_loader, pair_loader=None, device=None,
     if len(tokens) > max_tokens:
         g = torch.Generator().manual_seed(seed + 1)
         tokens = tokens[torch.randperm(len(tokens), generator=g)[:max_tokens]]
-    out = {"n": len(pooled),
+    out = {"n": len(pooled), "dim": int(pooled.shape[1]),
            "std_norm": mean_std_normalized(pooled),
            "erank_pooled": effective_rank(pooled),
            "erank_tokens": effective_rank(tokens),

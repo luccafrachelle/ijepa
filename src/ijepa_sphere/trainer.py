@@ -52,7 +52,7 @@ from ijepa_sphere.data import (TransformDataset, collapse_subset_ids, eval_trans
 from ijepa_sphere.evaluation import evaluate
 from ijepa_sphere.jepa import IJEPA
 from ijepa_sphere.masks import make_mask_collator
-from ijepa_sphere.metrics import TwoCropDataset, collapse_report
+from ijepa_sphere.metrics import TwoCropDataset, collapse_report, is_collapsed
 from ijepa_sphere.schedulers import build_schedules, momentum_at
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -425,7 +425,7 @@ def main(argv=None):
                   patch_size=mc.get("patch_size", 16), crop_size=crop,
                   pred_depth=mc.get("pred_depth", 6), pred_emb_dim=mc.get("pred_emb_dim", 192),
                   proj_hidden_dim=mc.get("proj_hidden_dim", 2048), proj_dim=mc.get("proj_dim", 256),
-                  reg_kwargs=mc.get("reg_kwargs")).to(device)
+                  reg_kwargs={"seed": seed, **(mc.get("reg_kwargs") or {})}).to(device)
     opt = torch.optim.AdamW(model.param_groups())
     sched, wd_sched, total_steps = build_schedules(opt, ipe, oc)
     ema_rng = tuple(oc.get("ema", [0.996, 1.0]))
@@ -585,7 +585,9 @@ def main(argv=None):
                 if k in cr:
                     writer.add_scalar(f"collapse/{k}", cr[k], ep1)
             print(f"[collapse] {cr}", flush=True)
-            if cr["erank_pooled"] <= lc.get("collapse_rank_threshold", 1.5):
+            if is_collapsed(cr["uniformity"], cr["std_norm"], cr["dim"],
+                            lc.get("collapse_uniformity_threshold", -0.2),
+                            lc.get("collapse_std_factor", 0.25)):
                 state["rank_low"] += 1
                 if state["rank_low"] == 1:
                     state["rank_low_first"] = ep1

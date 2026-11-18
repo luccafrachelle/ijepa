@@ -54,7 +54,7 @@ def fig_grid_bars(cells, figs_dir):
             s = agg.cell_summary(rs) if rs else None
             if not rs or s["linear"][0] is None:
                 st = {r["status"] for r in rs}
-                _empty(ax, "colapsa (sin métricas finales)" if "collapsed" in st else
+                _empty(ax, "colapsa (sin métricas finales)" if ("collapsed" in st or any(r["collapsed"] for r in rs)) else
                        "diverge" if "diverged" in st else "sin datos")
                 continue
             for k, (name, key) in enumerate((("lineal", "linear"), ("k-NN", "knn"))):
@@ -64,7 +64,7 @@ def fig_grid_bars(cells, figs_dir):
                 pts = [r[key] for r in rs if r[key] is not None]
                 ax.scatter([k] * len(pts), pts, color="white", edgecolor="black", s=14, zorder=3)
             ax.set_xticks([0, 1], ["lineal", "k-NN"])
-            collapsed = any(r["status"] == "collapsed" for r in rs)
+            collapsed = any(r["collapsed"] for r in rs)
             if collapsed:
                 ax.text(0.5, 0.97, "colapsa", transform=ax.transAxes, ha="center", va="top", fontsize=11,
                         color="#D55E00", weight="bold")
