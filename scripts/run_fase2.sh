@@ -9,7 +9,7 @@ PY=.venv/bin/python
 
 $PY scripts/run_queue.py queues/fase2a_lr.txt
 $PY scripts/aggregate.py sweeps
-LR=$(grep -o -- '--var LR=[^ ]*' results/sweeps.md | head -1 | cut -d= -f2)
+LR=$(grep -o -- '--var LR=[^ `]*' results/sweeps.md | head -1 | cut -d= -f2)
 [ -n "$LR" ] || { echo "no lr pick in results/sweeps.md" >&2; exit 1; }
 echo "fase2: chosen lr = $LR"
 
