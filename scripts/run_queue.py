@@ -20,6 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 import argparse  # noqa: E402
+import json  # noqa: E402
 import re  # noqa: E402
 import shlex  # noqa: E402
 import shutil  # noqa: E402
@@ -66,6 +67,27 @@ def is_done(argv, root=ROOT):
     return (root / out_dir_of(argv) / "evaluation.json").exists()
 
 
+def check_conflict(argv, root=ROOT):
+    """Compare the line's resolved config with the stored evaluation.json (trainer's own identity
+    check: seed, eval_split, source, epochs, lr, batch size, lambda, ema, reg, smoke).
+    Returns None if identical, else a message. Unresolvable lines count as conflicts."""
+    root = Path(root)
+    try:
+        sys.path.insert(0, str(ROOT / "src"))
+        from ijepa_sphere import trainer
+        cfg_path = Path(argv[0])
+        a = trainer.parse_args(["--config", str(cfg_path if cfg_path.is_absolute() else ROOT / cfg_path)]
+                               + list(argv[1:]))
+        resolved = trainer.resolve_config(a)
+        stored = json.load(open(root / out_dir_of(argv) / "evaluation.json")).get("config", {})
+        trainer.check_same_run(resolved, stored, out_dir_of(argv) / "evaluation.json")
+    except RuntimeError as e:
+        return str(e).replace("\n", " ")
+    except (SystemExit, Exception) as e:  # noqa: BLE001
+        return f"could not compare configs: {type(e).__name__}: {e}"
+    return None
+
+
 def gpu_busy():
     """List of GPU compute processes (any process is foreign: we run one job at a time)."""
     r = subprocess.run(["nvidia-smi", "--query-compute-apps=pid,process_name",
@@ -90,16 +112,23 @@ class Log:
 
 
 def run_queue(runs, root=ROOT, log=None, train_cmd=None, gpu_busy_fn=gpu_busy, free_gb_fn=free_gb,
-              poll_s=POLL_S, min_free_gb=MIN_FREE_GB, sleep=time.sleep):
-    """Run the queue. Returns dict(done=[], skipped=[], failed=[], stopped=None)."""
+              poll_s=POLL_S, min_free_gb=MIN_FREE_GB, sleep=time.sleep, conflict_fn=check_conflict):
+    """Run the queue. Returns dict(done, skipped, failed, conflict, stopped). A finished run whose
+    stored config differs from the line is reported as CONFLICT: not skipped silently, not rerun."""
     root = Path(root)
     log = log or Log(root / "logs" / "queue.log")
     train_cmd = train_cmd or [sys.executable, str(root / "scripts" / "train.py")]
-    res = {"done": [], "skipped": [], "failed": [], "stopped": None}
+    res = {"done": [], "skipped": [], "failed": [], "conflict": [], "stopped": None}
     log(f"queue start: {len(runs)} runs")
     for argv in runs:
         out = out_dir_of(argv)
         if is_done(argv, root):
+            msg = conflict_fn(argv, root)
+            if msg:
+                log(f"CONFLICT {out}: finished run has a different config than the queue line "
+                    f"(not skipped, not rerun; use another --out or delete it): {msg}")
+                res["conflict"].append(str(out))
+                continue
             log(f"SKIP {out} (evaluation.json exists)")
             res["skipped"].append(str(out))
             continue
@@ -130,7 +159,7 @@ def run_queue(runs, root=ROOT, log=None, train_cmd=None, gpu_busy_fn=gpu_busy, f
         else:
             log(f"FAILED {out} rc={rc} ({dt:.2f} h); see {out}/train.log")
             res["failed"].append(str(out))
-    log(f"queue end: done={len(res['done'])} skipped={len(res['skipped'])} failed={len(res['failed'])}")
+    log(f"queue end: done={len(res['done'])} skipped={len(res['skipped'])} failed={len(res['failed'])} conflict={len(res['conflict'])}")
     return res
 
 
@@ -147,10 +176,15 @@ def main(argv=None):
     _, runs = parse_queue(Path(args.queue_file).read_text(), ov)
     if args.dry_run:
         for r in runs:
-            print(("DONE  " if is_done(r) else "TODO  ") + " ".join(r))
+            tag = "TODO "
+            if is_done(r):
+                tag = "CONFLICT" if check_conflict(r) else "DONE "
+            print(tag + " " + " ".join(r))
         return 0
     res = run_queue(runs)
-    return 3 if res["stopped"] else (1 if res["failed"] else 0)
+    if res["conflict"]:
+        print("CONFLICTS (finished runs with a different config):", *res["conflict"], sep="\n  ", file=sys.stderr)
+    return 3 if res["stopped"] else (4 if res["conflict"] else (1 if res["failed"] else 0))
 
 
 if __name__ == "__main__":

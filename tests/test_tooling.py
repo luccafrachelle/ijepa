@@ -21,10 +21,10 @@ def _load(name):
 agg, figs, rq, bench = (_load(n) for n in ("aggregate", "figures", "run_queue", "bench_throughput"))
 
 
-def make_run(runs, name, lin, knn, status="ok", erank=50.0, epochs=3, gpu_h=1.0, cfg=None, dup=False):
+def make_run(runs, name, lin, knn, status="ok", erank=50.0, epochs=3, gpu_h=1.0, cfg=None, dup=False, split=None):
     d = runs / name
     d.mkdir(parents=True)
-    ev = {"status": status, "eval_split": "oficial", "gpu_hours": gpu_h, "epochs_completed": epochs,
+    ev = {"status": status, "eval_split": split or ("interno" if name.startswith("sweep") else "oficial"), "gpu_hours": gpu_h, "epochs_completed": epochs,
           "collapse_final": {"erank_pooled": erank, "uniformity": -2.0, "alignment": 0.3},
           "collapse_epoch": None, "config": cfg or {}}
     if lin is not None:
@@ -146,8 +146,11 @@ def test_parse_queue_vars_and_overrides():
 
 def test_shipped_queue_files_resolve():
     root = SCRIPTS.parent
-    _, sw = rq.parse_queue((root / "queues" / "fase2_sweeps.txt").read_text())
-    assert len(sw) == 9 and all("--eval-split" not in r for r in sw)
+    _, a = rq.parse_queue((root / "queues" / "fase2a_lr.txt").read_text())
+    _, b = rq.parse_queue((root / "queues" / "fase2b_lambda.txt").read_text(), {"LR": "1e-3"})
+    assert len(a) == 3 and len(b) == 6
+    assert all("--eval-split" not in r for r in a + b)
+    assert all(r[r.index("--lr") + 1] == "1e-3" for r in b)
     _, g = rq.parse_queue((root / "queues" / "fase3_grid.txt").read_text(), {"EPOCHS": "50"})
     outs = [rq.out_dir_of(r).name for r in g]
     assert len(g) == 16 and outs[:6] == [f"grid_c{i}_seed0" for i in range(1, 7)]
@@ -173,7 +176,7 @@ def test_queue_skip_fail_continue_and_logs(tmp_path):
     (tmp_path / "runs" / "c_seed0").mkdir(parents=True)
     (tmp_path / "runs" / "c_seed0" / "evaluation.json").write_text("{}")   # already done
     kw = dict(root=tmp_path, train_cmd=[sys.executable, str(tmp_path / "fake.py")],
-              gpu_busy_fn=lambda: [], free_gb_fn=lambda p: 500.0)
+              gpu_busy_fn=lambda: [], free_gb_fn=lambda p: 500.0, conflict_fn=lambda a, r: None)
     res = rq.run_queue(runs, **kw)
     assert res["done"] == ["runs/a_seed0"] and res["skipped"] == ["runs/c_seed0"]
     assert res["failed"] == ["runs/FAIL_seed0"] and res["stopped"] is None
@@ -216,3 +219,48 @@ def test_bench_decision_rule_and_tables(tmp_path):
     assert E2 == E and f"Recomendación: E = {E}" in md and "pendiente: requiere permiso" in md and "FALLÓ" in md
     # run-time sanity: 126689 imgs at 1463 img/s = 1.44 min/epoch
     assert f"{126689 / 1463 / 60:.2f}" in md
+
+
+def test_sweeps_stage_by_stage_and_exclusions(tmp_path):
+    runs, res = tmp_path / "runs", tmp_path / "results"
+    for lr, k in [(5e-4, 45), (1e-3, 42)]:
+        make_run(runs, f"sweep_lr{lr:g}_seed0", k, k, cfg={"optimization": {"lr": lr}})
+    agg.main(["sweeps", "--runs-dir", str(runs), "--results-dir", str(res)])   # after stage a only
+    md = (res / "sweeps.md").read_text()
+    assert "Elegido: lr = 0.0005" in md and "--var LR=0.0005`" in md and "--var LAMBDA" not in md
+    # official-split run (even a better one) is excluded; run without swept value is ignored
+    d = make_run(runs, "sweep_lr2e-3_seed0", 99, 99, cfg={"optimization": {"lr": 2e-3}})
+    ev = json.loads((d / "evaluation.json").read_text())
+    ev["eval_split"] = "oficial"
+    (d / "evaluation.json").write_text(json.dumps(ev))
+    make_run(runs, "sweep_lambda_c4_x_seed0", 50, 50, cfg={})
+    agg.main(["sweeps", "--runs-dir", str(runs), "--results-dir", str(res)])
+    md = (res / "sweeps.md").read_text()
+    assert "Elegido: lr = 0.0005" in md and "Excluidas" in md and "sweep_lr2e-3_seed0" in md
+    assert "Ignoradas" in md and "sweep_lambda_c4_x_seed0" in md
+
+
+def test_queue_conflict_on_changed_config(tmp_path):
+    """A finished run whose stored config differs from the (re)launched line is CONFLICT, not skipped."""
+    root = SCRIPTS.parent
+    _, lines = rq.parse_queue((root / "queues" / "fase3_grid.txt").read_text(), {"EPOCHS": "100", "LR": "5e-4"})
+    line = lines[0]                                    # grid_c1_seed0
+    trainer = sys.modules.get("ijepa_sphere.trainer") or __import__("ijepa_sphere.trainer", fromlist=["x"])
+    cfg = trainer.resolve_config(trainer.parse_args(["--config", str(root / line[0])] + line[1:]))
+    out = tmp_path / "runs" / "grid_c1_seed0"
+    out.mkdir(parents=True)
+    (out / "evaluation.json").write_text(json.dumps({"config": cfg}))
+    # same line: identical -> skipped
+    kw = dict(root=tmp_path, train_cmd=[sys.executable, "-c", "raise SystemExit(9)"],
+              gpu_busy_fn=lambda: [], free_gb_fn=lambda p: 500.0)
+    assert rq.check_conflict(line, tmp_path) is None
+    res = rq.run_queue([line], **kw)
+    assert res["skipped"] == ["runs/grid_c1_seed0"] and not res["conflict"]
+    # relaunch with other EPOCHS / LR / lambda-irrelevant seed: conflict, never skipped, never run
+    for var in ({"EPOCHS": "150", "LR": "5e-4"}, {"EPOCHS": "100", "LR": "1e-3"}):
+        _, l2 = rq.parse_queue((root / "queues" / "fase3_grid.txt").read_text(), var)
+        assert "optimization.epochs" in rq.check_conflict(l2[0], tmp_path) or "optimization.lr" in rq.check_conflict(l2[0], tmp_path)
+        res = rq.run_queue([l2[0]], **kw)
+        assert res["conflict"] == ["runs/grid_c1_seed0"] and not res["skipped"] and not res["failed"]
+    assert "CONFLICT runs/grid_c1_seed0" in (tmp_path / "logs" / "queue.log").read_text()
+    assert (out / "evaluation.json").exists() and not (out / "train.log").exists()

@@ -218,11 +218,15 @@ def grid_tables(cells):
 
 def sweep_tables(runs):
     """-> markdown for fase 2 sweeps: best lr (C1) and best lambda (C4, C6) by val_interno kNN."""
+    excluded, skipped_none = [], []
     groups = {}   # (title, param) -> [(value, knn, status, name)]
     for r in runs:
         n, ev = r["name"], r["ev"]
         met, cfg = ev.get("metrics") or {}, ev.get("config") or {}
         if "knn_top1" not in met:
+            continue
+        if ev.get("eval_split") == "oficial" or cfg.get("data", {}).get("eval_split") == "oficial":
+            excluded.append(n)   # sweeps select on val_interno only; never use the official val
             continue
         if n.startswith("sweep_lr"):
             key, val = ("lr sweep (C1)", "lr"), cfg.get("optimization", {}).get("lr")
@@ -231,6 +235,9 @@ def sweep_tables(runs):
             if not m:
                 continue
             key, val = (f"λ sweep ({m.group(1).upper()})", "λ"), cfg.get("model", {}).get("lambda_reg")
+        if val is None:
+            skipped_none.append(n)
+            continue
         groups.setdefault(key, []).append((val, met["knn_top1"] * 100, ev.get("status", "ok"), n,
                                            ev.get("eval_split")))
     L = ["# Barridos fase 2 (30 épocas, semilla 0, k-NN en val_interno)", ""]
@@ -244,11 +251,13 @@ def sweep_tables(runs):
             star = " **(mejor)**" if best and n == best[3] else ""
             L.append(f"| {v:g} | {k:.2f}{star} | {st} | {n} |")
         L.append("")
-        if any(t[4] == "oficial" for t in items):
-            L += ["ADVERTENCIA: hay corridas con eval_split=oficial; los barridos deben usar val_interno.", ""]
         if best:
             picks[title] = best[0]
             L += [f"Elegido: {param} = {best[0]:g} (k-NN {best[1]:.2f}%).", ""]
+    if excluded:
+        L += [f"Excluidas (eval_split=oficial; los barridos usan val_interno): {', '.join(excluded)}", ""]
+    if skipped_none:
+        L += [f"Ignoradas (sin valor del parámetro barrido en la config): {', '.join(skipped_none)}", ""]
     if not groups:
         L.append("Sin resultados de barridos todavía.")
     else:

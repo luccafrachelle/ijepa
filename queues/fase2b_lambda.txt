@@ -1,0 +1,10 @@
+# Fase 2b (PLAN §8): lambda sweep on C4/C6 (6 runs) with the lr chosen in fase 2a.
+# Launch: tmux new-window -n sweeps 'HF_HOME=$PWD/data/hf .venv/bin/python scripts/run_queue.py queues/fase2b_lambda.txt --var LR=<best lr from fase2a>'
+# 30 epochs (sweep configs), seed 0, eval on val_interno.
+LR=5e-4
+configs/sweep_lambda_c4_0.01.yaml --lr {LR} --out runs/sweep_lambda_c4_0.01_seed0
+configs/sweep_lambda_c4_0.05.yaml --lr {LR} --out runs/sweep_lambda_c4_0.05_seed0
+configs/sweep_lambda_c4_0.2.yaml --lr {LR} --out runs/sweep_lambda_c4_0.2_seed0
+configs/sweep_lambda_c6_0.01.yaml --lr {LR} --out runs/sweep_lambda_c6_0.01_seed0
+configs/sweep_lambda_c6_0.05.yaml --lr {LR} --out runs/sweep_lambda_c6_0.05_seed0
+configs/sweep_lambda_c6_0.2.yaml --lr {LR} --out runs/sweep_lambda_c6_0.2_seed0
