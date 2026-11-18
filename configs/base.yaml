@@ -1,0 +1,51 @@
+# Fixed I-JEPA settings for the whole grid (PLAN §5.1). Cells override model.ema / model.reg.
+seed: 0
+data:
+  source: hf                 # clane9/imagenet-100 from the HF cache (HF_HOME=data/hf)
+  root: data/imagenet100
+  val_ids: data/val_interno.txt
+  # interno: pretrain on train minus val_interno, eval (kNN + probe) on val_interno -> sweeps.
+  # oficial: pretrain on FULL train, final eval on the official val (5000)       -> final grid.
+  eval_split: interno
+  num_workers: 12
+  prefetch_factor: 4
+  num_classes: 100
+model:
+  ema: true
+  reg: none                  # none | sigreg | susreg
+  lambda_reg: 0.05           # L = L_pred + lambda * L_reg (placeholder until the lambda sweep)
+  crop_size: 224
+  patch_size: 16
+  pred_depth: 6
+  pred_emb_dim: 192
+  proj_hidden_dim: 2048
+  proj_dim: 256
+optimization:
+  epochs: 100
+  batch_size: 256
+  lr: 5.0e-4                 # placeholder until the lr sweep {2.5e-4, 5e-4, 1e-3}
+  start_lr_ratio: 0.2        # official start_lr/lr = 2e-4/1e-3
+  final_lr: 1.0e-6           # official
+  warmup_frac: 0.1           # PLAN: 10% of the epochs
+  weight_decay: 0.04         # official CosineWDSchedule 0.04 -> 0.4
+  final_weight_decay: 0.4
+  ema: [0.996, 1.0]          # official linear momentum schedule
+  ipe_scale: 1.0
+  bf16: true
+logging:
+  collapse_every: 5
+  knn_every: 10
+  collapse_subset: 10000
+  alignment_n: 2000
+  tokens_per_img: 4
+  early_stop_collapse: false
+  collapse_rank_threshold: 1.5
+  collapse_patience: 3
+  smoke_steps: 20
+  smoke_collapse_subset: 512
+eval:
+  batch_size: 256
+  knn_k: 20
+  knn_temperature: 0.07
+  linear_probe_epochs: 90
+  linear_probe_lr: 0.1       # official: SGD lr = 0.1 * batch_size / 256

@@ -1,0 +1,3 @@
+base: base.yaml
+# C6: no EMA + SUSReg
+model: {ema: false, reg: susreg}

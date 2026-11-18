@@ -1,0 +1,4 @@
+base: c1.yaml
+# lr sweep on C1 (PLAN §8 fase 2): 30 epochs, seed 0, kNN on val_interno
+data: {eval_split: interno}
+optimization: {epochs: 30, lr: 5.0e-4}

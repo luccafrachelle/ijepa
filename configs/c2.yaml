@@ -1,0 +1,4 @@
+base: base.yaml
+# C2: control (no EMA, no regularizer) -- expected to collapse; 1 seed
+model: {ema: false, reg: none}
+logging: {early_stop_collapse: true}
