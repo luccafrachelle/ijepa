@@ -1,0 +1,3 @@
+base: base.yaml
+# C1: I-JEPA reference (EMA, no regularizer)
+model: {ema: true, reg: none}

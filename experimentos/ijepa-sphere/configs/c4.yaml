@@ -1,0 +1,3 @@
+base: base.yaml
+# C4: no EMA + SIGReg
+model: {ema: false, reg: sigreg}

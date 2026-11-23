@@ -1,0 +1,3 @@
+base: base.yaml
+# C5: EMA + SUSReg (sphere, SPHERE-JEPA)
+model: {ema: true, reg: susreg}

@@ -1,0 +1,5 @@
+base: c4.yaml
+# lambda sweep (PLAN §8 fase 2): 30 epochs, seed 0, kNN on val_interno
+data: {eval_split: interno}
+model: {lambda_reg: 0.01}
+optimization: {epochs: 30}

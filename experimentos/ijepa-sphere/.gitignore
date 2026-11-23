@@ -1,0 +1,10 @@
+data/
+runs/
+.venv/
+third_party/
+__pycache__/
+*.pyc
+.superpowers/
+*.ckpt
+*.pt
+logs/

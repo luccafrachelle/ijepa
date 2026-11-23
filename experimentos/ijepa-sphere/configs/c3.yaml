@@ -1,0 +1,3 @@
+base: base.yaml
+# C3: EMA + SIGReg (Gaussian, LeJEPA)
+model: {ema: true, reg: sigreg}

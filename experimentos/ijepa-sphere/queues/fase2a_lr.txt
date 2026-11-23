@@ -1,0 +1,6 @@
+# Fase 2a (PLAN §8): lr sweep on C1 (3 runs), 30 epochs, seed 0, eval on val_interno
+# Launch: tmux new-window -n sweeps 'HF_HOME=$PWD/data/hf .venv/bin/python scripts/run_queue.py queues/fase2a_lr.txt'
+# Then: .venv/bin/python scripts/aggregate.py sweeps   (picks the lr) and use it as LR in fase2b / fase3.
+configs/sweep_lr_2.5e-4.yaml --out runs/sweep_lr2.5e-4_seed0
+configs/sweep_lr_5e-4.yaml --out runs/sweep_lr5e-4_seed0
+configs/sweep_lr_1e-3.yaml --out runs/sweep_lr1e-3_seed0

@@ -1,0 +1,28 @@
+# Fase 3 main grid (PLAN §8). FINAL numbers: eval on the official val (--eval-split oficial)
+# Launch: tmux new-window -n queue '.venv/bin/python scripts/run_queue.py queues/fase3_grid.txt --var LR=<lr> --var LAMBDA_SIGREG=<l> --var LAMBDA_SUSREG=<l>'
+# LR, LAMBDA_SIGREG, LAMBDA_SUSREG have NO defaults: launching without --var fails (unresolved placeholder).
+# One run per line: <config> [overrides] --out runs/<name>_seed<k>
+#
+# Take the values from the sweeps (results/sweeps.md, section "Para la cola de la grilla") and the
+# decision rule (results/tabla_tiempos.md). CLI --epochs / --var NAME=VALUE override EPOCHS.
+EPOCHS=100
+#
+# seed 0 of all 6 cells (C2 = 1 seed only, early-stops on collapse)
+configs/c1.yaml --seed 0 --epochs {EPOCHS} --lr {LR} --eval-split oficial --out runs/grid_c1_seed0
+configs/c2.yaml --seed 0 --epochs {EPOCHS} --lr {LR} --eval-split oficial --out runs/grid_c2_seed0
+configs/c3.yaml --seed 0 --epochs {EPOCHS} --lr {LR} --lambda {LAMBDA_SIGREG} --eval-split oficial --out runs/grid_c3_seed0
+configs/c4.yaml --seed 0 --epochs {EPOCHS} --lr {LR} --lambda {LAMBDA_SIGREG} --eval-split oficial --out runs/grid_c4_seed0
+configs/c5.yaml --seed 0 --epochs {EPOCHS} --lr {LR} --lambda {LAMBDA_SUSREG} --eval-split oficial --out runs/grid_c5_seed0
+configs/c6.yaml --seed 0 --epochs {EPOCHS} --lr {LR} --lambda {LAMBDA_SUSREG} --eval-split oficial --out runs/grid_c6_seed0
+# seed 1 (no C2)
+configs/c1.yaml --seed 1 --epochs {EPOCHS} --lr {LR} --eval-split oficial --out runs/grid_c1_seed1
+configs/c3.yaml --seed 1 --epochs {EPOCHS} --lr {LR} --lambda {LAMBDA_SIGREG} --eval-split oficial --out runs/grid_c3_seed1
+configs/c4.yaml --seed 1 --epochs {EPOCHS} --lr {LR} --lambda {LAMBDA_SIGREG} --eval-split oficial --out runs/grid_c4_seed1
+configs/c5.yaml --seed 1 --epochs {EPOCHS} --lr {LR} --lambda {LAMBDA_SUSREG} --eval-split oficial --out runs/grid_c5_seed1
+configs/c6.yaml --seed 1 --epochs {EPOCHS} --lr {LR} --lambda {LAMBDA_SUSREG} --eval-split oficial --out runs/grid_c6_seed1
+# seed 2 (no C2)
+configs/c1.yaml --seed 2 --epochs {EPOCHS} --lr {LR} --eval-split oficial --out runs/grid_c1_seed2
+configs/c3.yaml --seed 2 --epochs {EPOCHS} --lr {LR} --lambda {LAMBDA_SIGREG} --eval-split oficial --out runs/grid_c3_seed2
+configs/c4.yaml --seed 2 --epochs {EPOCHS} --lr {LR} --lambda {LAMBDA_SIGREG} --eval-split oficial --out runs/grid_c4_seed2
+configs/c5.yaml --seed 2 --epochs {EPOCHS} --lr {LR} --lambda {LAMBDA_SUSREG} --eval-split oficial --out runs/grid_c5_seed2
+configs/c6.yaml --seed 2 --epochs {EPOCHS} --lr {LR} --lambda {LAMBDA_SUSREG} --eval-split oficial --out runs/grid_c6_seed2
