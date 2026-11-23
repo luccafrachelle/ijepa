@@ -1,0 +1,54 @@
+seed: 2
+data:
+  source: hf
+  root: data/imagenet100
+  val_ids: data/val_interno.txt
+  eval_split: oficial
+  num_workers: 12
+  prefetch_factor: 4
+  num_classes: 100
+  val_interno_sha256: a045d8fe7da1634c9ceeaafef8dfa00fae6668488c646b577f76a0c1440ab640
+model:
+  ema: false
+  reg: susreg
+  lambda_reg: 0.05
+  crop_size: 224
+  patch_size: 16
+  pred_depth: 6
+  pred_emb_dim: 192
+  proj_hidden_dim: 2048
+  proj_dim: 256
+optimization:
+  epochs: 100
+  batch_size: 256
+  lr: 0.00025
+  start_lr_ratio: 0.2
+  final_lr: 1.0e-06
+  warmup_frac: 0.1
+  weight_decay: 0.04
+  final_weight_decay: 0.4
+  ema:
+  - 0.996
+  - 1.0
+  ipe_scale: 1.0
+  bf16: true
+logging:
+  collapse_every: 5
+  knn_every: 10
+  collapse_subset: 10000
+  alignment_n: 2000
+  tokens_per_img: 4
+  early_stop_collapse: false
+  collapse_uniformity_threshold: -0.2
+  collapse_std_factor: 0.25
+  collapse_patience: 3
+  smoke_steps: 20
+  smoke_collapse_subset: 512
+eval:
+  batch_size: 256
+  knn_k: 20
+  knn_temperature: 0.07
+  linear_probe_epochs: 90
+  linear_probe_lr: 0.1
+name: c6
+out: runs/grid_c6_seed2

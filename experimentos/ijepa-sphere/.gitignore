@@ -1,10 +1,13 @@
-data/
-runs/
+# Pesados o regenerables: no se versionan
+data/*
+!data/manifest.json
+!data/val_interno.txt
 .venv/
-third_party/
 __pycache__/
 *.pyc
-.superpowers/
+.pytest_cache/
 *.ckpt
 *.pt
-logs/
+*.pth
+
+# third_party/ son submódulos (ver .gitmodules en la raíz del repo)

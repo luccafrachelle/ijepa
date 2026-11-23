@@ -1,0 +1,8 @@
+# 2026-11-18T04:10:25 /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c4_0.01.yaml --lr 0.00025` --out runs/sweep_lambda_c4_0.01_seed0
+usage: train.py [-h] --config CONFIG [--seed SEED] [--epochs EPOCHS] [--lr LR]
+                [--lambda LAMBDA_REG] [--ema {on,off}]
+                [--reg {none,sigreg,susreg}] [--out OUT]
+                [--eval-split {interno,oficial}] [--workers WORKERS]
+                [--max-steps MAX_STEPS] [--smoke]
+                [--stop-after-epoch STOP_AFTER_EPOCH] [--set KEY.PATH=VALUE]
+train.py: error: argument --lr: invalid float value: '0.00025`'

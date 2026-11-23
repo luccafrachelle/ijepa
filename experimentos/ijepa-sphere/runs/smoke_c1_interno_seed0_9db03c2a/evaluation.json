@@ -1,0 +1,115 @@
+{
+  "status": "ok",
+  "run": "c1",
+  "out": "runs/smoke_c1_interno_seed0_9db03c2a",
+  "smoke": true,
+  "config": {
+    "seed": 0,
+    "data": {
+      "source": "hf",
+      "root": "data/imagenet100",
+      "val_ids": "data/val_interno.txt",
+      "eval_split": "interno",
+      "num_workers": 12,
+      "prefetch_factor": 4,
+      "num_classes": 100,
+      "val_interno_sha256": "a045d8fe7da1634c9ceeaafef8dfa00fae6668488c646b577f76a0c1440ab640"
+    },
+    "model": {
+      "ema": true,
+      "reg": "none",
+      "lambda_reg": 0.05,
+      "crop_size": 224,
+      "patch_size": 16,
+      "pred_depth": 6,
+      "pred_emb_dim": 192,
+      "proj_hidden_dim": 2048,
+      "proj_dim": 256
+    },
+    "optimization": {
+      "epochs": 1,
+      "batch_size": 256,
+      "lr": 0.0005,
+      "start_lr_ratio": 0.2,
+      "final_lr": 1e-06,
+      "warmup_frac": 0.1,
+      "weight_decay": 0.04,
+      "final_weight_decay": 0.4,
+      "ema": [
+        0.996,
+        1.0
+      ],
+      "ipe_scale": 1.0,
+      "bf16": true
+    },
+    "logging": {
+      "collapse_every": 5,
+      "knn_every": 10,
+      "collapse_subset": 10000,
+      "alignment_n": 2000,
+      "tokens_per_img": 4,
+      "early_stop_collapse": false,
+      "collapse_rank_threshold": 1.5,
+      "collapse_patience": 3,
+      "smoke_steps": 20,
+      "smoke_collapse_subset": 512
+    },
+    "eval": {
+      "batch_size": 256,
+      "knn_k": 20,
+      "knn_temperature": 0.07,
+      "linear_probe_epochs": 90,
+      "linear_probe_lr": 0.1
+    },
+    "name": "c1",
+    "smoke": true,
+    "out": "runs/smoke_c1_interno_seed0_9db03c2a"
+  },
+  "git_commit": "4d8b5efc25066d9ad96e90b2cdc313212d2d3c06",
+  "git_dirty": true,
+  "seed": 0,
+  "eval_split": "interno",
+  "eval_sets": {
+    "bank": "train_minus_val_interno",
+    "query": "val_interno"
+  },
+  "metrics": {
+    "n_train": 512,
+    "n_eval": 512,
+    "knn_top1": 0.25390625,
+    "linear_top1": 0.25390625,
+    "protocol": {
+      "features": "avg-pool target encoder tokens",
+      "knn_k": 20,
+      "knn_temperature": 0.07,
+      "linear_probe_epochs": 1,
+      "linear_probe_lr_effective": 0.1
+    }
+  },
+  "collapse_final": {
+    "epoch": 1,
+    "step": 20,
+    "n": 512,
+    "std_norm": 0.03517099469900131,
+    "erank_pooled": 11.843666076660156,
+    "erank_tokens": 66.61811065673828,
+    "uniformity": -0.7914667129516602,
+    "alignment": 0.05447767674922943
+  },
+  "collapse_epoch": null,
+  "stopped_early": false,
+  "epochs_completed": 1,
+  "global_step": 20,
+  "best_quick_knn": {
+    "epoch": 1,
+    "knn_top1": 0.25390625
+  },
+  "train_hours": 0.002232284148534139,
+  "eval_hours": 0.00200766921043396,
+  "gpu_hours": 0.004239953358968099,
+  "throughput_img_per_s": 637.1152270897702,
+  "peak_mem_gb": 5.482840061187744,
+  "torch": "2.11.0+cu128",
+  "gpu": "NVIDIA GeForce RTX 5090 Laptop GPU",
+  "finished_at": "2026-11-18T01:12:29"
+}

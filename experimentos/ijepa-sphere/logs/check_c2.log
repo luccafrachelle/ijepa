@@ -1,0 +1,14 @@
+Using the latest cached version of the dataset since clane9/imagenet-100 couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at data/imagenet100/clane9___imagenet-100/default/0.0.0/0519dc2f402a3a18c6e57f7913db059215eee25b (last modified on Wed Nov 18 00:49:28 2026).
+[train] epoch=1 step=445 loss=0.1481 loss_pred=0.1481 loss_reg=0 lr=0.0004849 wd=0.07438 momentum=0.9968 grad_norm=0.124 img_per_s=1389 epoch_time=82.03 peak_mem_gb=5.709
+[collapse] {'epoch': 1, 'step': 445, 'n': 10000, 'std_norm': 0.018634764477610588, 'erank_pooled': 3.451786518096924, 'erank_tokens': 7.032734394073486, 'uniformity': -0.3297281265258789, 'alignment': 0.01903669349849224}
+[train] epoch=2 step=890 loss=0.05847 loss_pred=0.05847 loss_reg=0 lr=0.0003751 wd=0.1644 momentum=0.9976 grad_norm=0.04269 img_per_s=1413 epoch_time=80.62 peak_mem_gb=5.828
+[collapse] {'epoch': 2, 'step': 890, 'n': 10000, 'std_norm': 0.01103031262755394, 'erank_pooled': 3.522305727005005, 'erank_tokens': 8.028139114379883, 'uniformity': -0.13046932220458984, 'alignment': 0.005678942427039146}
+[train] epoch=3 step=1335 loss=0.03883 loss_pred=0.03883 loss_reg=0 lr=0.0002071 wd=0.2756 momentum=0.9984 grad_norm=0.03108 img_per_s=1416 epoch_time=80.47 peak_mem_gb=5.709
+[collapse] {'epoch': 3, 'step': 1335, 'n': 10000, 'std_norm': 0.011236422695219517, 'erank_pooled': 3.872990369796753, 'erank_tokens': 9.239899635314941, 'uniformity': -0.12827491760253906, 'alignment': 0.005493755452334881}
+[train] epoch=4 step=1780 loss=0.03409 loss_pred=0.03409 loss_reg=0 lr=5.934e-05 wd=0.3656 momentum=0.9992 grad_norm=0.02614 img_per_s=1417 epoch_time=80.4 peak_mem_gb=5.581
+[collapse] {'epoch': 4, 'step': 1780, 'n': 10000, 'std_norm': 0.010899466462433338, 'erank_pooled': 3.9546825885772705, 'erank_tokens': 9.681833267211914, 'uniformity': -0.11815261840820312, 'alignment': 0.0050494736060500145}
+[train] epoch=5 step=2225 loss=0.03042 loss_pred=0.03042 loss_reg=0 lr=1e-06 wd=0.4 momentum=1 grad_norm=0.01817 img_per_s=1419 epoch_time=80.26 peak_mem_gb=5.709
+[collapse] {'epoch': 5, 'step': 2225, 'n': 10000, 'std_norm': 0.01047248113900423, 'erank_pooled': 3.8743391036987305, 'erank_tokens': 9.570304870605469, 'uniformity': -0.10908889770507812, 'alignment': 0.0046317195519804955}
+[eval] status=ok {"n_train": 114020, "n_eval": 12669, "knn_top1": 0.06235693424895414, "linear_top1": 0.07127634383139948, "protocol": {"features": "avg-pool target encoder tokens", "knn_k": 20, "knn_temperature": 0.07, "linear_probe_epochs": 90, "linear_probe_lr_effective": 0.1}} gpu_hours=0.142
+EXIT 0

@@ -1,0 +1,40 @@
+2026-11-21T19:35:29+00:00 START avg imagenet100_tinyvit_spherejepa
+Seed set to 0
+[official_eval_pool] global_pool=avg num_prefix_tokens=1
+Using the latest cached version of the dataset since clane9/imagenet-100 couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /home/lfrachelle/dlviz/ijepa-sphere/data/imagenet100/clane9___imagenet-100/default/0.0.0/0519dc2f402a3a18c6e57f7913db059215eee25b (last modified on Wed Nov 18 00:49:28 2026).
+Using the latest cached version of the dataset since clane9/imagenet-100 couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /home/lfrachelle/dlviz/ijepa-sphere/data/imagenet100/clane9___imagenet-100/default/0.0.0/0519dc2f402a3a18c6e57f7913db059215eee25b (last modified on Wed Nov 18 00:49:28 2026).
+val/knn_top1: 0.5320
+val/linear_top1: 0.6376
+2026-11-21T19:38:09+00:00 DONE avg imagenet100_tinyvit_spherejepa
+2026-11-21T19:38:09+00:00 START avg imagenet100_tinyvit_lejepa
+Seed set to 0
+[official_eval_pool] global_pool=avg num_prefix_tokens=1
+Using the latest cached version of the dataset since clane9/imagenet-100 couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /home/lfrachelle/dlviz/ijepa-sphere/data/imagenet100/clane9___imagenet-100/default/0.0.0/0519dc2f402a3a18c6e57f7913db059215eee25b (last modified on Wed Nov 18 00:49:28 2026).
+Using the latest cached version of the dataset since clane9/imagenet-100 couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /home/lfrachelle/dlviz/ijepa-sphere/data/imagenet100/clane9___imagenet-100/default/0.0.0/0519dc2f402a3a18c6e57f7913db059215eee25b (last modified on Wed Nov 18 00:49:28 2026).
+val/knn_top1: 0.4944
+val/linear_top1: 0.5842
+2026-11-21T19:40:48+00:00 DONE avg imagenet100_tinyvit_lejepa
+2026-11-21T19:40:48+00:00 START token imagenet100_tinyvit_spherejepa
+Seed set to 0
+[official_eval_pool] global_pool=token num_prefix_tokens=1
+Using the latest cached version of the dataset since clane9/imagenet-100 couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /home/lfrachelle/dlviz/ijepa-sphere/data/imagenet100/clane9___imagenet-100/default/0.0.0/0519dc2f402a3a18c6e57f7913db059215eee25b (last modified on Wed Nov 18 00:49:28 2026).
+Using the latest cached version of the dataset since clane9/imagenet-100 couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /home/lfrachelle/dlviz/ijepa-sphere/data/imagenet100/clane9___imagenet-100/default/0.0.0/0519dc2f402a3a18c6e57f7913db059215eee25b (last modified on Wed Nov 18 00:49:28 2026).
+val/knn_top1: 0.7060
+val/linear_top1: 0.7276
+2026-11-21T19:43:33+00:00 DONE token imagenet100_tinyvit_spherejepa
+2026-11-21T19:43:33+00:00 START token imagenet100_tinyvit_lejepa
+Seed set to 0
+[official_eval_pool] global_pool=token num_prefix_tokens=1
+Using the latest cached version of the dataset since clane9/imagenet-100 couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /home/lfrachelle/dlviz/ijepa-sphere/data/imagenet100/clane9___imagenet-100/default/0.0.0/0519dc2f402a3a18c6e57f7913db059215eee25b (last modified on Wed Nov 18 00:49:28 2026).
+Using the latest cached version of the dataset since clane9/imagenet-100 couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /home/lfrachelle/dlviz/ijepa-sphere/data/imagenet100/clane9___imagenet-100/default/0.0.0/0519dc2f402a3a18c6e57f7913db059215eee25b (last modified on Wed Nov 18 00:49:28 2026).
+val/knn_top1: 0.6346
+val/linear_top1: 0.6706
+2026-11-21T19:46:10+00:00 DONE token imagenet100_tinyvit_lejepa

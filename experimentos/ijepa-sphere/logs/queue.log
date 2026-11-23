@@ -1,0 +1,75 @@
+2026-11-18T01:57:22 queue start: 3 runs
+2026-11-18T01:57:22 START runs/sweep_lr2.5e-4_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lr_2.5e-4.yaml --out runs/sweep_lr2.5e-4_seed0
+2026-11-18T02:41:36 DONE runs/sweep_lr2.5e-4_seed0 (0.74 h)
+2026-11-18T02:41:36 START runs/sweep_lr5e-4_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lr_5e-4.yaml --out runs/sweep_lr5e-4_seed0
+2026-11-18T03:26:00 DONE runs/sweep_lr5e-4_seed0 (0.74 h)
+2026-11-18T03:26:00 START runs/sweep_lr1e-3_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lr_1e-3.yaml --out runs/sweep_lr1e-3_seed0
+2026-11-18T04:10:24 DONE runs/sweep_lr1e-3_seed0 (0.74 h)
+2026-11-18T04:10:24 queue end: done=3 skipped=0 failed=0 conflict=0
+2026-11-18T04:10:25 queue start: 6 runs
+2026-11-18T04:10:25 START runs/sweep_lambda_c4_0.01_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c4_0.01.yaml --lr 0.00025` --out runs/sweep_lambda_c4_0.01_seed0
+2026-11-18T04:10:26 FAILED runs/sweep_lambda_c4_0.01_seed0 rc=2 (0.00 h); see runs/sweep_lambda_c4_0.01_seed0/train.log
+2026-11-18T04:10:26 START runs/sweep_lambda_c4_0.05_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c4_0.05.yaml --lr 0.00025` --out runs/sweep_lambda_c4_0.05_seed0
+2026-11-18T04:10:27 FAILED runs/sweep_lambda_c4_0.05_seed0 rc=2 (0.00 h); see runs/sweep_lambda_c4_0.05_seed0/train.log
+2026-11-18T04:10:27 START runs/sweep_lambda_c4_0.2_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c4_0.2.yaml --lr 0.00025` --out runs/sweep_lambda_c4_0.2_seed0
+2026-11-18T04:10:29 FAILED runs/sweep_lambda_c4_0.2_seed0 rc=2 (0.00 h); see runs/sweep_lambda_c4_0.2_seed0/train.log
+2026-11-18T04:10:29 START runs/sweep_lambda_c6_0.01_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c6_0.01.yaml --lr 0.00025` --out runs/sweep_lambda_c6_0.01_seed0
+2026-11-18T04:10:30 FAILED runs/sweep_lambda_c6_0.01_seed0 rc=2 (0.00 h); see runs/sweep_lambda_c6_0.01_seed0/train.log
+2026-11-18T04:10:30 START runs/sweep_lambda_c6_0.05_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c6_0.05.yaml --lr 0.00025` --out runs/sweep_lambda_c6_0.05_seed0
+2026-11-18T04:10:31 FAILED runs/sweep_lambda_c6_0.05_seed0 rc=2 (0.00 h); see runs/sweep_lambda_c6_0.05_seed0/train.log
+2026-11-18T04:10:31 START runs/sweep_lambda_c6_0.2_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c6_0.2.yaml --lr 0.00025` --out runs/sweep_lambda_c6_0.2_seed0
+2026-11-18T04:10:33 FAILED runs/sweep_lambda_c6_0.2_seed0 rc=2 (0.00 h); see runs/sweep_lambda_c6_0.2_seed0/train.log
+2026-11-18T04:10:33 queue end: done=0 skipped=0 failed=6 conflict=0
+2026-11-18T11:34:51 queue start: 3 runs
+2026-11-18T11:34:52 SKIP runs/sweep_lr2.5e-4_seed0 (evaluation.json exists)
+2026-11-18T11:34:52 SKIP runs/sweep_lr5e-4_seed0 (evaluation.json exists)
+2026-11-18T11:34:52 SKIP runs/sweep_lr1e-3_seed0 (evaluation.json exists)
+2026-11-18T11:34:52 queue end: done=0 skipped=3 failed=0 conflict=0
+2026-11-18T11:34:53 queue start: 6 runs
+2026-11-18T11:34:53 START runs/sweep_lambda_c4_0.01_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c4_0.01.yaml --lr 0.00025 --out runs/sweep_lambda_c4_0.01_seed0
+2026-11-18T12:19:57 DONE runs/sweep_lambda_c4_0.01_seed0 (0.75 h)
+2026-11-18T12:19:57 START runs/sweep_lambda_c4_0.05_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c4_0.05.yaml --lr 0.00025 --out runs/sweep_lambda_c4_0.05_seed0
+2026-11-18T13:05:01 DONE runs/sweep_lambda_c4_0.05_seed0 (0.75 h)
+2026-11-18T13:05:01 START runs/sweep_lambda_c4_0.2_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c4_0.2.yaml --lr 0.00025 --out runs/sweep_lambda_c4_0.2_seed0
+2026-11-18T13:50:00 DONE runs/sweep_lambda_c4_0.2_seed0 (0.75 h)
+2026-11-18T13:50:00 START runs/sweep_lambda_c6_0.01_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c6_0.01.yaml --lr 0.00025 --out runs/sweep_lambda_c6_0.01_seed0
+2026-11-18T14:36:28 DONE runs/sweep_lambda_c6_0.01_seed0 (0.77 h)
+2026-11-18T14:36:28 START runs/sweep_lambda_c6_0.05_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c6_0.05.yaml --lr 0.00025 --out runs/sweep_lambda_c6_0.05_seed0
+2026-11-18T15:22:51 DONE runs/sweep_lambda_c6_0.05_seed0 (0.77 h)
+2026-11-18T15:22:51 START runs/sweep_lambda_c6_0.2_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c6_0.2.yaml --lr 0.00025 --out runs/sweep_lambda_c6_0.2_seed0
+2026-11-18T16:09:15 DONE runs/sweep_lambda_c6_0.2_seed0 (0.77 h)
+2026-11-18T16:09:15 queue end: done=6 skipped=0 failed=0 conflict=0
+2026-11-20T01:08:42 queue start: 16 runs
+2026-11-20T01:08:42 START runs/grid_c1_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c1.yaml --seed 0 --epochs 100 --lr 0.00025 --eval-split oficial --out runs/grid_c1_seed0
+2026-11-20T03:34:10 DONE runs/grid_c1_seed0 (2.42 h)
+2026-11-20T03:34:11 START runs/grid_c2_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c2.yaml --seed 0 --epochs 100 --lr 0.00025 --eval-split oficial --out runs/grid_c2_seed0
+2026-11-20T05:58:54 DONE runs/grid_c2_seed0 (2.41 h)
+2026-11-20T05:58:54 START runs/grid_c3_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c3.yaml --seed 0 --epochs 100 --lr 0.00025 --lambda 0.05 --eval-split oficial --out runs/grid_c3_seed0
+2026-11-20T08:26:45 DONE runs/grid_c3_seed0 (2.46 h)
+2026-11-20T08:26:45 START runs/grid_c4_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c4.yaml --seed 0 --epochs 100 --lr 0.00025 --lambda 0.05 --eval-split oficial --out runs/grid_c4_seed0
+2026-11-20T10:54:06 DONE runs/grid_c4_seed0 (2.46 h)
+2026-11-20T10:54:06 START runs/grid_c5_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c5.yaml --seed 0 --epochs 100 --lr 0.00025 --lambda 0.05 --eval-split oficial --out runs/grid_c5_seed0
+2026-11-20T13:25:46 DONE runs/grid_c5_seed0 (2.53 h)
+2026-11-20T13:25:46 START runs/grid_c6_seed0: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c6.yaml --seed 0 --epochs 100 --lr 0.00025 --lambda 0.05 --eval-split oficial --out runs/grid_c6_seed0
+2026-11-20T15:56:56 DONE runs/grid_c6_seed0 (2.52 h)
+2026-11-20T15:56:56 START runs/grid_c1_seed1: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c1.yaml --seed 1 --epochs 100 --lr 0.00025 --eval-split oficial --out runs/grid_c1_seed1
+2026-11-20T18:22:18 DONE runs/grid_c1_seed1 (2.42 h)
+2026-11-20T18:22:18 START runs/grid_c3_seed1: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c3.yaml --seed 1 --epochs 100 --lr 0.00025 --lambda 0.05 --eval-split oficial --out runs/grid_c3_seed1
+2026-11-20T20:50:07 DONE runs/grid_c3_seed1 (2.46 h)
+2026-11-20T20:50:07 START runs/grid_c4_seed1: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c4.yaml --seed 1 --epochs 100 --lr 0.00025 --lambda 0.05 --eval-split oficial --out runs/grid_c4_seed1
+2026-11-20T23:17:30 DONE runs/grid_c4_seed1 (2.46 h)
+2026-11-20T23:17:30 START runs/grid_c5_seed1: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c5.yaml --seed 1 --epochs 100 --lr 0.00025 --lambda 0.05 --eval-split oficial --out runs/grid_c5_seed1
+2026-11-21T01:49:07 DONE runs/grid_c5_seed1 (2.53 h)
+2026-11-21T01:49:07 START runs/grid_c6_seed1: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c6.yaml --seed 1 --epochs 100 --lr 0.00025 --lambda 0.05 --eval-split oficial --out runs/grid_c6_seed1
+2026-11-21T04:20:19 DONE runs/grid_c6_seed1 (2.52 h)
+2026-11-21T04:20:19 START runs/grid_c1_seed2: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c1.yaml --seed 2 --epochs 100 --lr 0.00025 --eval-split oficial --out runs/grid_c1_seed2
+2026-11-21T06:45:51 DONE runs/grid_c1_seed2 (2.43 h)
+2026-11-21T06:45:51 START runs/grid_c3_seed2: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c3.yaml --seed 2 --epochs 100 --lr 0.00025 --lambda 0.05 --eval-split oficial --out runs/grid_c3_seed2
+2026-11-21T09:13:46 DONE runs/grid_c3_seed2 (2.47 h)
+2026-11-21T09:13:46 START runs/grid_c4_seed2: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c4.yaml --seed 2 --epochs 100 --lr 0.00025 --lambda 0.05 --eval-split oficial --out runs/grid_c4_seed2
+2026-11-21T11:41:05 DONE runs/grid_c4_seed2 (2.46 h)
+2026-11-21T11:41:05 START runs/grid_c5_seed2: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c5.yaml --seed 2 --epochs 100 --lr 0.00025 --lambda 0.05 --eval-split oficial --out runs/grid_c5_seed2
+2026-11-21T14:12:54 DONE runs/grid_c5_seed2 (2.53 h)
+2026-11-21T14:12:54 START runs/grid_c6_seed2: /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/c6.yaml --seed 2 --epochs 100 --lr 0.00025 --lambda 0.05 --eval-split oficial --out runs/grid_c6_seed2
+2026-11-21T16:44:02 DONE runs/grid_c6_seed2 (2.52 h)
+2026-11-21T16:44:02 queue end: done=16 skipped=0 failed=0 conflict=0

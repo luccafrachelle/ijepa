@@ -1,0 +1,2 @@
+epoch,step,knn_top1,n_train,n_eval
+1,20,0.25390625,512,512

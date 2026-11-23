@@ -1,0 +1,42 @@
+# 2026-11-18T14:36:28 /home/lfrachelle/dlviz/ijepa-sphere/.venv/bin/python /home/lfrachelle/dlviz/ijepa-sphere/scripts/train.py --config configs/sweep_lambda_c6_0.05.yaml --lr 0.00025 --out runs/sweep_lambda_c6_0.05_seed0
+Using the latest cached version of the dataset since clane9/imagenet-100 couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at data/imagenet100/clane9___imagenet-100/default/0.0.0/0519dc2f402a3a18c6e57f7913db059215eee25b (last modified on Wed Nov 18 00:49:28 2026).
+[train] epoch=1 step=445 loss=0.3029 loss_pred=0.2049 loss_reg=1.96 lr=0.0001167 wd=0.04099 momentum=0.9961 grad_norm=2.115 img_per_s=1296 epoch_time=87.88 peak_mem_gb=6.527
+[train] epoch=2 step=890 loss=0.2173 loss_pred=0.1547 loss_reg=1.252 lr=0.0001833 wd=0.04393 momentum=0.9963 grad_norm=1.567 img_per_s=1330 epoch_time=85.64 peak_mem_gb=6.646
+[train] epoch=3 step=1335 loss=0.2429 loss_pred=0.1803 loss_reg=1.252 lr=0.00025 wd=0.04881 momentum=0.9964 grad_norm=1.299 img_per_s=1339 epoch_time=85.09 peak_mem_gb=6.527
+[train] epoch=4 step=1780 loss=0.247 loss_pred=0.1875 loss_reg=1.192 lr=0.0002492 wd=0.05556 momentum=0.9965 grad_norm=1.038 img_per_s=1344 epoch_time=84.77 peak_mem_gb=6.468
+[train] epoch=5 step=2225 loss=0.2534 loss_pred=0.1975 loss_reg=1.116 lr=0.0002466 wd=0.06412 momentum=0.9967 grad_norm=0.8737 img_per_s=1338 epoch_time=85.13 peak_mem_gb=6.527
+[collapse] {'epoch': 5, 'step': 2225, 'n': 10000, 'dim': 192, 'std_norm': 0.043958425521850586, 'erank_pooled': 51.217899322509766, 'erank_tokens': 68.08562469482422, 'uniformity': -1.3846416473388672, 'alignment': 0.25194409489631653}
+[train] epoch=6 step=2670 loss=0.2516 loss_pred=0.1971 loss_reg=1.09 lr=0.0002425 wd=0.07438 momentum=0.9968 grad_norm=0.7855 img_per_s=1339 epoch_time=85.08 peak_mem_gb=6.528
+[train] epoch=7 step=3115 loss=0.2453 loss_pred=0.1923 loss_reg=1.06 lr=0.0002368 wd=0.08623 momentum=0.9969 grad_norm=0.7079 img_per_s=1336 epoch_time=85.29 peak_mem_gb=6.467
+[train] epoch=8 step=3560 loss=0.2546 loss_pred=0.2036 loss_reg=1.021 lr=0.0002295 wd=0.09956 momentum=0.9971 grad_norm=0.6349 img_per_s=1345 epoch_time=84.71 peak_mem_gb=6.589
+[train] epoch=9 step=4005 loss=0.2573 loss_pred=0.2067 loss_reg=1.011 lr=0.0002209 wd=0.1142 momentum=0.9972 grad_norm=0.6051 img_per_s=1341 epoch_time=84.98 peak_mem_gb=6.591
+[train] epoch=10 step=4450 loss=0.2541 loss_pred=0.2058 loss_reg=0.9669 lr=0.0002109 wd=0.13 momentum=0.9973 grad_norm=0.5442 img_per_s=1337 epoch_time=85.19 peak_mem_gb=6.526
+[collapse] {'epoch': 10, 'step': 4450, 'n': 10000, 'dim': 192, 'std_norm': 0.04665367677807808, 'erank_pooled': 51.834861755371094, 'erank_tokens': 65.6801528930664, 'uniformity': -1.5753192901611328, 'alignment': 0.3011889159679413}
+[knn] {'epoch': 10, 'step': 4450, 'n_train': 114020, 'n_eval': 12669, 'knn_top1': 0.11390007103954534}
+[train] epoch=11 step=4895 loss=0.2569 loss_pred=0.2088 loss_reg=0.9617 lr=0.0001998 wd=0.1468 momentum=0.9975 grad_norm=0.5267 img_per_s=1332 epoch_time=85.53 peak_mem_gb=6.469
+[train] epoch=12 step=5340 loss=0.2477 loss_pred=0.2013 loss_reg=0.9279 lr=0.0001877 wd=0.1644 momentum=0.9976 grad_norm=0.4831 img_per_s=1334 epoch_time=85.43 peak_mem_gb=6.41
+[train] epoch=13 step=5785 loss=0.2479 loss_pred=0.2021 loss_reg=0.9157 lr=0.0001748 wd=0.1826 momentum=0.9977 grad_norm=0.463 img_per_s=1339 epoch_time=85.08 peak_mem_gb=6.527
+[train] epoch=14 step=6230 loss=0.2597 loss_pred=0.2145 loss_reg=0.9045 lr=0.0001612 wd=0.2012 momentum=0.9979 grad_norm=0.4463 img_per_s=1341 epoch_time=84.97 peak_mem_gb=6.527
+[train] epoch=15 step=6675 loss=0.2668 loss_pred=0.2223 loss_reg=0.8911 lr=0.0001471 wd=0.22 momentum=0.998 grad_norm=0.426 img_per_s=1327 epoch_time=85.83 peak_mem_gb=6.588
+[collapse] {'epoch': 15, 'step': 6675, 'n': 10000, 'dim': 192, 'std_norm': 0.04666067287325859, 'erank_pooled': 50.6621208190918, 'erank_tokens': 64.66946411132812, 'uniformity': -1.5681791305541992, 'alignment': 0.23963488638401031}
+[train] epoch=16 step=7120 loss=0.2649 loss_pred=0.2211 loss_reg=0.8754 lr=0.0001327 wd=0.2388 momentum=0.9981 grad_norm=0.4105 img_per_s=1344 epoch_time=84.79 peak_mem_gb=6.646
+[train] epoch=17 step=7565 loss=0.2599 loss_pred=0.2167 loss_reg=0.8644 lr=0.0001183 wd=0.2574 momentum=0.9983 grad_norm=0.3959 img_per_s=1340 epoch_time=85.02 peak_mem_gb=6.647
+[train] epoch=18 step=8010 loss=0.2607 loss_pred=0.2184 loss_reg=0.845 lr=0.0001039 wd=0.2756 momentum=0.9984 grad_norm=0.3777 img_per_s=1336 epoch_time=85.29 peak_mem_gb=6.589
+[train] epoch=19 step=8455 loss=0.2646 loss_pred=0.2232 loss_reg=0.8283 lr=8.979e-05 wd=0.2932 momentum=0.9985 grad_norm=0.3667 img_per_s=1341 epoch_time=84.93 peak_mem_gb=6.469
+[train] epoch=20 step=8900 loss=0.2465 loss_pred=0.2064 loss_reg=0.8027 lr=7.619e-05 wd=0.31 momentum=0.9987 grad_norm=0.3481 img_per_s=1331 epoch_time=85.59 peak_mem_gb=6.715
+[collapse] {'epoch': 20, 'step': 8900, 'n': 10000, 'dim': 192, 'std_norm': 0.04466462507843971, 'erank_pooled': 49.87616729736328, 'erank_tokens': 65.27635192871094, 'uniformity': -1.4363689422607422, 'alignment': 0.17728982865810394}
+[knn] {'epoch': 20, 'step': 8900, 'n_train': 114020, 'n_eval': 12669, 'knn_top1': 0.16133870076564844}
+[train] epoch=21 step=9345 loss=0.2353 loss_pred=0.196 loss_reg=0.7864 lr=6.325e-05 wd=0.3258 momentum=0.9988 grad_norm=0.3394 img_per_s=1329 epoch_time=85.69 peak_mem_gb=6.527
+[train] epoch=22 step=9790 loss=0.247 loss_pred=0.2087 loss_reg=0.7669 lr=5.115e-05 wd=0.3404 momentum=0.9989 grad_norm=0.3223 img_per_s=1340 epoch_time=85.01 peak_mem_gb=6.59
+[train] epoch=23 step=10235 loss=0.2401 loss_pred=0.2026 loss_reg=0.7498 lr=4.006e-05 wd=0.3538 momentum=0.9991 grad_norm=0.3117 img_per_s=1328 epoch_time=85.79 peak_mem_gb=6.467
+[train] epoch=24 step=10680 loss=0.2492 loss_pred=0.2125 loss_reg=0.7352 lr=3.013e-05 wd=0.3656 momentum=0.9992 grad_norm=0.2989 img_per_s=1332 epoch_time=85.5 peak_mem_gb=6.467
+[train] epoch=25 step=11125 loss=0.246 loss_pred=0.2101 loss_reg=0.7192 lr=2.148e-05 wd=0.3759 momentum=0.9993 grad_norm=0.2863 img_per_s=1333 epoch_time=85.47 peak_mem_gb=6.527
+[collapse] {'epoch': 25, 'step': 11125, 'n': 10000, 'dim': 192, 'std_norm': 0.05065019801259041, 'erank_pooled': 54.83230972290039, 'erank_tokens': 70.88709259033203, 'uniformity': -1.8449115753173828, 'alignment': 0.19537858664989471}
+[train] epoch=26 step=11570 loss=0.2538 loss_pred=0.2182 loss_reg=0.7126 lr=1.424e-05 wd=0.3844 momentum=0.9995 grad_norm=0.2786 img_per_s=1328 epoch_time=85.8 peak_mem_gb=6.59
+[train] epoch=27 step=12015 loss=0.2567 loss_pred=0.2219 loss_reg=0.696 lr=8.508e-06 wd=0.3912 momentum=0.9996 grad_norm=0.2676 img_per_s=1336 epoch_time=85.25 peak_mem_gb=6.646
+[train] epoch=28 step=12460 loss=0.2562 loss_pred=0.2216 loss_reg=0.6916 lr=4.356e-06 wd=0.3961 momentum=0.9997 grad_norm=0.2611 img_per_s=1335 epoch_time=85.36 peak_mem_gb=6.528
+[train] epoch=29 step=12905 loss=0.2545 loss_pred=0.2202 loss_reg=0.686 lr=1.842e-06 wd=0.399 momentum=0.9999 grad_norm=0.2562 img_per_s=1340 epoch_time=85.04 peak_mem_gb=6.525
+[train] epoch=30 step=13350 loss=0.2532 loss_pred=0.2191 loss_reg=0.6833 lr=1e-06 wd=0.4 momentum=1 grad_norm=0.2531 img_per_s=1338 epoch_time=85.15 peak_mem_gb=6.41
+[collapse] {'epoch': 30, 'step': 13350, 'n': 10000, 'dim': 192, 'std_norm': 0.05203378200531006, 'erank_pooled': 56.07587814331055, 'erank_tokens': 72.72709655761719, 'uniformity': -1.9471435546875, 'alignment': 0.19430576264858246}
+[eval] status=ok {"n_train": 114020, "n_eval": 12669, "knn_top1": 0.1843870865893125, "linear_top1": 0.2268529481411319, "protocol": {"features": "avg-pool target encoder tokens", "knn_k": 20, "knn_temperature": 0.07, "linear_probe_epochs": 90, "linear_probe_lr_effective": 0.1}} gpu_hours=0.771

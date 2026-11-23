@@ -1,0 +1,262 @@
+---
+title: "¿I-JEPA sin promedio móvil? Regularizadores de distribución (esfera y gaussiana) dentro de I-JEPA"
+subtitle: "Proyecto final — Redes Neuronales para Visión Artificial"
+author: "Lucca Frachelle"
+date: today
+lang: es
+abstract: |
+  Probamos si los regularizadores de distribución de LeJEPA (SIGReg, gaussiana) y SPHERE-JEPA (SUSReg, esfera) pueden reemplazar o complementar al EMA de I-JEPA, en una grilla 2 × 3 (EMA × regularizador) con ViT-Tiny/16 sobre ImageNet-100, 100 épocas y 3 semillas. La tubería se validó reproduciendo SPHERE-JEPA con su código oficial (72,8 / 70,6 contra 71,9 / 69,0 publicados). Sin EMA, los regularizadores evitan el colapso, pero quedan 16–22 puntos por debajo de I-JEPA; agregados a I-JEPA con EMA, le restan 15–17 puntos; y la gaussiana iguala o supera a la esfera. Los beneficios de estos regularizadores no se trasladan del marco de vistas aumentadas al marco de máscaras.
+bibliography: refs.bib
+format:
+  pdf:
+    documentclass: article
+    papersize: a4
+    fontsize: 11pt
+    geometry: [margin=2cm]
+    number-sections: true
+    colorlinks: true
+    toc: false
+    fig-pos: "H"
+    tbl-cap-location: top
+  html:
+    number-sections: true
+    toc: true
+---
+
+# Introducción
+
+Las arquitecturas predictivas de embeddings conjuntos (JEPA) aprenden representaciones prediciendo, en el espacio latente, la representación de una parte de la entrada a partir de otra. Su riesgo principal es el **colapso**: el encoder puede devolver un vector constante (o confinado a un subespacio pequeño) que hace trivial la predicción. I-JEPA [@assran2023ijepa] lo evita con una asimetría: el objetivo se calcula con un encoder que es un promedio móvil exponencial (EMA) del encoder de contexto y no recibe gradiente. Funciona bien en la práctica, pero no hay garantía teórica de que impida el colapso.
+
+Trabajos recientes reemplazan esa heurística por un regularizador explícito sobre la distribución de los embeddings. LeJEPA [@balestriero2025lejepa] empuja los embeddings hacia una gaussiana isotrópica con **SIGReg**. SPHERE-JEPA [@nicollier2026spherejepa] los normaliza y los empuja hacia la distribución uniforme en la hiperesfera con **SUSReg**. Ambos métodos trabajan con **vistas aumentadas** de la imagen, no con las **máscaras** de I-JEPA.
+
+Este trabajo mete esos dos regularizadores dentro de I-JEPA (máscaras multi-bloque, predictor y sin aumentos fuertes) y cruza la presencia del EMA con el tipo de regularizador en una grilla 2 × 3. Las preguntas son tres:
+
+- **P1.** ¿Puede el regularizador reemplazar al EMA?
+- **P2.** ¿Importa la geometría del objetivo (esfera frente a gaussiana)?
+- **P3.** ¿El EMA y el regularizador se suman?
+
+La escala (ViT-Tiny/16 sobre ImageNet-100 a 224 px) es la misma de la tabla 7 de SPHERE-JEPA. Eso permite calibrar la tubería de datos y evaluación contra un número publicado antes de correr la grilla.
+
+# Antecedentes
+
+## I-JEPA
+
+A partir de una imagen se muestrean 4 bloques objetivo (escala 0,15–0,2 de la imagen, aspecto 0,75–1,5) y un bloque de contexto grande (escala 0,85–1,0) al que se le quitan los parches de los objetivos. El encoder de contexto procesa sólo los parches visibles. Un predictor (un ViT angosto) recibe esos tokens más tokens de máscara posicionados y predice la representación de cada bloque objetivo. Los objetivos salen del encoder objetivo aplicado a la imagen completa, normalizados con *layer norm*, y la pérdida es *smooth L1* entre predicción y objetivo. El encoder objetivo se actualiza como EMA del de contexto, con un momento que sube linealmente de 0,996 a 1.
+
+## SIGReg y SUSReg
+
+Ambos regularizadores comparan la distribución empírica de los embeddings de un batch contra una distribución de referencia proyectando sobre direcciones aleatorias. Para cada dirección comparan la función característica empírica de la proyección contra la teórica con el estadístico de Epps–Pulley, integrado en una grilla de frecuencias $t \in [-t_{\max}, t_{\max}]$.
+
+- **SIGReg** usa como referencia $\mathcal{N}(0, I)$, cuya función característica en una dirección es $e^{-t^2/2}$. Trabaja sobre los embeddings sin normalizar.
+- **SUSReg** normaliza los embeddings, los reescala por $\sqrt{d}$ y compara contra la distribución exacta de una coordenada de un vector uniforme en $S^{d-1}$, que tiene función característica de tipo Bessel. En el código oficial, si $d > 256$ se reemplaza por la aproximación gaussiana. Por eso en este trabajo la cabeza de proyección tiene $d = 256$: así la comparación esfera–gaussiana no se diluye.
+
+Un dato motiva la pregunta P1. En la tabla 3 de SPHERE-JEPA (ViT-B, ImageNet-1K, 100 épocas), quitar el EMA cuesta unos 8–9 puntos de probe lineal aun con el regularizador presente. Ahí el regularizador ya impide el colapso, así que esos puntos vienen de otra cosa, probablemente de un objetivo más estable. En I-JEPA el EMA cumple los dos papeles a la vez, y la grilla de este trabajo permite separarlos.
+
+# Método
+
+## La grilla
+
+: Celdas del experimento. Todo lo demás es idéntico entre celdas. {#tbl-grilla}
+
+|                     | **con EMA**                | **sin EMA**                     |
+|---------------------|----------------------------|---------------------------------|
+| sin regularizador   | **C1** I-JEPA (referencia) | **C2** control: debería colapsar |
+| SIGReg (gaussiana)  | **C3**                     | **C4**                          |
+| SUSReg (esfera)     | **C5**                     | **C6**                          |
+
+- **Sin EMA**: el encoder objetivo *es* el encoder de contexto (pesos compartidos). Se aplica a la imagen completa con corte de gradiente, lo que equivale a un momento $m = 0$.
+- **Dónde va el regularizador**: una cabeza de proyección $h$ (MLP 192 → 2048 → 256, como en LeJEPA y SPHERE-JEPA) se aplica al **promedio de los tokens del encoder de contexto** sobre los parches visibles. El regularizador actúa sobre $h(\cdot)$ del batch. Tiene que ir en la rama con gradiente porque, con EMA, el encoder objetivo no se entrena.
+- **Pérdida**: $L = L_\text{pred} + \lambda\, L_\text{reg}$, con $L_\text{pred}$ igual a la de I-JEPA en todas las celdas. Los papers usan $(1-\lambda)L_\text{inv} + \lambda L_\text{reg}$; con $\lambda$ chico la diferencia es despreciable. SIGReg y SUSReg se copiaron sin cambios del repositorio oficial de SPHERE-JEPA, incluido el factor de escala por tamaño de batch.
+
+Las preguntas se leen en la grilla así: P1 compara C4 y C6 contra C1, P2 compara C6 contra C4 y C5 contra C3, y P3 compara C3 y C5 contra C1. C2 es el control: si no colapsa, la grilla pierde sentido.
+
+## Configuración común
+
+: Hiperparámetros fijos en toda la grilla. {#tbl-config}
+
+| Parámetro | Valor |
+|---|---|
+| Encoder | ViT-Tiny/16 (dim 192, 12 capas, 3 cabezas), sin token CLS, 224 px (196 parches) |
+| Predictor | ViT de profundidad 6 y ancho 192 |
+| Aumentos | RandomResizedCrop (escala 0,3–1,0) + flip horizontal |
+| Máscaras | 4 bloques objetivo (0,15–0,2; aspecto 0,75–1,5); contexto (0,85–1,0; aspecto 1) |
+| Optimización | AdamW, batch 256, warmup 10 % de las épocas, coseno; wd 0,04 → 0,4 |
+| lr pico | $2{,}5\times10^{-4}$ (barrido, @sec-barridos) |
+| $\lambda$ | 0,05 para SIGReg y para SUSReg (barrido, @sec-barridos) |
+| EMA | momento 0,996 → 1,0 lineal |
+| Épocas | 100 (regla de presupuesto, @sec-costo) |
+| Precisión | bf16 autocast + TF32 |
+| Semillas | 0, 1, 2 (C2: sólo semilla 0) |
+
+## Datos
+
+ImageNet-100 (`clane9/imagenet-100` de Hugging Face, el mismo que usa el código oficial de SPHERE-JEPA): 100 clases, 126 689 imágenes de entrenamiento y 5000 de validación (50 por clase), sin redimensionar. Para elegir hiperparámetros se separó un **split de validación interno** del 10 % del entrenamiento, estratificado, con semilla fija y los ids guardados en un archivo. El val oficial se usó **sólo** para los números finales.
+
+## Evaluación
+
+Con el encoder congelado se usa el protocolo de `evaluation.py` de SPHERE-JEPA: **k-NN** ponderado con similitud coseno ($k = 20$, $T = 0{,}07$) y **probe lineal** con SGD (90 épocas, lr 0,1). Como I-JEPA no tiene token CLS, las features son el **promedio de los tokens de salida del encoder objetivo**. En la grilla, el banco del k-NN y el entrenamiento del probe usan todo el train, y las consultas son el val oficial.
+
+**Indicadores de colapso.** Cada 5 épocas, sobre un subconjunto fijo de 10 000 imágenes de train: desvío estándar medio por dimensión de los embeddings normalizados, **rango efectivo** [@roy2007erank], y **uniformidad** y **alineación** [@wang2020uniformity]. Una corrida se declara colapsada si la uniformidad supera $-0{,}2$ **y** el desvío estándar normalizado cae por debajo de $0{,}25/\sqrt{d}$.
+
+**Regla de comparación.** Cada celda se reporta como media ± desvío estándar muestral de 3 semillas. Una celda supera a otra sólo si la diferencia de medias supera 2 desvíos estándar; si no, se dice que son *no distinguibles*.
+
+# Calibración contra la tabla 7 de SPHERE-JEPA {#sec-calibracion}
+
+Antes de la grilla se corrió el código oficial de SPHERE-JEPA sin modificar (fp32, 6 vistas, token CLS) con nuestros datos. El objetivo era verificar que los datos y la evaluación reproducen el número publicado. El único agregado fue un checkpoint por época, para poder retomar una corrida interrumpida. Una corrida a 200 épocas tardó más de 15 h, así que, por la regla fijada de antemano, SPHERE-JEPA se corrió a 200 épocas y LeJEPA a 100.
+
+: Calibración, semilla 0, val oficial, top-1 (%) con token CLS (como el paper) y con avg-pool de los tokens de parche (como I-JEPA). Publicado: media ± desvío de 4 semillas a 200 épocas, con CLS. {#tbl-calib}
+
+| Método | Épocas | CLS lineal | CLS k-NN | avg lineal | avg k-NN | Publicado (lin / k-NN) |
+|---|---|---|---|---|---|---|
+| SPHERE-JEPA | 200 | 72,76 | 70,60 | 63,76 | 53,20 | 71,91 / 69,03 |
+| LeJEPA | 100 | 67,06 | 63,46 | 58,42 | 49,44 | 70,71 / 67,39 |
+
+SPHERE-JEPA queda dentro de ~1,6 puntos del valor publicado, por encima, en las dos métricas. Eso cumple el criterio de calibración (±2 puntos): los datos y el protocolo de evaluación están bien. LeJEPA corrió con la mitad de las épocas, así que no se compara en valor absoluto; sólo se verifica el orden esperado (SPHERE-JEPA $\geq$ LeJEPA en k-NN).
+
+Como pide el plan (§6), los mismos checkpoints se reevaluaron con el mismo `evaluation.py` cambiando sólo el pooling del ViT (`global_pool = avg`: promedio de los tokens de parche tras la norma final, sin el CLS). Una reevaluación con CLS reproduce exactamente los números del final del entrenamiento, lo que confirma que el envoltorio no cambia nada más. Con avg-pool los dos métodos caen mucho: 9 puntos de lineal y 17 de k-NN SPHERE-JEPA, y 9 y 14 LeJEPA. Es esperable, porque la pérdida de estos métodos se aplica sólo al token CLS y los tokens de parche nunca se entrenan directamente. El orden se mantiene (SPHERE-JEPA > LeJEPA con los dos poolings). Para comparar con I-JEPA, que no tiene CLS, la columna relevante es la de avg-pool.
+
+# Selección de hiperparámetros {#sec-barridos}
+
+Todos los barridos corrieron 30 épocas con semilla 0 y se evaluaron con k-NN sobre el **val interno**, nunca sobre el val oficial.
+
+: Barridos (k-NN top-1 en val interno, %). Cada celda sin EMA se barrió por separado. {#tbl-barridos}
+
+| Barrido | Valores | k-NN (val interno) | Elegido |
+|---|---|---|---|
+| lr (C1) | 2,5e-4 / 5e-4 / 1e-3 | **29,21** / 28,68 / 26,06 | 2,5e-4 |
+| $\lambda$ SIGReg (C4) | 0,01 / 0,05 / 0,2 | 15,98 / **17,83** / 10,69 | 0,05 |
+| $\lambda$ SUSReg (C6) | 0,01 / 0,05 / 0,2 | 16,58 / **18,44** / 7,38 | 0,05 |
+
+El lr más bajo del rango ganó. El paper usa $10^{-3}$ con batch 2048, y bajar el lr de forma proporcional al batch da un orden de magnitud similar. Para los dos regularizadores el óptimo de $\lambda$ quedó en el centro del rango, y $\lambda = 0{,}2$ degrada fuerte, sobre todo con SUSReg. Ninguna corrida del barrido cumplió el criterio de colapso.
+
+Por diseño, $\lambda$ se eligió en las celdas **sin** EMA y se reusó en las celdas con EMA (C3, C5). Esto se retoma en @sec-limitaciones.
+
+# Resultados de la grilla {#sec-resultados}
+
+Las 16 corridas terminaron sin fallos: 5 celdas × 3 semillas, más C2 con una semilla. Todas completaron las 100 épocas. Ninguna cumplió el criterio de colapso total, ni siquiera el control C2 (ver @sec-colapso).
+
+## Desempeño (val oficial)
+
+: Grilla 2 × 3: top-1 (%) sobre el val oficial, media ± desvío de 3 semillas (C2: 1 semilla). {#tbl-resultados}
+
+| Celda | EMA | Regularizador | Lineal | k-NN |
+|---|---|---|---|---|
+| C1 | sí | — | **43,40 ± 0,22** | **38,05 ± 0,87** |
+| C2 | no | — | 19,44 | 14,70 |
+| C3 | sí | SIGReg | 28,37 ± 0,70 | 23,18 ± 1,00 |
+| C4 | no | SIGReg | 25,03 ± 0,33 | 21,81 ± 0,24 |
+| C5 | sí | SUSReg | 26,45 ± 1,48 | 21,26 ± 1,00 |
+| C6 | no | SUSReg | 21,57 ± 0,66 | 19,28 ± 0,58 |
+
+![Lineal y k-NN por celda (barra = media, puntos = semillas, barra de error = desvío).](../results/figs/fig1_grilla_barras.pdf){#fig-barras width=72%}
+
+Las semillas son muy estables: el desvío está entre 0,2 y 1,5 puntos. C1 queda claramente por encima de todas las demás celdas. Las cuatro celdas con regularizador quedan agrupadas entre 19 y 28 puntos. C2 queda último.
+
+## Comparaciones por pregunta
+
+: Diferencia de medias A − B (puntos). «Distinguible»: |Δ| > 2 desvíos (el mayor de las dos celdas) o *p* < 0,05 en el test t pareado por semilla; para P2 con EMA, *p* = 0,076 (lineal) y 0,054 (k-NN). Contra C2 no hay test (n = 1). {#tbl-comparaciones}
+
+| Pregunta | A − B | Δ lineal | Δ k-NN | Veredicto |
+|---|---|---|---|---|
+| P1 | C6 − C1 | −21,83 | −18,77 | distinguible |
+| P1 | C4 − C1 | −18,37 | −16,24 | distinguible |
+| P2 | C6 − C4 | −3,47 | −2,53 | distinguible |
+| P2 | C5 − C3 | −1,92 | −1,92 | no distinguible |
+| P3 | C5 − C1 | −16,95 | −16,79 | distinguible |
+| P3 | C3 − C1 | −15,03 | −14,87 | distinguible |
+| Control | C4 − C2 | +5,59 | +7,11 | — |
+| Control | C6 − C2 | +2,13 | +4,58 | — |
+
+## Colapso y geometría de las representaciones {#sec-colapso}
+
+::: {#fig-geom layout-ncol=2}
+
+![Rango efectivo de las features (avg-pool del encoder objetivo) vs. época. Línea gruesa: media de semillas.](../results/figs/fig2_rango_efectivo.pdf){#fig-erank}
+
+![Uniformidad vs. alineación al final (una marca por semilla; menor es mejor en ambos ejes).](../results/figs/fig3_uniformidad_alineacion.pdf){#fig-unif}
+
+Indicadores de colapso medidos sobre 10 000 imágenes de train.
+:::
+
+: Indicadores finales (época 100, media de semillas) y pérdida de predicción al final. {#tbl-colapso}
+
+| Celda | Rango efectivo | Uniformidad | Alineación | $L_\text{pred}$ final (semilla 0) |
+|---|---|---|---|---|
+| C1 | 101,6 | −1,58 | 0,097 | 0,220 |
+| C2 | 27,7 | −0,68 | 0,027 | 0,139 |
+| C3 | 62,6 | −2,31 | 0,170 | 0,220 |
+| C4 | 57,0 | −2,36 | 0,138 | 0,227 |
+| C5 | 68,8 | −1,66 | 0,177 | 0,223 |
+| C6 | 57,0 | −1,83 | 0,106 | 0,207 |
+
+**El control C2 no colapsó del todo.** En la época 5 quedó justo en el umbral (desvío normalizado 0,0186 contra 0,018 del criterio; uniformidad −0,26 contra −0,2; rango efectivo 9), y después se recuperó en parte. Terminó en un **colapso dimensional**: rango efectivo ~28 contra ~102 de C1, la peor uniformidad de la grilla, la menor pérdida de predicción (el objetivo es más fácil de predecir) y el peor k-NN. El plan (§9) advertía que un C2 sin colapso podía indicar un error en el modo sin EMA. Lo descartamos porque los tests de la fase 2 verifican que la rama objetivo comparte pesos y no recibe gradiente, y porque la corrida de prueba de 5 épocas con lr $5\times10^{-4}$ sí colapsó. Atribuimos la recuperación al warmup lento (10 épocas, lr pico $2{,}5\times10^{-4}$). El control quedó entonces más débil que lo previsto: muestra un colapso parcial, no total.
+
+**Los regularizadores actúan al principio del entrenamiento.** En la época 5 las celdas con regularizador ya tienen rango efectivo entre 33 y 67, mientras que C1 y C2 están en 22 y 9. Pero se estancan cerca de 57–69. C1, en cambio, sigue creciendo hasta ~105. Las celdas con SIGReg son las más uniformes de la grilla (uniformidad −2,3), y aun así tienen menos rango efectivo y bastante peor desempeño que C1. En este régimen, la uniformidad de las features no predice su calidad.
+
+**La predicción no queda bloqueada.** $L_\text{pred}$ termina en el mismo nivel en C1 y en las celdas con regularizador (0,21–0,23). El término $\lambda L_\text{reg}$ domina sólo al principio: con SIGReg vale ~0,31 en la época 1, frente a $L_\text{pred} \approx 0{,}21$, y al final cae a ~0,035. Así que el riesgo de §9 («el regularizador domina y la predicción no aprende») no se dio en ese sentido: el regularizador cambia *qué* representación se aprende, no si se aprende a predecir.
+
+## Tabla combinada con la referencia publicada
+
+: Celdas I-JEPA junto a la tabla 7 de SPHERE-JEPA y a nuestra calibración. Mismos datos y mismo protocolo de evaluación, pero **no es una comparación de igual costo**: las filas de vistas múltiples usan 6 vistas por imagen y 200 épocas (salvo nuestro LeJEPA, a 100); I-JEPA usa una vista con máscaras, avg-pool y 100 épocas. Las filas con avg-pool son las de pooling comparable. {#tbl-combinada}
+
+| Método | Épocas | Lineal | k-NN |
+|---|---|---|---|
+| InfoNCE / VICReg (publicado) | 200 | 51,93 / 57,74 | 56,93 / 56,01 |
+| LeJEPA (publicado) | 200 | 70,71 ± 0,38 | 67,39 ± 0,61 |
+| SPHERE-JEPA (publicado) | 200 | 71,91 ± 0,90 | 69,03 ± 0,43 |
+| SPHERE-JEPA (nuestro, CLS) | 200 | 72,76 | 70,60 |
+| SPHERE-JEPA (nuestro, avg-pool) | 200 | 63,76 | 53,20 |
+| LeJEPA (nuestro, CLS) | 100 | 67,06 | 63,46 |
+| LeJEPA (nuestro, avg-pool) | 100 | 58,42 | 49,44 |
+| I-JEPA C1 (nuestro) | 100 | 43,40 ± 0,22 | 38,05 ± 0,87 |
+| I-JEPA C3, mejor regularizada | 100 | 28,37 ± 0,70 | 23,18 ± 1,00 |
+
+A esta escala y con 100 épocas, I-JEPA queda muy por debajo de los métodos de vistas múltiples, incluso con el mismo pooling: LeJEPA, también a 100 épocas y con avg-pool, saca 15 puntos más de lineal y 11 más de k-NN que C1. Es esperable: I-JEPA necesita muchas épocas y su ventaja aparece con modelos y datos más grandes. Por eso los resultados de la grilla se leen **entre celdas**, no contra la tabla 7.
+
+# Costo computacional {#sec-costo}
+
+En la fase 0 se midió el throughput con 200 pasos de cada configuración (RTX 5090 Laptop, 24 GB). La regla fijada de antemano fue elegir el mayor número de épocas $E$ tal que las 15 corridas de la grilla entraran en $\leq$ 60 h de GPU. Con la estimación de la fase 0, $E = 100$ daba 44 h y $E = 150$ ya daba 65 h, así que se eligió $E = 100$.
+
+Medido al final de cada corrida, cada una de la grilla costó 2,4–2,5 h de GPU ($\approx$ 1510–1580 img/s en bf16, 5,9–6,7 GB de memoria pico), y la grilla completa costó 39,5 h. Las calibraciones con el código oficial (fp32, 6 vistas, ~23,6 GB) costaron 21,7 h (SPHERE-JEPA, 200 épocas) y 10,5 h (LeJEPA, 100 épocas). Por época, I-JEPA es varias veces más barato que los métodos de vistas múltiples: procesa una vista por imagen y el encoder de contexto ve sólo una fracción de los parches. Por eso la comparación justa de costo es en **horas de GPU**, no en épocas. Los regularizadores agregan entre 2 % y 5 % de tiempo.
+
+Nota operativa: durante los barridos la GPU estaba limitada a 95 W por la configuración de energía de la laptop. Antes de la calibración y la grilla se habilitó el *Dynamic Boost* ($\approx$ +13 % de throughput). Esto cambia sólo los tiempos, no los resultados, y todas las corridas de la grilla se hicieron con la misma configuración.
+
+# Discusión
+
+**P1: ¿puede el regularizador reemplazar al EMA? No.** Sin EMA, los dos regularizadores evitan el colapso total y mejoran al control (C4 está 7 puntos de k-NN por encima de C2, y C6 4,6), pero quedan entre 16 y 22 puntos por debajo de C1, con diferencias de más de 10 desvíos. Es el escenario previsto en §3 para «sale al revés»: el regularizador impide el colapso pero no reemplaza la estabilización del objetivo que da el EMA. Coincide con la tabla 3 de SPHERE-JEPA, donde quitar el EMA cuesta puntos aun con el regularizador presente. Con máscaras, la pérdida es mucho mayor.
+
+**P2: ¿importa la geometría? Sí, pero a favor de la gaussiana.** Sin EMA, SIGReg le gana a SUSReg de forma distinguible: C4 supera a C6 por 3,5 puntos de lineal y 2,5 de k-NN. Con EMA, C3 también supera a C5 por 1,9 puntos en las dos métricas, pero no llega al umbral de 2 desvíos (*p* $\approx$ 0,05–0,08). La hipótesis («la esfera gana, sobre todo en k-NN») **no se confirma**: en ningún caso la esfera supera a la gaussiana. Una explicación posible: SUSReg normaliza los embeddings y sólo restringe su dirección, mientras que la pérdida de I-JEPA es de regresión (*smooth L1* sobre objetivos con *layer norm*), es decir, no esférica. SPHERE-JEPA, en cambio, usa una pérdida de invariancia por coseno, coherente con la esfera. Esta explicación no se probó (la variante 3 de §5.3 lo haría).
+
+**P3: ¿se suman EMA y regularizador? No, se restan.** Agregarle el regularizador a I-JEPA con EMA baja 15 puntos (SIGReg) y 17 (SUSReg), en las dos métricas y de forma distinguible. Hay una salvedad importante: $\lambda = 0{,}05$ se eligió en las celdas *sin* EMA, que son las que más lo necesitan. Con EMA el valor óptimo podría ser mucho menor, y el experimento no permite separar «el regularizador estorba» de «este $\lambda$ es demasiado alto con EMA». Lo que sí muestra es que, con el $\lambda$ que hace funcionar el regularizador sin EMA, el regularizador perjudica a I-JEPA.
+
+**Control.** C2 tuvo un colapso dimensional, no total. Eso no invalida la grilla: C2 es la peor celda en todas las métricas y tiene un cuarto del rango efectivo de C1. Pero hace que la lectura de P1 sea más modesta. «El regularizador evita el colapso» significa aquí «evita el colapso dimensional parcial que sufre I-JEPA sin EMA y con este cronograma».
+
+## Conclusiones
+
+1. **La tubería está validada.** La reproducción de SPHERE-JEPA con el código oficial cae dentro del margen de la tabla 7 (72,8 / 70,6 contra 71,9 / 69,0). Los datos y la evaluación son correctos, y las diferencias de la grilla no se deben a un problema de protocolo.
+2. **En I-JEPA, el EMA no es reemplazable por SIGReg ni por SUSReg** a esta escala: quitarlo cuesta ~16–22 puntos aun con el regularizador. El regularizador sólo evita el colapso dimensional.
+3. **La geometría importa, pero al revés de lo esperado:** la gaussiana es igual o mejor que la esfera (mejor sin EMA). La ventaja de la esfera que reporta SPHERE-JEPA con vistas aumentadas no se traslada a I-JEPA con máscaras y pérdida de regresión.
+4. **EMA y regularizador no se suman:** con el $\lambda$ elegido, el regularizador le resta ~15–17 puntos a I-JEPA.
+5. **Una representación más uniforme no es mejor:** las celdas con SIGReg son las más uniformes y quedan muy por debajo de C1.
+
+Las tres preguntas tienen respuesta clara con 3 semillas (salvo P2 con EMA), y las respuestas son en su mayoría negativas para la hipótesis de partida. Es un resultado útil: muestra que el beneficio de los regularizadores de distribución depende del marco de vistas aumentadas y no se transfiere directamente al marco de máscaras de I-JEPA.
+
+# Limitaciones {#sec-limitaciones}
+
+- **Escala y épocas.** ViT-Tiny, ImageNet-100 y 100 épocas. I-JEPA está lejos de su régimen; las conclusiones podrían cambiar con más épocas o modelos más grandes.
+- **$\lambda$ elegido sin EMA** y reusado en C3 y C5. Afecta directamente a P3 (ver Discusión).
+- **Pooling.** Los métodos de vistas múltiples se entrenan sobre el token CLS, así que su avg-pool los penaliza. Ningún pooling da una comparación perfectamente simétrica con I-JEPA.
+- **Una semilla** para la calibración y para C2, y LeJEPA calibrado a 100 épocas en lugar de 200.
+- **Un solo lugar para el regularizador** (promedio de tokens de contexto) y una sola pérdida de predicción (la de I-JEPA, no esférica).
+- **El control C2 colapsó sólo parcialmente**, por lo que la evidencia de «evita el colapso» es más débil que la prevista.
+
+# Trabajo futuro
+
+En orden de prioridad según lo que dejaron abierto los resultados: (1) barrido de $\lambda$ con EMA (C3/C5, valores menores), para cerrar P3; (2) predicción y objetivo normalizados con pérdida coseno en C5/C6, para probar si la desventaja de la esfera viene de la pérdida de regresión; (3) regularizador por token de parche; (4) C6 sin corte de gradiente, como LeJEPA; (5) MMD esférico determinista [@expanding2026spherejepa]; (6) más épocas.
+
+**Reproducibilidad.** El código (`src/`, `scripts/`, `configs/`) y el plan (`PLAN.md`) están en el repositorio del proyecto. Cada corrida guarda en `runs/<celda>_seed<k>/evaluation.json` la configuración, el commit, la semilla, las métricas y las horas de GPU.
+
+# Referencias {.unnumbered}
+
+::: {#refs}
+:::
