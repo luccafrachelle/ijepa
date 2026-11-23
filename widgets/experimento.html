@@ -1,0 +1,291 @@
+<script>
+/* Widgets del experimento propio: I-JEPA con SIGReg / SUSReg en lugar de (o además de) el EMA.
+   Los números salen de ~/dlviz/ijepa-sphere/results (tabla_grilla.csv y el collapse.csv de cada corrida de la grilla).
+   Requiere widgets/nucleo.html. */
+(function () {
+  const K = window.OTK;
+  const { C, setupCanvas, text, caja, ease, clamp, alfa, mulberry, gauss } = K;
+  const fase = (t, a, b) => ease((t - a) / (b - a));
+  const lerp = (a, b, u) => a + (b - a) * u;
+  const coma = (v, d = 1) => v.toFixed(d).replace('.', ',');
+
+  // ============================================================ regularizadores, por arriba
+  K.register('regs', root => {
+    const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
+    const NP = 320, r = mulberry(11);
+    const g = () => gauss(r);
+    // nube inicial: estirada, corrida y casi en una recta (lo que tiende a pasar sin nada que lo impida)
+    const ang0 = 0.55, P0 = [...Array(NP)].map(() => {
+      const a = 1.35 * g(), b = 0.32 * g();
+      return [0.35 + a * Math.cos(ang0) - b * Math.sin(ang0), 0.2 + a * Math.sin(ang0) + b * Math.cos(ang0)];
+    });
+    const PG = [...Array(NP)].map(() => [g(), g()]);
+    // destino en el círculo: mismo orden angular que la nube inicial, ángulos parejos
+    const RAD = 1.45;
+    const orden = P0.map((p, i) => [Math.atan2(p[1], p[0]), i]).sort((x, y) => x[0] - y[0]);
+    const TH = Array(NP); orden.forEach(([a, i], k) => { TH[i] = -Math.PI + 2 * Math.PI * (k + 0.5) / NP; });
+    const ANG = P0.map(p => Math.atan2(p[1], p[0]));
+    const ux = [Math.cos(ang0), Math.sin(ang0)];
+    const PAN = [
+      { x: 30, titulo: 'Sin regularizador', sub: 'nada impide achicarse a pocas dimensiones', col: C.blue },
+      { x: 395, titulo: 'SIGReg (LeJEPA)', sub: 'empuja hacia una gaussiana isótropa', col: C.teal },
+      { x: 760, titulo: 'SUSReg (SPHERE-JEPA)', sub: 'normaliza y reparte parejo en la esfera', col: C.coralD }
+    ];
+    const S = 44, SC = { y: 168 }, HB = { y: 300, w: 300, h: 74 };
+    const pos = (j, i, t) => {
+      const p = P0[i];
+      if (j === 0) { const c = (p[0] - 0.35) * ux[0] + (p[1] - 0.2) * ux[1]; const u = fase(t, 0.1, 0.9); return [lerp(p[0], 0.35 + c * ux[0], u), lerp(p[1], 0.2 + c * ux[1], u)]; }
+      if (j === 1) { const u = fase(t, 0.1, 0.9); return [lerp(p[0], PG[i][0], u), lerp(p[1], PG[i][1], u)]; }
+      const n = Math.hypot(p[0], p[1]) || 1, u1 = fase(t, 0.08, 0.45), u2 = fase(t, 0.5, 0.92);
+      const a = lerp(ANG[i], TH[i], u2), rr = RAD;
+      const pn = [rr * Math.cos(a), rr * Math.sin(a)];
+      return u2 > 0 ? pn : [lerp(p[0], RAD * p[0] / n, u1), lerp(p[1], RAD * p[1] / n, u1)];
+    };
+    const PHI0 = 0.55;
+    const draw = tt => {
+      ctx.clearRect(0, 0, W, H);
+      const t = clamp(tt, 0, 1), uP = clamp(tt - 1, 0, 1), uR = clamp(tt - 2, 0, 1);
+      const phi = PHI0 + uR * 2.2, d = [Math.cos(phi), Math.sin(phi)];
+      PAN.forEach((P, j) => {
+        const cx = P.x + 170, cy = SC.y;
+        text(ctx, P.titulo, P.x + 8, 28, { color: P.col, size: 16.5, weight: '700' });
+        text(ctx, t < 0.01 ? 'el mismo lote de embeddings' : P.sub, P.x + 8, 48, { color: C.grey2, size: 13 });
+        ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.beginPath();
+        ctx.moveTo(cx - 150, cy); ctx.lineTo(cx + 150, cy); ctx.moveTo(cx, cy - 104); ctx.lineTo(cx, cy + 104); ctx.stroke();
+        // forma buscada
+        ctx.setLineDash([4, 4]); ctx.strokeStyle = alfa(P.col, 0.55 * t); ctx.lineWidth = 1.5;
+        if (j === 1) { [1, 2].forEach(k => { ctx.beginPath(); ctx.arc(cx, cy, k * S, 0, 7); ctx.stroke(); }); }
+        if (j === 2) { ctx.beginPath(); ctx.arc(cx, cy, RAD * S, 0, 7); ctx.stroke(); }
+        ctx.setLineDash([]);
+        // direcciones ya usadas (paso 4) y dirección actual
+        if (uR > 0) for (let a = PHI0; a < phi - 0.05; a += 0.37) { ctx.strokeStyle = alfa(C.navy, 0.14); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx - 140 * Math.cos(a), cy + 140 * Math.sin(a)); ctx.lineTo(cx + 140 * Math.cos(a), cy - 140 * Math.sin(a)); ctx.stroke(); }
+        if (uP > 0) { ctx.strokeStyle = alfa(C.navy, 0.7 * uP); ctx.lineWidth = 1.6; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(cx - 140 * d[0], cy + 140 * d[1]); ctx.lineTo(cx + 140 * d[0], cy - 140 * d[1]); ctx.stroke(); ctx.setLineDash([]); }
+        // puntos, su sombra sobre la dirección e histograma
+        const NB = 24, LIM = 3, hist = Array(NB).fill(0);
+        for (let i = 0; i < NP; i++) {
+          const p = pos(j, i, t);
+          const x = cx + p[0] * S, y = cy - p[1] * S, pr = p[0] * d[0] + p[1] * d[1];
+          if (x > P.x + 10 && x < P.x + 330 && y > 58 && y < 280) { ctx.fillStyle = alfa(P.col, uP > 0 ? 0.35 : 0.55); ctx.beginPath(); ctx.arc(x, y, 2.4, 0, 7); ctx.fill(); }
+          if (uP > 0) {
+            const qx = cx + pr * d[0] * S, qy = cy - pr * d[1] * S;
+            if (i % 9 === 0 && uR === 0) { ctx.strokeStyle = alfa(C.navy, 0.18 * uP); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(qx, qy); ctx.stroke(); }
+            if (Math.abs(pr) * S < 140) { ctx.fillStyle = alfa(C.navy, 0.55 * uP); ctx.fillRect(qx - 1.2, qy - 1.2, 2.4, 2.4); }
+          }
+          const b = Math.floor((pr + LIM) / (2 * LIM) * NB);
+          if (b >= 0 && b < NB) hist[b]++;
+        }
+        if (uP <= 0) return;
+        const hx = P.x + 20, bw = HB.w / NB, esc = HB.h / (NP * (2 * LIM / NB) * 0.62);
+        ctx.globalAlpha = uP;
+        caja(ctx, hx - 6, HB.y - 6, HB.w + 12, HB.h + 12, { r: 8, fill: '#fafafc' });
+        hist.forEach((c, b) => { const h = Math.min(HB.h, c * esc); ctx.fillStyle = alfa(P.col, 0.5); ctx.fillRect(hx + b * bw + 1, HB.y + HB.h - h, bw - 2, h); });
+        if (j > 0) {
+          ctx.strokeStyle = C.navy; ctx.lineWidth = 2; ctx.beginPath(); let first = true;
+          for (let k = 0; k <= 120; k++) {
+            const x = -LIM + 2 * LIM * k / 120;
+            const f = j === 1 ? Math.exp(-x * x / 2) / Math.sqrt(2 * Math.PI) : (Math.abs(x) < RAD * 0.995 ? 1 / (Math.PI * Math.sqrt(RAD * RAD - x * x)) : NaN);
+            if (isNaN(f)) { first = true; continue; }
+            const y = HB.y + HB.h - Math.min(HB.h, f * NP * esc * (2 * LIM / NB)), X = hx + (x + LIM) / (2 * LIM) * HB.w;
+            first ? ctx.moveTo(X, y) : ctx.lineTo(X, y); first = false;
+          }
+          ctx.stroke();
+        }
+        text(ctx, j === 0 ? 'sombra del lote sobre la dirección' : 'sombra del lote (barras) y la buscada (línea)', hx - 4, HB.y + HB.h + 22, { color: C.grey2, size: 12.5 });
+        ctx.globalAlpha = 1;
+      });
+      const nota = tt < 0.01 ? 'Cada punto es el embedding de una imagen del lote (esquema en 2D; en el experimento, 256 dimensiones).'
+        : tt < 1.01 ? 'Sin regularizador nada impide el colapso dimensional; cada regularizador empuja el lote hacia una forma fija.'
+        : tt < 2.01 ? 'Para medir la forma, el lote se proyecta sobre una dirección al azar y esa sombra se compara con la de la forma buscada.'
+        : 'Se repite con muchas direcciones (1024 por paso): si todas las sombras coinciden, la distribución coincide.';
+      text(ctx, nota, 24, H - 10, { color: C.navy, size: 13.5, weight: '600' });
+    };
+    K.pasos(root, [0, 1, 2, 3], draw, { ms: 4200, max: 4200 });
+  });
+
+  // ============================================================ resultados de la grilla 2 × 3
+  const CEL = {
+    C1: { ema: true, reg: '—', lin: [43.40, 0.22], knn: [38.05, 0.87] },
+    C2: { ema: false, reg: '—', lin: [19.44, null], knn: [14.70, null] },
+    C3: { ema: true, reg: 'SIGReg', lin: [28.37, 0.70], knn: [23.18, 1.00] },
+    C4: { ema: false, reg: 'SIGReg', lin: [25.03, 0.33], knn: [21.81, 0.24] },
+    C5: { ema: true, reg: 'SUSReg', lin: [26.45, 1.48], knn: [21.26, 1.00] },
+    C6: { ema: false, reg: 'SUSReg', lin: [21.57, 0.66], knn: [19.28, 0.58] }
+  };
+  const colReg = reg => (reg === 'SIGReg' ? C.teal : reg === 'SUSReg' ? C.coralD : C.blue);
+
+  K.register('grilla', root => {
+    const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
+    const ORD = ['C1', 'C3', 'C5', 'C2', 'C4', 'C6'];
+    const PREG = [
+      { id: 'todo', tit: 'Las seis celdas', on: ORD, comp: [],
+        txt: ['I-JEPA tal cual (C1) queda arriba de todo. Las cuatro celdas con regularizador', 'se agrupan entre 19 y 28 puntos; el control sin EMA ni regularizador (C2) queda último.'] },
+      { id: 'p1', tit: 'P1 · ¿El regularizador reemplaza al EMA?', on: ['C1', 'C4', 'C6'], comp: [['C1', 'C4'], ['C1', 'C6']],
+        txt: ['No. Sin EMA quedan 16 a 22 puntos debajo de I-JEPA. Pero con regularizador el EMA', 'sólo suma 1,4 a 4,9 puntos: lo que más resta es el propio regularizador (ver P3).'] },
+      { id: 'p2', tit: 'P2 · ¿Esfera o gaussiana?', on: ['C3', 'C5', 'C4', 'C6'], comp: [['C3', 'C5'], ['C4', 'C6']],
+        txt: ['La esfera no ayuda acá: sin EMA gana la gaussiana (3,5 puntos, distinguible);', 'con EMA la diferencia (1,9) no llega al umbral. Al revés de lo esperado.'] },
+      { id: 'p3', tit: 'P3 · ¿EMA y regularizador se suman?', on: ['C1', 'C3', 'C5'], comp: [['C1', 'C3'], ['C1', 'C5']],
+        txt: ['No: se restan. Agregarle el regularizador a I-JEPA le quita 15 a 17 puntos,', 'con el λ elegido en las celdas sin EMA (con EMA podría convenir uno menor).'] }
+    ];
+    let met = 'lin', pi = 0;
+    const alt = {}; ORD.forEach(c => { alt[c] = 0; });
+    const op = {}; ORD.forEach(c => { op[c] = 1; });
+    let comp = 0;
+    const G = { x: 28, y: 92, cw: 108, ch: 70 };          // tabla 2 × 3
+    const B = { x: 470, y: 62, w: 600, h: 252, max: 60 };  // barras
+    const xb = k => B.x + 30 + k * 92 + (k >= 3 ? 26 : 0);
+    const yv = v => B.y + B.h - B.h * v / B.max;
+    const draw = () => {
+      ctx.clearRect(0, 0, W, H);
+      const P = PREG[pi];
+      // tabla
+      text(ctx, 'La grilla', G.x, 30, { color: C.navy, size: 17, weight: '700' });
+      text(ctx, 'con EMA', G.x + 92 + G.cw / 2, G.y - 14, { color: C.navy, size: 14, weight: '600', align: 'center' });
+      text(ctx, 'sin EMA', G.x + 92 + G.cw * 1.5 + 8, G.y - 14, { color: C.navy, size: 14, weight: '600', align: 'center' });
+      ['—', 'SIGReg', 'SUSReg'].forEach((reg, i) => {
+        text(ctx, reg === '—' ? 'sin reg.' : reg, G.x + 84, G.y + i * (G.ch + 8) + G.ch / 2 + 5, { color: colReg(reg), size: 14, weight: '600', align: 'right' });
+        [true, false].forEach((ema, jj) => {
+          const id = Object.keys(CEL).find(k => CEL[k].ema === ema && CEL[k].reg === reg), c = CEL[id], o = op[id];
+          const x = G.x + 92 + jj * (G.cw + 8), y = G.y + i * (G.ch + 8);
+          caja(ctx, x, y, G.cw, G.ch, { r: 10, fill: alfa(colReg(reg), 0.08 + 0.1 * o), stroke: alfa(colReg(reg), 0.25 + 0.75 * o), lw: id === 'C1' ? 2.6 : 1.4 });
+          text(ctx, id, x + 10, y + 22, { color: alfa(C.navy, 0.35 + 0.65 * o), size: 14, weight: '700' });
+          text(ctx, coma(c[met][0]), x + G.cw - 10, y + 50, { color: alfa(colReg(reg), 0.35 + 0.65 * o), size: 21, weight: '700', align: 'right' });
+        });
+      });
+      text(ctx, 'C1 = I-JEPA tal cual · C2 = control', G.x, G.y + 3 * (G.ch + 8) + 14, { color: C.grey2, size: 12.5 });
+      text(ctx, 'ViT-Tiny/16 · ImageNet-100 · 100 épocas', G.x, G.y + 3 * (G.ch + 8) + 34, { color: C.grey2, size: 12.5 });
+      text(ctx, '3 semillas por celda (C2: 1) · RTX 5090 Laptop', G.x, G.y + 3 * (G.ch + 8) + 52, { color: C.grey2, size: 12.5 });
+      // barras
+      text(ctx, P.tit, B.x - 30, 30, { color: C.navy, size: 17, weight: '700' });
+      ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.textBaseline = 'alphabetic';
+      for (let v = 0; v <= B.max; v += 10) {
+        const y = yv(v); ctx.beginPath(); ctx.moveTo(B.x, y); ctx.lineTo(B.x + B.w, y); ctx.stroke();
+        text(ctx, String(v), B.x - 8, y + 4, { color: C.grey2, size: 12, align: 'right' });
+      }
+      text(ctx, met === 'lin' ? 'top-1 lineal (%)' : 'top-1 k-NN (%)', B.x + B.w, 30, { color: C.grey2, size: 12.5, align: 'right' });
+      ORD.forEach((id, k) => {
+        const c = CEL[id], v = c[met][0] * alt[id], sd = c[met][1], x = xb(k), o = op[id], bw = 50;
+        caja(ctx, x, yv(v), bw, B.y + B.h - yv(v), { r: 4, fill: alfa(colReg(c.reg), 0.2 + 0.7 * o) });
+        if (sd && alt[id] > 0.98) {
+          ctx.strokeStyle = alfa(C.navy, o); ctx.lineWidth = 1.6; ctx.beginPath();
+          ctx.moveTo(x + bw / 2, yv(v + sd)); ctx.lineTo(x + bw / 2, yv(v - sd));
+          ctx.moveTo(x + bw / 2 - 6, yv(v + sd)); ctx.lineTo(x + bw / 2 + 6, yv(v + sd));
+          ctx.moveTo(x + bw / 2 - 6, yv(v - sd)); ctx.lineTo(x + bw / 2 + 6, yv(v - sd)); ctx.stroke();
+        }
+        text(ctx, coma(c[met][0]), x + bw / 2, yv(v) - (sd ? 12 : 6) - 2, { color: alfa(C.navy, 0.3 + 0.7 * o), size: 13, weight: '600', align: 'center' });
+        text(ctx, id, x + bw / 2, B.y + B.h + 18, { color: alfa(C.navy, 0.35 + 0.65 * o), size: 13.5, weight: '700', align: 'center' });
+        text(ctx, c.reg === '—' ? 'sin reg.' : c.reg, x + bw / 2, B.y + B.h + 34, { color: alfa(colReg(c.reg), 0.35 + 0.65 * o), size: 11.5, align: 'center' });
+      });
+      text(ctx, 'con EMA', (xb(0) + xb(2) + 50) / 2, B.y + B.h + 54, { color: C.navy, size: 13, weight: '600', align: 'center' });
+      text(ctx, 'sin EMA', (xb(3) + xb(5) + 50) / 2, B.y + B.h + 54, { color: C.navy, size: 13, weight: '600', align: 'center' });
+      // comparaciones: flecha de A a B con la diferencia
+      P.comp.forEach(([a, b], n) => {
+        const ka = ORD.indexOf(a), kb = ORD.indexOf(b), va = CEL[a][met][0], vb = CEL[b][met][0];
+        const xa = xb(ka) + 25, xB = xb(kb) + 25, yl = yv(Math.max(va, vb)) - 44 - n * 28;
+        ctx.strokeStyle = alfa(C.navy, comp); ctx.lineWidth = 1.6; ctx.beginPath();
+        ctx.moveTo(xa, yv(va) - 30); ctx.lineTo(xa, yl); ctx.lineTo(xB, yl); ctx.lineTo(xB, yv(vb) - 30); ctx.stroke();
+        const dlt = vb - va;
+        caja(ctx, (xa + xB) / 2 - 30, yl - 11, 60, 21, { r: 6, fill: alfa('#ffffff', comp), stroke: alfa(C.navy, comp), lw: 1.2 });
+        text(ctx, (dlt > 0 ? '+' : '−') + coma(Math.abs(dlt)), (xa + xB) / 2, yl + 5, { color: alfa(C.navy, comp), size: 13, weight: '700', align: 'center' });
+      });
+      // lectura
+      caja(ctx, B.x - 30, 356, B.w + 30, 54, { r: 10, fill: C.light });
+      P.txt.forEach((s, i) => text(ctx, s, B.x - 16, 378 + i * 21, { color: C.navy, size: 14, weight: i ? '400' : '600' }));
+    };
+    const b = K.bar(root);
+    const setP = K.opciones(b, PREG.map((p, i) => [String(i), p.id === 'todo' ? 'todas' : p.id.toUpperCase()]), '0', v => { pi = +v; comp = 0; });
+    K.opciones(b, [['lin', 'lineal'], ['knn', 'k-NN']], met, v => { met = v; ORD.forEach(c => { alt[c] = 0.75; }); comp = 0; });
+    const conFragments = () => { const sec = root.closest('section'); return sec && sec.querySelector('.fragment.paso') ? sec : null; };
+    root._sync = () => { const sec = conFragments(); if (sec) { pi = Math.min(PREG.length - 1, sec.querySelectorAll('.fragment.paso.visible').length); setP(String(pi)); comp = 0; } };
+    root._entrar = () => { ORD.forEach(c => { alt[c] = 0; }); comp = 0; };
+    K.frame(root, (now, dt) => {
+      const on = PREG[pi].on;
+      ORD.forEach(c => {
+        alt[c] = Math.min(1, alt[c] + dt / 700);
+        op[c] = clamp(op[c] + (on.includes(c) ? 1 : -1) * dt / 300, 0.28, 1);
+      });
+      if (ORD.every(c => alt[c] >= 1)) comp = clamp(comp + dt / 400, 0, 1);
+      draw();
+    });
+    draw();
+  });
+
+  // ============================================================ rango efectivo durante el entrenamiento
+  // erank del avg-pool del encoder objetivo, cada 5 épocas (épocas 5…100), tres semillas por celda
+  const ER = {
+    C1: [[22.5,50.5,64.4,73.1,79.7,85.0,89.7,93.9,97.4,100.3,102.7,104.6,106.0,106.7,106.9,106.8,106.2,105.7,105.2,105.0],
+         [22.6,46.4,59.8,67.6,73.2,78.7,83.5,87.2,90.6,93.5,95.7,97.0,97.8,98.4,98.4,97.9,97.2,96.2,95.6,95.3],
+         [23.7,49.1,63.1,71.8,78.6,84.6,89.3,93.6,97.4,100.4,103.0,104.9,106.2,106.8,106.9,106.6,105.8,105.1,104.5,104.4]],
+    C2: [[9.0,17.2,22.5,26.7,29.2,27.5,24.8,26.7,29.7,30.5,27.4,26.8,28.6,28.1,27.9,27.5,27.3,28.5,27.7,27.7]],
+    C3: [[37.7,50.9,57.8,60.2,62.1,63.2,63.8,63.5,63.8,64.0,64.2,64.0,63.8,63.6,63.6,63.6,63.4,63.2,63.1,63.0],
+         [38.1,51.9,58.6,61.8,63.5,65.0,65.4,65.9,66.1,65.4,65.4,65.2,64.8,64.9,65.0,64.8,64.6,64.5,64.4,64.3],
+         [38.4,51.4,56.2,59.4,60.2,61.0,61.2,61.1,61.0,60.7,61.1,61.0,60.7,60.7,60.7,60.8,60.8,60.6,60.5,60.5]],
+    C4: [[32.8,41.3,45.5,45.3,46.7,50.4,50.0,48.0,53.9,51.2,54.1,54.7,55.3,56.9,57.2,57.3,57.2,57.2,57.1,57.2],
+         [36.6,46.2,46.9,48.0,49.8,49.8,52.2,50.4,51.9,50.0,52.9,54.1,55.8,55.7,54.5,56.4,55.4,56.4,56.3,56.4],
+         [38.1,39.3,41.1,49.0,46.9,51.8,50.5,49.5,53.7,55.8,55.0,55.6,56.4,57.9,57.8,58.5,57.7,57.8,57.7,57.5]],
+    C5: [[64.4,74.2,73.5,73.3,72.9,72.4,72.2,71.8,71.7,71.6,71.4,71.5,70.8,70.2,69.6,68.7,67.9,67.2,66.8,66.6],
+         [64.1,70.1,70.0,70.1,70.3,69.7,69.3,68.9,68.9,68.5,68.6,68.1,67.7,67.4,66.9,66.1,65.4,64.9,64.6,64.6],
+         [70.7,79.8,81.1,81.7,81.0,80.7,79.7,80.1,79.8,79.3,79.0,78.9,78.5,78.2,77.9,77.3,76.5,75.8,75.3,75.1]],
+    C6: [[67.4,57.4,51.7,54.1,59.4,59.4,55.1,55.0,52.6,54.4,54.7,51.3,54.8,55.1,55.0,55.5,55.4,54.7,54.4,54.2],
+         [70.0,61.4,60.9,60.4,58.8,58.3,58.7,57.6,57.1,54.9,57.7,57.6,60.8,59.8,60.0,60.8,60.7,59.9,59.4,59.5],
+         [68.4,69.5,67.0,61.8,60.4,58.9,58.6,58.7,57.0,56.0,57.0,55.3,57.4,58.1,57.4,58.9,58.2,57.2,57.1,57.2]]
+  };
+  const MEDIA = {}; Object.keys(ER).forEach(c => { MEDIA[c] = ER[c][0].map((_, e) => ER[c].reduce((s, a) => s + a[e], 0) / ER[c].length); });
+
+  K.register('rango', root => {
+    const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
+    const A = { x: 80, y: 64, w: 640, h: 286, max: 120 };
+    const ex = ep => A.x + A.w * ep / 100, ey = v => A.y + A.h - A.h * v / A.max;
+    const ETQ = { C1: 'C1 · EMA (I-JEPA)', C2: 'C2 · sin EMA ni reg.', C3: 'C3 · EMA + SIGReg', C4: 'C4 · SIGReg sin EMA', C5: 'C5 · EMA + SUSReg', C6: 'C6 · SUSReg sin EMA' };
+    const ACC = { C1: 43.4, C2: 19.4, C3: 28.4, C4: 25.0, C5: 26.4, C6: 21.6 };
+    const estilo = c => ({ col: colReg(CEL[c].reg), dash: CEL[c].ema ? [] : [7, 5] });
+    const draw = t => {
+      ctx.clearRect(0, 0, W, H);
+      const epA = 100 * t;
+      text(ctx, 'Rango efectivo de las representaciones durante el entrenamiento', 24, 26, { color: C.navy, size: 17, weight: '700' });
+      ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+      for (let v = 0; v <= A.max; v += 20) { const y = ey(v); ctx.beginPath(); ctx.moveTo(A.x, y); ctx.lineTo(A.x + A.w, y); ctx.stroke(); text(ctx, String(v), A.x - 10, y + 4, { color: C.grey2, size: 12, align: 'right' }); }
+      for (let e = 0; e <= 100; e += 20) text(ctx, String(e), ex(e), A.y + A.h + 20, { color: C.grey2, size: 12, align: 'center' });
+      text(ctx, 'época', A.x + A.w, A.y + A.h + 38, { color: C.grey2, size: 12.5, align: 'right' });
+      text(ctx, 'cuántas de las 192 dimensiones del ViT-Tiny se usan en la práctica', 24, 46, { color: C.grey2, size: 13 });
+      const ORDEN = ['C1', 'C5', 'C3', 'C6', 'C4', 'C2'];
+      ORDEN.forEach(c => {
+        const { col, dash } = estilo(c), m = MEDIA[c];
+        ctx.strokeStyle = col; ctx.lineWidth = c === 'C1' ? 3.4 : 2.4; ctx.setLineDash(dash); ctx.beginPath();
+        let last = null;
+        for (let k = 0; k < m.length; k++) {
+          const e = 5 * (k + 1);
+          if (e > epA + 5) break;
+          let v = m[k], ee = e;
+          if (e > epA) { const u = (epA - (e - 5)) / 5, vp = k ? m[k - 1] : m[0]; v = lerp(vp, m[k], u); ee = epA; }
+          const X = ex(ee), Y = ey(v);
+          k ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); last = [X, Y, v];
+        }
+        ctx.stroke(); ctx.setLineDash([]);
+        if (last && epA >= 5) K.dot(ctx, last[0], last[1], col, c === 'C1' ? 5.5 : 4.5);
+      });
+      // leyenda con el valor final y la precisión lineal
+      const LX = 760;
+      text(ctx, 'al final', LX + 210, 62, { color: C.grey2, size: 12, align: 'right' });
+      text(ctx, 'lineal', LX + 290, 62, { color: C.grey2, size: 12, align: 'right' });
+      ORDEN.forEach((c, i) => {
+        const { col, dash } = estilo(c), y = 90 + i * 34;
+        ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(LX, y - 5); ctx.lineTo(LX + 26, y - 5); ctx.stroke(); ctx.setLineDash([]);
+        text(ctx, ETQ[c], LX + 34, y, { color: C.navy, size: 13, weight: c === 'C1' ? '700' : '500' });
+        const fin = t > 0.97;
+        text(ctx, fin ? coma(MEDIA[c][19], 0) : '·', LX + 210, y + 16, { color: col, size: 13, weight: '700', align: 'right' });
+        text(ctx, fin ? coma(ACC[c]) + ' %' : '·', LX + 290, y + 16, { color: C.navy, size: 13, align: 'right' });
+      });
+      // notas que aparecen con el tiempo
+      const n1 = fase(t, 0.05, 0.2), n2 = fase(t, 0.55, 0.7), n3 = fase(t, 0.85, 0.97);
+      if (n1 > 0) { text(ctx, 'los regularizadores', ex(4), ey(97), { color: alfa(C.teal, n1), size: 13.5, weight: '600' }); text(ctx, 'arrancan altos…', ex(4), ey(90), { color: alfa(C.teal, n1), size: 13.5, weight: '600' }); }
+      if (n2 > 0) text(ctx, '…pero se estancan en 57–69; I-JEPA sigue subiendo', ex(40), ey(114), { color: alfa(C.blue, n2), size: 13.5, weight: '600' });
+      if (n3 > 0) text(ctx, 'sin EMA ni regularizador: colapso parcial', ex(48), ey(16), { color: alfa(C.blue, n3), size: 13.5, weight: '600' });
+      caja(ctx, LX, 300, 300, 60, { r: 10, fill: C.light });
+      text(ctx, 'Más uniforme no es mejor: SIGReg', LX + 14, 324, { color: C.navy, size: 13.5, weight: '600' });
+      text(ctx, 'es lo más uniforme y rinde 15–18 menos', LX + 14, 344, { color: C.navy, size: 13.5 });
+      text(ctx, 'Media de 3 semillas (C2: 1), medida sobre 10 000 imágenes de entrenamiento. Línea llena: con EMA; punteada: sin EMA.', 24, H - 10, { color: C.grey2, size: 13 });
+    };
+    K.pasos(root, [0, 0.22, 0.72, 1], draw, { ms: 6000 });
+  });
+})();
+</script>

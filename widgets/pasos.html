@@ -1,0 +1,522 @@
+<script>
+/* Animaciones de cada parte de I-JEPA, en el orden en que ocurre un paso de entrenamiento.
+   Siguen el código oficial (facebookresearch/ijepa): la posición se suma antes de quitar parches,
+   el predictor proyecta a 384 dimensiones y usa un único token de máscara más la posición,
+   los objetivos se normalizan (layer norm) y se recortan a la salida del encoder objetivo,
+   y el encoder objetivo se actualiza con θ̄ ← m θ̄ + (1 − m) θ.
+   Requiere widgets/nucleo.html y widgets/ijepa.html (usa K.escena). */
+(function () {
+  const K = window.OTK;
+  const { C, setupCanvas, text, caja, flecha, ease, clamp, alfa, mulberry, gauss } = K;
+  const fase = (t, a, b) => ease((t - a) / (b - a));
+  // texto con fórmulas: las partes entre signos de pesos se dibujan con LaTeX compilado (widgets/tex.html)
+  const tx = (ctx, s, x, y, opt = {}) => K.rich(ctx, s, x, y, opt);
+  const lerp = (a, b, u) => a + (b - a) * u;
+
+  // ---------------------------------------------------------------- grilla de juguete (6 × 6)
+  const N = 6, NT = N * N;
+  const OBJ = [{ top: 0, left: 3, h: 2, w: 3 }, { top: 3, left: 0, h: 3, w: 2 }];
+  const bloqueDe = k => { const i = Math.floor(k / N), j = k % N; return OBJ.findIndex(b => i >= b.top && i < b.top + b.h && j >= b.left && j < b.left + b.w); };
+  // bloque de contexto: filas 1 a 5, columnas 0 a 4 (sin los objetivos). Lo que queda fuera de los dos sólo lo ve el encoder objetivo.
+  const CBOX = { top: 1, left: 0, h: 5, w: 5 };
+  const enCBox = k => { const i = Math.floor(k / N), j = k % N; return i >= CBOX.top && i < CBOX.top + CBOX.h && j >= CBOX.left && j < CBOX.left + CBOX.w; };
+  const ROL = [...Array(NT)].map((_, k) => { const b = bloqueDe(k); return b >= 0 ? { r: 'obj', b } : (enCBox(k) ? { r: 'ctx' } : { r: 'nada' }); });
+  const CTX = ROL.map((r, k) => (r.r === 'ctx' ? k : -1)).filter(k => k >= 0);                 // 17 parches
+  const NADA = ROL.filter(r => r.r === 'nada').length;                                            // 7 parches
+  const OBJK = [0, 1].map(b => ROL.map((r, k) => (r.r === 'obj' && r.b === b ? k : -1)).filter(k => k >= 0)); // 6 + 6
+  const colRol = k => (ROL[k].r === 'ctx' ? C.teal : ROL[k].r === 'obj' ? C.coralD : C.grey);
+  const R = mulberry(5), VAL = [...Array(NT)].map(() => [...Array(8)].map(() => R()));
+  const VAL2 = [...Array(NT)].map(() => [...Array(8)].map(() => R()));
+  const mezcla = (k, u) => VAL[k].map((v, c) => lerp(v, VAL2[k][c], u));
+
+  // vector como pila de 8 celdas; la intensidad de cada celda es su valor
+  function vec(ctx, x, y, w, h, k, color, a = 1, opt = {}) {
+    if (a <= 0.01 || h <= 1) return;
+    const vals = opt.vals || VAL[k % NT], ch = h / 8;
+    for (let c = 0; c < 8; c++) { ctx.fillStyle = alfa(color, a * (0.22 + 0.78 * vals[c])); ctx.fillRect(x, y + c * ch, w, Math.max(0.5, ch - 0.8)); }
+    if (opt.borde) { ctx.strokeStyle = alfa(opt.borde, a); ctx.lineWidth = opt.lw || 1.8; ctx.setLineDash(opt.dash || []); ctx.strokeRect(x - 1.5, y - 1.5, w + 3, h + 2); ctx.setLineDash([]); }
+  }
+  function parche(ctx, k, x, y, s, a = 1) {
+    const E = K.escena(), ps = E.width / N;
+    ctx.globalAlpha = a; ctx.drawImage(E, (k % N) * ps, Math.floor(k / N) * ps, ps, ps, x, y, s, s); ctx.globalAlpha = 1;
+  }
+  function encabezado(ctx, n, txt) {
+    caja(ctx, 24, 12, 36, 28, { r: 8, fill: C.blue });
+    tx(ctx, String(n), 42, 33, { color: '#fff', size: 17, weight: '600', align: 'center' });
+    tx(ctx, txt, 72, 33, { color: C.navy, size: 18, weight: '600' });
+  }
+  // imagen chica con los roles marcados
+  function mapa(ctx, x, y, s, opt = {}) {
+    const q = s / N;
+    ctx.drawImage(K.escena(), x, y, s, s);
+    for (let k = 0; k < NT; k++) {
+      const col = opt.color ? opt.color(k) : null;
+      if (col) { ctx.fillStyle = col; ctx.fillRect(x + (k % N) * q, y + Math.floor(k / N) * q, q, q); }
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let k = 1; k < N; k++) { ctx.moveTo(x + k * q, y); ctx.lineTo(x + k * q, y + s); ctx.moveTo(x, y + k * q); ctx.lineTo(x + s, y + k * q); }
+    ctx.stroke();
+    caja(ctx, x, y, s, s, { r: 3, stroke: C.grid, lw: 1.5 });
+    if (opt.cbox) caja(ctx, x + CBOX.left * q + 1.5, y + CBOX.top * q + 1.5, CBOX.w * q - 3, CBOX.h * q - 3, { r: 2, stroke: C.teal, lw: 2.5, dash: [6, 4] });
+  }
+  // leyenda de los tres grupos de parches
+  function leyendaRoles(ctx, x, y) {
+    [[C.teal, `contexto (${CTX.length})`, 'rgba(42,157,143,0.0)'], [C.coralD, `objetivo (${OBJK[0].length + OBJK[1].length})`, alfa(C.coral, 0.6)], [C.grey2, `ninguno (${NADA})`, 'rgba(150,155,170,0.78)']].forEach(([col, s, fill], i) => {
+      caja(ctx, x, y + i * 19 - 10, 12, 12, { r: 2, fill: i === 0 ? '#fff' : fill, stroke: col, lw: 1.5, dash: i === 0 ? [3, 2] : [] });
+      tx(ctx, s, x + 18, y + i * 19, { color: col, size: 13, weight: '600' });
+    });
+  }
+  const colorMapa = k => (ROL[k].r === 'obj' ? alfa(C.coral, 0.6) : ROL[k].r === 'nada' ? 'rgba(150,155,170,0.78)' : null);
+  // red: una caja con título y símbolo
+  function red(ctx, x, y, w, h, titulo, sub, color, a = 1) {
+    if (a <= 0.01) return;
+    caja(ctx, x, y, w, h, { r: 14, fill: alfa('#ffffff', a), stroke: alfa(color, a), lw: 2.5 });
+    tx(ctx, titulo, x + 16, y + 24, { color: alfa(color, a), size: 15.5, weight: '600' });
+    if (sub) tx(ctx, sub, x + w - 16, y + 24, { color: alfa(C.grey2, a), size: 13.5, align: 'right' });
+  }
+  // atención: arcos que se encienden y apagan entre pares de tokens
+  const paresDe = (n, semilla) => { const r = mulberry(semilla); const p = []; while (p.length < 16) { const i = Math.floor(r() * n), j = Math.floor(r() * n); if (i !== j) p.push([i, j]); } return p; };
+  function arcos(ctx, xs, y, t, color, a, pares) {
+    pares.forEach(([i, j], m) => {
+      const al = a * 0.5 * (1 + Math.sin(2 * Math.PI * (2.5 * t + m / pares.length)));
+      if (al < 0.04 || xs[i] === undefined || xs[j] === undefined) return;
+      const x1 = xs[i], x2 = xs[j];
+      ctx.strokeStyle = alfa(color, 0.85 * al); ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(x1, y); ctx.quadraticCurveTo((x1 + x2) / 2, y - 8 - Math.min(34, 0.25 * Math.abs(x2 - x1)), x2, y); ctx.stroke();
+    });
+  }
+  const nota = (ctx, W, H, s) => tx(ctx, s, 24, H - 12, { color: C.grey2, size: 13.5 });
+
+  // ============================================================ 1. de la imagen a los tokens
+  K.register('parches', root => {
+    const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
+    const IM = { x: 36, y: 86, s: 252 }, q = IM.s / N;
+    const X0 = 340, DX = 20.6, TS = 17, TY = 82, VY = 196, VH = 88, VW = 13, PY = 352;
+    const fx = k => X0 + k * DX;
+    const sale = k => 0.15 + k * 0.0072;
+    // embedding posicional 2D sin-cos (fijo): mitad de las coordenadas codifica la fila, mitad la columna
+    const VIO = '#7b5ea7';
+    const PE = [...Array(NT)].map((_, k) => { const i = Math.floor(k / N), j = k % N, w = [1.1, 0.4];
+      return [Math.sin(i * w[0]), Math.cos(i * w[0]), Math.sin(i * w[1]), Math.cos(i * w[1]), Math.sin(j * w[0]), Math.cos(j * w[0]), Math.sin(j * w[1]), Math.cos(j * w[1])].map(v => (v + 1) / 2); });
+    const SUMA = PE.map((p, k) => p.map((v, c) => clamp(0.55 * VAL[k][c] + 0.45 * v, 0, 1)));
+    const draw = t => {
+      ctx.clearRect(0, 0, W, H);
+      const f1 = fase(t, 0.03, 0.13), f3 = fase(t, 0.55, 0.7), f4 = fase(t, 0.74, 0.84), f5 = fase(t, 0.87, 0.98);
+      encabezado(ctx, 1, t < 0.15 ? 'La imagen se corta en parches cuadrados que no se superponen'
+        : t < 0.54 ? 'Los parches se ordenan en una secuencia, por filas'
+        : t < 0.73 ? 'Una misma proyección lineal convierte cada parche en un vector: un token'
+        : t < 0.86 ? 'Cada posición de la grilla tiene su vector: el embedding posicional (sin-cos 2D, fijo)'
+        : 'Se suma a cada token: el token lleva consigo de qué lugar de la imagen salió');
+      ctx.drawImage(K.escena(), IM.x, IM.y, IM.s, IM.s);
+      for (let k = 0; k < NT; k++) {
+        const u = fase(t, sale(k), sale(k) + 0.12);
+        if (u > 0) { ctx.fillStyle = alfa(C.light, 0.82 * u); ctx.fillRect(IM.x + (k % N) * q, IM.y + Math.floor(k / N) * q, q, q); }
+      }
+      ctx.strokeStyle = alfa('#ffffff', f1); ctx.lineWidth = 2; ctx.beginPath();
+      for (let k = 1; k < N; k++) { ctx.moveTo(IM.x + k * q, IM.y); ctx.lineTo(IM.x + k * q, IM.y + IM.s); ctx.moveTo(IM.x, IM.y + k * q); ctx.lineTo(IM.x + IM.s, IM.y + k * q); }
+      ctx.stroke();
+      caja(ctx, IM.x, IM.y, IM.s, IM.s, { r: 3, stroke: C.grid, lw: 1.5 });
+      // en el paso de la posición, la grilla muestra (fila, columna) de cada parche
+      if (f4 > 0) for (let k = 0; k < NT; k++) {
+        const x = IM.x + (k % N) * q + q / 2, y = IM.y + Math.floor(k / N) * q + q / 2 + 5;
+        tx(ctx, `${Math.floor(k / N)},${k % N}`, x, y, { color: alfa(VIO, f4), size: 13, weight: '600', align: 'center' });
+      }
+      tx(ctx, f4 > 0 ? '(fila, columna) de cada parche' : 'imagen de 224 × 224 píxeles', IM.x + IM.s / 2, IM.y + IM.s + 24, { color: f4 > 0 ? VIO : C.grey2, size: 14, align: 'center' });
+      // parches en vuelo hacia la fila
+      for (let k = 0; k < NT; k++) {
+        const u = fase(t, sale(k), sale(k) + 0.12);
+        if (u <= 0) continue;
+        const x0 = IM.x + (k % N) * q, y0 = IM.y + Math.floor(k / N) * q, s = lerp(q, TS, u);
+        const x = lerp(x0, fx(k), u), y = lerp(y0, TY, u) - Math.sin(Math.PI * u) * 36;
+        parche(ctx, k, x, y, s); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.strokeRect(x, y, s, s);
+        if (u >= 1 && (k % 6 === 0 || k === NT - 1)) tx(ctx, String(k + 1), x + TS / 2, TY + TS + 15, { color: C.grey, size: 11.5, align: 'center' });
+      }
+      // proyección lineal
+      if (f3 > 0) {
+        caja(ctx, X0 - 6, 140, 36 * DX + 2, 34, { r: 8, fill: alfa(C.light, f3), stroke: alfa(C.blue, f3), lw: 1.5 });
+        tx(ctx, 'proyección lineal $E$, la misma para todos los parches', X0 + 18 * DX, 162, { color: alfa(C.blue, f3), size: 14, weight: '600', align: 'center' });
+        for (let k = 0; k < NT; k++) {
+          const u = clamp(f3 * 1.4 - (k / NT) * 0.4, 0, 1);
+          vec(ctx, fx(k) + 2, VY, VW, VH * u, k, C.blue, 1, { vals: f5 > 0.5 ? SUMA[k] : VAL[k], borde: f5 >= 1 ? VIO : null, lw: 1.4 });
+        }
+        if (f4 === 0) tx(ctx, 'tokens $E\\,x_k$: un vector por parche (768 números en un ViT-B)', X0, VY + VH + 22, { color: alfa(C.blue, f3), size: 14, weight: '600' });
+      }
+      // embedding posicional: aparece debajo de cada token y después sube y se suma
+      if (f4 > 0) {
+        const PH = 46, y = lerp(PY - 24, VY + 20, f5), a = f5 >= 1 ? 0 : f4 * (1 - fase(f5, 0.75, 1));
+        for (let k = 0; k < NT; k++) vec(ctx, fx(k) + 2, y, VW, PH, k, VIO, a, { vals: PE[k] });
+        if (f5 === 0) {
+          tx(ctx, '+', X0 + 18 * DX, VY + VH + 20, { color: VIO, size: 22, weight: '700', align: 'center' });
+          tx(ctx, 'embedding posicional $p_k$: cada coordenada es un seno o coseno de la fila o la columna; no se entrena', X0, PY + 40, { color: alfa(VIO, f4), size: 13.5, weight: '600' });
+        } else if (f5 >= 1) {
+          tx(ctx, 'token de entrada: $E\\,x_k + p_k$', X0, VY + VH + 22, { color: C.navy, size: 15, weight: '600' });
+          tx(ctx, 'Como cada token lleva su posición, después se pueden quitar tokens sin perder dónde estaba cada uno.', X0, VY + VH + 46, { color: C.grey2, size: 13.5 });
+        }
+      }
+      nota(ctx, W, H, 'Simplificado a 6 × 6 parches. Un ViT-B/16 a 224 px corta 14 × 14 = 196 parches de 16 × 16 píxeles.');
+    };
+    K.pasos(root, [0.14, 0.535, 0.725, 0.855, 1], draw, { ms: 16000, max: 4200 });
+  });
+
+  // ============================================================ 2. el encoder de contexto
+  K.register('contexto', root => {
+    const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
+    const MAP = { x: 30, y: 92, s: 156 }, X0 = 222, DX = 23.6, RY = 76, TW = 14, TH = 58;
+    const BOX = { x: 210, y: 166, w: 870, h: 116 }, OY = 298;
+    const xFila = k => X0 + k * DX;
+    const xComp = n => 645 - (CTX.length - 1) * 30 / 2 + n * 30;
+    const PARES = paresDe(CTX.length, 3);
+    const draw = t => {
+      ctx.clearRect(0, 0, W, H);
+      const a = fase(t, 0.02, 0.14), b = fase(t, 0.17, 0.35), c = fase(t, 0.37, 0.5), d = fase(t, 0.52, 0.8), e = fase(t, 0.82, 0.96);
+      encabezado(ctx, 3, t < 0.16 ? 'Cada token es contexto (verde), objetivo (coral) o ninguno (gris)'
+        : t < 0.36 ? 'Lo que no es contexto se descarta antes de entrar a la red'
+        : t < 0.51 ? `Quedan ${CTX.length} de los 36 tokens, cada uno con su posición ya sumada`
+        : t < 0.81 ? 'El encoder de contexto, un ViT, mezcla los tokens visibles con atención'
+        : 'Sale un vector por token visible: las representaciones de contexto $s_x$');
+      mapa(ctx, MAP.x, MAP.y, MAP.s, { color: colorMapa, cbox: true });
+      leyendaRoles(ctx, MAP.x + 10, MAP.y + MAP.s + 22);
+      red(ctx, BOX.x, BOX.y, BOX.w, BOX.h, 'Encoder de contexto $f_\\theta$', 'ViT · se entrena por gradiente', C.teal, fase(t, 0.42, 0.52));
+      // tokens descartados
+      for (let k = 0; k < NT; k++) {
+        if (ROL[k].r === 'ctx') continue;
+        const al = 1 - b;
+        if (al <= 0.01) continue;
+        vec(ctx, xFila(k), RY + b * 70, TW, TH, k, lerp(0, 1, a) > 0.5 ? colRol(k) : C.blue, al);
+      }
+      // tokens de contexto
+      CTX.forEach((k, n) => {
+        let x = lerp(xFila(k), xComp(n), c), y = RY;
+        if (d > 0) y = lerp(RY, BOX.y + 50, fase(d, 0, 0.35));
+        if (e > 0) y = lerp(BOX.y + 50, OY, e);
+        const col = a > 0.5 ? C.teal : C.blue;
+        vec(ctx, x, y, TW, TH, k, col, 1, { vals: mezcla(k, fase(d, 0.4, 1)), borde: e > 0.5 ? C.teal : null });
+      });
+      if (d > 0.3 && e < 0.6) arcos(ctx, CTX.map((_, n) => xComp(n) + TW / 2), BOX.y + 48, t, C.teal, fase(d, 0.3, 0.5) * (1 - fase(e, 0, 0.6)), PARES);
+      if (e > 0.5) tx(ctx, '$s_x$: cada vector ya mezcló información de los demás parches visibles; ninguno vio los objetivos', 222, OY + TH + 24, { color: C.teal, size: 14, weight: '600' });
+      nota(ctx, W, H, 'Como sólo procesa una parte de los parches, este encoder es más barato que uno que ve la imagen entera.');
+    };
+    K.pasos(root, [0.155, 0.355, 0.505, 0.805, 1], draw);
+  });
+
+  // ============================================================ 3. el encoder objetivo
+  K.register('objetivo', root => {
+    const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
+    const MAP = { x: 30, y: 92, s: 156 }, X0 = 222, DX = 23.6, RY = 76, TW = 14, TH = 58;
+    const BOX = { x: 210, y: 166, w: 870, h: 116 }, OY = 298;
+    const xFila = k => X0 + k * DX;
+    const OBJS = [...OBJK[0], ...OBJK[1]];
+    const xGrupo = k => { const b = bloqueDe(k), n = OBJK[b].indexOf(k); return (b === 0 ? 420 : 760) + n * 24; };
+    const xEntrada = k => { const b = bloqueDe(k), n = OBJK[b].indexOf(k); return (b === 0 ? 380 : 720) + n * 30; };
+    const PARES = paresDe(NT, 11), PB = [paresDe(6, 4), paresDe(6, 8)];
+    let modo = root.dataset.modo || 'salida';
+    const draw = t => {
+      ctx.clearRect(0, 0, W, H);
+      const a = fase(t, 0.02, 0.12);
+      mapa(ctx, MAP.x, MAP.y, MAP.s, { color: k => (ROL[k].r === 'obj' ? alfa(C.coral, 0.6) : null) });
+      tx(ctx, 'bloques objetivo', MAP.x + MAP.s / 2, MAP.y + MAP.s + 20, { color: C.grey2, size: 13.5, align: 'center' });
+      red(ctx, BOX.x, BOX.y, BOX.w, BOX.h, 'Encoder objetivo $f_{\\bar\\theta}$', 'misma arquitectura · sin gradiente', C.navy, 1);
+      if (modo === 'salida') {
+        const b = fase(t, 0.14, 0.44), c = fase(t, 0.46, 0.6), d = fase(t, 0.62, 0.72), e = fase(t, 0.74, 0.94);
+        encabezado(ctx, 4, t < 0.13 ? 'El encoder objetivo recibe la imagen completa: los 36 tokens'
+          : t < 0.27 ? 'Entran todos los tokens, sin quitar ninguno'
+          : t < 0.45 ? 'Todos los tokens se mezclan con atención: cada uno ve toda la escena'
+          : t < 0.61 ? 'Sale un vector por parche, para toda la imagen'
+          : t < 0.73 ? 'Cada vector se normaliza (layer norm)'
+          : 'Recién ahora se recortan las posiciones de los bloques: son los objetivos $s_y$');
+        for (let k = 0; k < NT; k++) {
+          const esObj = ROL[k].r === 'obj';
+          let x = xFila(k), y = lerp(RY, BOX.y + 50, fase(b, 0, 0.36));
+          if (c > 0) y = lerp(BOX.y + 50, OY, c);
+          let al = a, col = C.blue;
+          if (e > 0) { if (esObj) { x = lerp(xFila(k), xGrupo(k), e); col = C.coralD; } else al = 1 - e; }
+          const vals = mezcla(k, fase(b, 0.4, 1));
+          if (d > 0 && d < 1) { const pulso = Math.sin(Math.PI * d); ctx.fillStyle = alfa(C.navy, 0.15 * pulso); ctx.fillRect(x - 3, y - 3, TW + 6, TH + 6); }
+          vec(ctx, x, y, TW, TH, k, col, al, { vals, borde: e > 0.6 && esObj ? C.coralD : null });
+        }
+        if (b > 0.3 && c < 0.6) arcos(ctx, [...Array(NT)].map((_, k) => xFila(k) + TW / 2), BOX.y + 48, t, C.coralD, fase(b, 0.3, 0.5) * (1 - fase(c, 0, 0.6)), PARES);
+        if (d > 0 && e < 0.3) tx(ctx, 'layer norm', 222 + 36 * DX / 2, OY + TH + 24, { color: C.navy, size: 14, weight: '600', align: 'center' });
+        if (e > 0.5) {
+          tx(ctx, '$s_y$ bloque 1', 420 + 2.5 * 24 + 7, OY + TH + 24, { color: C.coralD, size: 14, weight: '600', align: 'center' });
+          tx(ctx, '$s_y$ bloque 2', 760 + 2.5 * 24 + 7, OY + TH + 24, { color: C.coralD, size: 14, weight: '600', align: 'center' });
+        }
+      } else {
+        const b = fase(t, 0.12, 0.3), c = fase(t, 0.32, 0.6), e = fase(t, 0.62, 0.9);
+        encabezado(ctx, 4, t < 0.31 ? 'Alternativa (ablación): recortar los bloques antes de entrar a la red'
+          : t < 0.61 ? 'Cada bloque se codifica solo: sus tokens no ven el resto de la escena'
+          : 'Los objetivos salen sin información del resto de la escena');
+        for (let k = 0; k < NT; k++) {
+          const esObj = ROL[k].r === 'obj';
+          if (!esObj) { if (b < 1) vec(ctx, xFila(k), RY + b * 70, TW, TH, k, C.blue, a * (1 - b)); continue; }
+          let x = lerp(xFila(k), xEntrada(k), fase(c, 0, 0.4)), y = lerp(RY, BOX.y + 50, fase(c, 0.3, 1));
+          if (e > 0) y = lerp(BOX.y + 50, OY, e);
+          vec(ctx, x, y, TW, TH, k, C.coralD, a, { vals: mezcla(k, 0.35 * fase(c, 0.5, 1)), borde: e > 0.6 ? C.coralD : null });
+        }
+        if (c > 0.9 && e < 0.6) [0, 1].forEach(bb => arcos(ctx, OBJK[bb].map(k => xEntrada(k) + TW / 2), BOX.y + 48, t, C.coralD, (1 - fase(e, 0, 0.6)), PB[bb]));
+      }
+      // resultado de la ablación (tabla 11 del paper)
+      const on = modo === 'salida';
+      tx(ctx, 'Top-1 con 1 % de etiquetas (ViT-H/16, 300 épocas):', 560, H - 12, { color: C.grey2, size: 13.5 });
+      tx(ctx, 'salida 67,3', 905, H - 12, { color: on ? C.teal : C.grey, size: 14, weight: on ? '700' : '400' });
+      tx(ctx, 'entrada 56,1', 1000, H - 12, { color: !on ? C.coralD : C.grey, size: 14, weight: !on ? '700' : '400' });
+    };
+    const ST = { salida: [0.125, 0.265, 0.445, 0.605, 0.725, 1], entrada: [0.11, 0.305, 0.605, 1] };
+    const L = K.pasos(root, ST.salida, draw, { nMax: 5 });
+    const b = root.querySelector('.ot-controls'); b.classList.add('ot-controls-wrap');
+    K.opciones(b, [['salida', 'recortar a la salida (I-JEPA)'], ['entrada', 'recortar a la entrada (ablación)']], modo, v => { modo = v; L.setStops(ST[v]); L.va(0, true); });
+  });
+
+  // ============================================================ 4. el predictor
+  K.register('predictor', root => {
+    const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
+    const MAP = { x: 30, y: 92, s: 156 }, BOX = { x: 210, y: 166, w: 870, h: 116 };
+    const CX0 = 226, CDX = 24, RY = 92, TW = 14, TH0 = 58, TH1 = 30, MX0 = 790, MDX = 26, OY = 298, TPL = { x: 945, y: 58 };
+    const xc = n => CX0 + n * CDX, xm = n => MX0 + n * MDX;
+    const draw = tt => {
+      ctx.clearRect(0, 0, W, H);
+      const bq = Math.min(1, Math.floor(tt)), u = tt - bq >= 1 ? 1 : tt - bq, OB = OBJK[bq];
+      const a = fase(u, 0.02, 0.16), b = fase(u, 0.18, 0.36), c = fase(u, 0.37, 0.5), d = fase(u, 0.52, 0.76), e = fase(u, 0.78, 0.92);
+      encabezado(ctx, 5, u < 0.17 ? 'El contexto se proyecta a 384 dimensiones y se le vuelve a sumar su posición'
+        : u < 0.37 ? 'Un único token de máscara, aprendido, se copia una vez por parche a predecir'
+        : u < 0.51 ? 'A cada copia se le suma la posición de su parche objetivo: «¿qué hay acá?»'
+        : u < 0.77 ? 'El predictor, un ViT angosto, procesa contexto y máscaras juntos'
+        : `Las salidas en las posiciones de máscara son la predicción $\\hat s_y$ del bloque ${bq + 1}`);
+      mapa(ctx, MAP.x, MAP.y, MAP.s, { color: k => (OB.includes(k) ? alfa(C.coral, 0.65) : ROL[k].r === 'ctx' ? null : 'rgba(150,155,170,0.78)') });
+      tx(ctx, `bloque ${bq + 1} de 2`, MAP.x + MAP.s / 2, MAP.y + MAP.s + 20, { color: C.coralD, size: 14, weight: '600', align: 'center' });
+      red(ctx, BOX.x, BOX.y, BOX.w, BOX.h, 'Predictor $g_\\phi$', 'ViT angosto · 384 dimensiones', C.blue, fase(u, 0.45, 0.53));
+      const th = lerp(TH0, TH1, a);
+      // contexto
+      CTX.forEach((k, n) => {
+        let y = RY;
+        if (d > 0) y = lerp(RY, BOX.y + 50, fase(d, 0, 0.35));
+        let al = 1;
+        if (e > 0) { y = lerp(BOX.y + 50, OY, e); al = 1 - e; }
+        vec(ctx, xc(n), y, TW, th, k, C.teal, al, { vals: mezcla(k, 1) });
+      });
+      if (a > 0 && a < 1) tx(ctx, 'proyección lineal a 384 dimensiones', CX0, RY + TH0 + 16, { color: C.teal, size: 13.5, weight: '600' });
+      if (a >= 1 && d === 0) tx(ctx, `$s_x$ (${CTX.length} tokens de contexto)`, CX0, RY + TH1 + 20, { color: C.teal, size: 13.5, weight: '600' });
+      // token de máscara: uno solo, aprendido
+      const MV = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
+      if (d < 0.3) {
+        vec(ctx, TPL.x, TPL.y, TW, TH1, 0, C.grey, 1, { vals: MV, borde: C.grey, dash: [3, 2] });
+        tx(ctx, 'token de máscara', TPL.x + TW + 8, TPL.y + 12, { color: C.grey2, size: 12.5 });
+        tx(ctx, '(uno, aprendido)', TPL.x + TW + 8, TPL.y + 27, { color: C.grey2, size: 12.5 });
+      }
+      OB.forEach((k, n) => {
+        const v = fase(b, n * 0.09, n * 0.09 + 0.5);
+        if (v <= 0) return;
+        let x = lerp(TPL.x, xm(n), v), y = lerp(TPL.y, RY, v);
+        if (d > 0) y = lerp(RY, BOX.y + 50, fase(d, 0, 0.35));
+        if (e > 0) y = lerp(BOX.y + 50, OY, e);
+        const h = e > 0 ? lerp(TH1, TH0, e) : TH1;
+        const lleno = e > 0.3;
+        vec(ctx, x, y, TW, h, k, lleno ? C.blue : C.grey, 1, { vals: lleno ? mezcla(k, 1) : MV, borde: c > 0.3 ? C.coralD : C.grey, dash: lleno ? [] : [3, 2] });
+        // la posición del parche objetivo llega desde el mapa
+        if (c > 0 && c < 1 && d === 0) {
+          const q = MAP.s / N, px = MAP.x + (k % N + 0.5) * q, py = MAP.y + (Math.floor(k / N) + 0.5) * q;
+          flecha(ctx, [[px, py], [x + TW / 2, RY - 4]], alfa(C.coralD, 0.55), { lw: 1.4, t: c, cabeza: 6 });
+        }
+      });
+      if (c > 0.3 && d === 0) tx(ctx, '+ posición', xm(0), RY + TH1 + 20, { color: C.coralD, size: 13.5, weight: '600' });
+      // atención: del contexto hacia las máscaras
+      if (d > 0.3 && e < 0.6) {
+        const al = fase(d, 0.3, 0.5) * (1 - fase(e, 0, 0.6));
+        CTX.forEach((_, n) => {
+          if (n % 2) return;
+          const m = n % OB.length, w = al * 0.5 * (1 + Math.sin(2 * Math.PI * (2.5 * u + n / CTX.length)));
+          if (w < 0.05) return;
+          const x1 = xc(n) + TW / 2, x2 = xm(m) + TW / 2, y = BOX.y + 50;
+          ctx.strokeStyle = alfa(C.blue, 0.8 * w); ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(x1, y); ctx.quadraticCurveTo((x1 + x2) / 2, y - 30, x2, y); ctx.stroke();
+        });
+      }
+      if (e > 0.5) {
+        tx(ctx, 'las salidas del contexto se descartan', CX0, OY + TH0 + 22, { color: C.grey, size: 13.5 });
+        tx(ctx, `$\\hat s_y$ bloque ${bq + 1}`, xm(0), OY + TH0 + 22, { color: C.blue, size: 14, weight: '600' });
+        tx(ctx, '(de vuelta a la dimensión del encoder)', xm(0), OY + TH0 + 40, { color: C.grey2, size: 12.5 });
+      }
+      tx(ctx, 'Se repite una vez por bloque objetivo: 4 en el paper, 2 en este dibujo.', 24, H - 12, { color: C.grey2, size: 13.5 });
+    };
+    K.pasos(root, [0.165, 0.365, 0.505, 0.765, 0.999, 1.365, 1.765, 2], draw, { ms: 7000 });
+  });
+
+  // ============================================================ 5. la pérdida
+  K.register('perdida', root => {
+    const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
+    const OB = OBJK[0], r = mulberry(21);
+    const P0 = OB.map(() => [...Array(8)].map(() => r()));
+    const RES = OB.map(() => [...Array(8)].map(() => (r() - 0.5) * 0.14));
+    const T = OB.map(k => VAL2[k]);
+    const pred = (j, u) => T[j].map((s, c) => clamp(lerp(P0[j][c], s + RES[j][c], ease(u)), 0, 1));
+    const dist = (j, u) => pred(j, u).reduce((acc, p, c) => acc + (p - T[j][c]) ** 2, 0);
+    const perd = u => OB.reduce((acc, _, j) => acc + dist(j, u), 0);
+    const L0 = perd(0);
+    const BX = 30, BW = 104, BGAP = 12, BY = 96, BH = 150;
+    const R2 = { x: 760, y: 100, w: 300, h: 170 };
+    const draw = t => {
+      ctx.clearRect(0, 0, W, H);
+      encabezado(ctx, 6, t < 0.01 ? 'Al principio, la predicción de cada parche no se parece al objetivo'
+        : t < 0.31 ? 'El gradiente acerca la predicción al objetivo, parche por parche'
+        : 'Al final quedan diferencias: no todo se puede predecir');
+      // leyenda de colores
+      caja(ctx, BX, 62, 14, 14, { r: 3, fill: alfa(C.blue, 0.75) }); tx(ctx, 'predicción $\\hat s_y$', BX + 22, 74, { color: C.blue, size: 14, weight: '600' });
+      caja(ctx, BX + 190, 62, 14, 14, { r: 3, stroke: C.coralD, lw: 1.8 }); tx(ctx, 'objetivo $s_y$', BX + 212, 74, { color: C.coralD, size: 14, weight: '600' });
+      OB.forEach((k, j) => {
+        const x = BX + j * (BW + BGAP), p = pred(j, t);
+        caja(ctx, x, BY, BW, BH, { r: 8, fill: '#fafafc', stroke: C.grid, lw: 1.2 });
+        const base = BY + BH - 12, alto = BH - 30;
+        for (let c = 0; c < 8; c++) {
+          const bx = x + 8 + c * 11;
+          ctx.fillStyle = alfa(C.blue, 0.75); ctx.fillRect(bx, base - alto * p[c], 7, alto * p[c]);
+          ctx.strokeStyle = C.coralD; ctx.lineWidth = 1.6; ctx.strokeRect(bx - 0.5, base - alto * T[j][c], 8, alto * T[j][c]);
+        }
+        tx(ctx, 'parche ' + (j + 1), x + BW / 2, BY + BH + 20, { color: C.grey2, size: 13, align: 'center' });
+        tx(ctx, dist(j, t).toFixed(2).replace('.', ','), x + BW / 2, BY + BH + 44, { color: C.navy, size: 17, weight: '700', align: 'center' });
+      });
+      tx(ctx, 'distancia $D(\\hat s_{y_j}, s_{y_j})$ de cada parche', BX, BY + BH + 70, { color: C.grey2, size: 13.5 });
+      tx(ctx, `pérdida del bloque = promedio de las seis = ${(perd(t) / OB.length).toFixed(2).replace('.', ',')}`, BX, BY + BH + 102, { color: C.navy, size: 17, weight: '700' });
+      // curva de la pérdida durante el entrenamiento
+      tx(ctx, 'pérdida a lo largo del entrenamiento', R2.x, R2.y - 8, { color: C.navy, size: 14.5, weight: '600' });
+      ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+      for (let g = 0; g <= 4; g++) { const y = R2.y + R2.h * g / 4; ctx.beginPath(); ctx.moveTo(R2.x, y); ctx.lineTo(R2.x + R2.w, y); ctx.stroke(); }
+      ctx.strokeStyle = C.grey; ctx.beginPath(); ctx.moveTo(R2.x, R2.y + R2.h); ctx.lineTo(R2.x + R2.w, R2.y + R2.h); ctx.stroke();
+      ctx.strokeStyle = C.coral; ctx.lineWidth = 3; ctx.beginPath();
+      for (let i = 0; i <= 120; i++) { const u = t * i / 120, x = R2.x + R2.w * u, y = R2.y + R2.h * (1 - perd(u) / L0); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke();
+      K.dot(ctx, R2.x + R2.w * t, R2.y + R2.h * (1 - perd(t) / L0), C.coral, 6);
+      tx(ctx, 'pasos de entrenamiento →', R2.x + R2.w, R2.y + R2.h + 20, { color: C.grey2, size: 13, align: 'right' });
+      tx(ctx, 'no llega a cero: no todo es predecible', R2.x, R2.y + R2.h + 44, { color: C.grey2, size: 13 });
+      // quién recibe el gradiente
+      tx(ctx, 'el gradiente llega al predictor y al encoder', R2.x, R2.y + R2.h + 72, { color: C.blue, size: 13.5, weight: '600' });
+      tx(ctx, 'de contexto; $s_y$ no recibe gradiente', R2.x, R2.y + R2.h + 92, { color: C.blue, size: 13.5, weight: '600' });
+    };
+    K.pasos(root, [0, 0.3, 1], draw, { ms: 4000 });
+  });
+
+  // ============================================================ 6. el promedio móvil (EMA)
+  K.register('ema', root => {
+    const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
+    const P = { x: 30, y: 62, s: 318 }, S = { x: 440, y: 78, w: 620, h: 196 }, MS = { x: 800, y: 330, w: 260, h: 56 };
+    // trayectoria fija de los pesos de contexto (descenso de gradiente con ruido) y tres versiones del promedio móvil
+    const T = 1500, rnd = mulberry(7), th = [[0.75, 0.35]];
+    const optimo = k => [0.62 * Math.cos(k / 260), 0.62 * Math.sin(k / 190)];
+    for (let k = 1; k < T; k++) { const p = th[k - 1], o = optimo(k); th.push([0, 1].map(d => p[d] + 0.025 * (o[d] - p[d]) + 0.032 * gauss(rnd))); }
+    const ema = mk => { const out = [th[0].slice()]; for (let k = 1; k < T; k++) { const m = mk(k); out.push([0, 1].map(d => m * out[k - 1][d] + (1 - m) * th[k][d])); } return out; };
+    const E90 = ema(() => 0.9), E996 = ema(() => 0.996), ESCH = ema(k => 0.996 + 0.004 * k / T);
+    const PX = v => P.x + P.s / 2 + v * P.s * 0.42, PY = v => P.y + P.s / 2 - v * P.s * 0.42;
+    const SX = k => S.x + S.w * k / T, SY = v => S.y + S.h / 2 - v * S.h * 0.62;
+    const traza = (pts, n, col, lw, plano) => {
+      if (n < 2) return; ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.beginPath();
+      for (let k = 0; k < n; k++) { const x = plano ? PX(pts[k][0]) : SX(k), y = plano ? PY(pts[k][1]) : SY(pts[k][0]); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke();
+    };
+    const capa = (pts, n, col, lw) => { traza(pts, n, col, lw, true); traza(pts, n, col, lw, false); if (n > 1) K.dot(ctx, PX(pts[n - 1][0]), PY(pts[n - 1][1]), col, lw + 4); };
+    const draw = t => {
+      ctx.clearRect(0, 0, W, H);
+      const u0 = clamp(t, 0, 1), u1 = clamp(t - 1, 0, 1), u2 = clamp(t - 2, 0, 1), u3 = clamp(t - 3, 0, 1);
+      encabezado(ctx, 7, t < 1.001 ? 'Los pesos $\\theta$ del encoder de contexto se mueven por gradiente, con ruido'
+        : t < 2.001 ? 'Promedio móvil $\\bar\\theta \\leftarrow m\\,\\bar\\theta + (1-m)\\,\\theta$: con $m = 0{,}9$ sigue de cerca a $\\theta$'
+        : t < 3.001 ? 'Con $m = 0{,}996$ promedia unos 250 pasos: el objetivo cambia despacio'
+        : 'En I-JEPA $m$ sube de 0,996 a 1: hacia el final el encoder objetivo casi no se mueve');
+      caja(ctx, P.x, P.y, P.s, P.s, { r: 10, fill: '#fafafc', stroke: C.grid, lw: 1.2 });
+      tx(ctx, 'pesos de la red (esquema en 2D)', P.x, P.y + P.s + 22, { color: C.grey2, size: 13.5 });
+      ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+      for (let g = 0; g <= 4; g++) { const y = S.y + S.h * g / 4; ctx.beginPath(); ctx.moveTo(S.x, y); ctx.lineTo(S.x + S.w, y); ctx.stroke(); }
+      tx(ctx, 'una coordenada de los pesos a lo largo del entrenamiento', S.x, S.y - 14, { color: C.navy, size: 14.5, weight: '600' });
+      tx(ctx, 'pasos →', S.x + S.w, S.y + S.h + 18, { color: C.grey2, size: 12.5, align: 'right' });
+      // θ: siempre de fondo una vez dibujado
+      capa(th, Math.round(T * u0), alfa(C.coral, t > 1 ? 0.45 : 0.8), 1.2);
+      // m = 0,9
+      if (u1 > 0) capa(E90, Math.round(T * u1), alfa(C.blue, t > 2 ? 0.25 : 1), 2);
+      // m = 0,996 fijo
+      if (u2 > 0) capa(E996, Math.round(T * u2), alfa(C.teal, t > 3 ? 0.3 : 1), 3);
+      // m de 0,996 a 1
+      if (u3 > 0) {
+        capa(ESCH, Math.round(T * u3), C.teal, 3.4);
+        caja(ctx, MS.x - 10, MS.y - 26, MS.w + 20, MS.h + 46, { r: 8, fill: '#fafafc' });
+        tx(ctx, '$m$ durante el entrenamiento', MS.x, MS.y - 8, { color: C.navy, size: 13, weight: '600' });
+        ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.strokeRect(MS.x, MS.y, MS.w, MS.h);
+        ctx.strokeStyle = C.teal; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(MS.x, MS.y + MS.h); ctx.lineTo(MS.x + MS.w * u3, MS.y + MS.h - MS.h * u3); ctx.stroke();
+        tx(ctx, '0,996', MS.x - 4, MS.y + MS.h + 4, { color: C.grey2, size: 11.5, align: 'right' });
+        tx(ctx, '1', MS.x - 4, MS.y + 8, { color: C.grey2, size: 11.5, align: 'right' });
+      }
+      // leyenda
+      const LY = S.y + S.h + 44;
+      tx(ctx, '$\\theta$: encoder de contexto', S.x, LY, { color: C.coralD, size: 14, weight: '600' });
+      if (u1 > 0) tx(ctx, '$\\bar\\theta$ con $m = 0{,}9$', S.x, LY + 22, { color: alfa(C.blue, t > 2 ? 0.45 : 1), size: 14, weight: '600' });
+      if (u2 > 0) tx(ctx, '$\\bar\\theta$ con $m = 0{,}996$', S.x, LY + 44, { color: alfa(C.teal, t > 3 ? 0.5 : 1), size: 14, weight: '600' });
+      if (u3 > 0) tx(ctx, '$\\bar\\theta$ con $m$ de 0,996 a 1 (I-JEPA)', S.x, LY + 66, { color: C.teal, size: 14, weight: '700' });
+    };
+    K.pasos(root, [0, 1, 2, 3, 4], draw, { ms: 4200, max: 4200 });
+  });
+
+  // ============================================================ 7. después de entrenar: la evaluación
+  K.register('evaluacion', root => {
+    const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
+    const IM = { x: 30, y: 186, s: 150 }, ENC = { x: 230, y: 196, w: 200, h: 130 };
+    const G = { x: 470, y: 200, dx: 20, dy: 22 }, POOL = { x: 680, y: 222 }, LIN = { x: 750, y: 206, w: 150, h: 92 };
+    const CLASES = [['casa', 0.62], ['granja', 0.21], ['lago', 0.1], ['montaña', 0.07]];
+    const draw = t => {
+      ctx.clearRect(0, 0, W, H);
+      const a = fase(t, 0.03, 0.18), b = fase(t, 0.2, 0.38), c = fase(t, 0.4, 0.54), d = fase(t, 0.56, 0.72), e = fase(t, 0.74, 0.84), f = fase(t, 0.86, 0.98);
+      encabezado(ctx, '✓', t < 0.19 ? 'Al terminar el preentrenamiento, el encoder de contexto y el predictor se descartan'
+        : t < 0.55 ? 'Se usa el encoder objetivo, congelado: una imagen nueva da un vector por parche'
+        : t < 0.73 ? 'Los vectores de todos los parches se promedian en uno solo'
+        : 'Encima se entrena sólo un clasificador lineal: la evaluación lineal');
+      // las tres redes entrenadas
+      const top = [['Encoder de contexto', C.teal, true], ['Predictor', C.blue, true], ['Encoder objetivo', C.coralD, false]];
+      top.forEach(([n, col, fuera], i) => {
+        const x = 230 + i * 250, y = 56;
+        const al = fuera ? 1 - 0.7 * a : 1;
+        caja(ctx, x, y, 220, 50, { r: 12, fill: '#ffffff', stroke: alfa(col, al), lw: 2.4 });
+        tx(ctx, n, x + 110, y + 31, { color: alfa(col, al), size: 15.5, weight: '600', align: 'center' });
+        if (fuera && a > 0) { ctx.strokeStyle = alfa(C.coralD, a); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + 12, y + 8); ctx.lineTo(x + 208, y + 42); ctx.stroke(); tx(ctx, 'se descarta', x + 110, y + 70, { color: alfa(C.coralD, a), size: 13.5, align: 'center' }); }
+        if (!fuera && a > 0.5) tx(ctx, 'se usa, congelado ↓', x + 110, y + 70, { color: C.coralD, size: 13.5, weight: '600', align: 'center' });
+      });
+      // imagen nueva y encoder
+      if (b > 0) {
+        ctx.globalAlpha = b; ctx.drawImage(K.escena(), IM.x, IM.y, IM.s, IM.s); ctx.globalAlpha = 1;
+        caja(ctx, IM.x, IM.y, IM.s, IM.s, { r: 3, stroke: alfa(C.grid, b), lw: 1.5 });
+        tx(ctx, 'imagen nueva', IM.x + IM.s / 2, IM.y + IM.s + 20, { color: alfa(C.grey2, b), size: 13.5, align: 'center' });
+        flecha(ctx, [[IM.x + IM.s + 6, IM.y + IM.s / 2], [ENC.x - 4, IM.y + IM.s / 2]], alfa(C.navy, b), { t: b });
+        red(ctx, ENC.x, ENC.y, ENC.w, ENC.h, 'Encoder objetivo', null, C.navy, b);
+        tx(ctx, 'imagen completa,', ENC.x + 16, ENC.y + 56, { color: alfa(C.grey2, b), size: 13.5 });
+        tx(ctx, 'sin máscaras', ENC.x + 16, ENC.y + 76, { color: alfa(C.grey2, b), size: 13.5 });
+        tx(ctx, '❄ congelado', ENC.x + 16, ENC.y + 108, { color: alfa(C.blue, b), size: 13.5, weight: '600' });
+      }
+      // un vector por parche y su promedio
+      if (c > 0) {
+        flecha(ctx, [[ENC.x + ENC.w + 4, ENC.y + ENC.h / 2], [G.x - 8, ENC.y + ENC.h / 2]], alfa(C.navy, c), { t: c });
+        for (let k = 0; k < NT; k++) {
+          const x0 = G.x + (k % N) * G.dx, y0 = G.y + Math.floor(k / N) * G.dy;
+          vec(ctx, x0, y0, 12, 18, k, C.coralD, c * (1 - 0.6 * d), { vals: VAL2[k] });
+          if (d > 0 && d < 1) vec(ctx, lerp(x0, POOL.x, d), lerp(y0, POOL.y, d), 12, 18, k, C.coralD, 1 - d, { vals: VAL2[k] });
+        }
+        if (d === 0) tx(ctx, '36 vectores', G.x + 3 * G.dx, G.y + 6 * G.dy + 16, { color: C.grey2, size: 13.5, align: 'center' });
+      }
+      if (d > 0) {
+        flecha(ctx, [[G.x + 6 * G.dx + 2, G.y + 3 * G.dy + 6], [POOL.x - 10, G.y + 3 * G.dy + 6]], alfa(C.navy, d), { t: d });
+        const prom = [...Array(8)].map((_, ci) => VAL2.reduce((s, v) => s + v[ci], 0) / NT);
+        vec(ctx, POOL.x - 4, POOL.y - 20, 20, lerp(18, 70, d), 0, C.navy, d, { vals: prom.map(v => clamp((v - 0.35) * 2.5, 0, 1)) });
+        tx(ctx, 'promedio', POOL.x + 6, POOL.y + 72, { color: alfa(C.navy, d), size: 13.5, weight: '600', align: 'center' });
+      }
+      if (e > 0) {
+        flecha(ctx, [[POOL.x + 22, POOL.y + 14], [LIN.x - 4, POOL.y + 14]], alfa(C.navy, e), { t: e });
+        caja(ctx, LIN.x, LIN.y, LIN.w, LIN.h, { r: 12, fill: alfa(C.light, e), stroke: alfa(C.blue, e), lw: 2.2 });
+        tx(ctx, 'clasificador', LIN.x + LIN.w / 2, LIN.y + 36, { color: alfa(C.blue, e), size: 15, weight: '600', align: 'center' });
+        tx(ctx, 'lineal', LIN.x + LIN.w / 2, LIN.y + 56, { color: alfa(C.blue, e), size: 15, weight: '600', align: 'center' });
+        tx(ctx, 'lo único que se entrena', LIN.x + LIN.w / 2, LIN.y + LIN.h + 20, { color: alfa(C.grey2, e), size: 13, align: 'center' });
+      }
+      if (f > 0) {
+        CLASES.forEach(([n, p], i) => {
+          const y = 206 + i * 26;
+          tx(ctx, n, 925, y + 14, { color: C.navy, size: 14 });
+          caja(ctx, 1004, y + 2, 66 * p * f, 16, { r: 4, fill: i ? alfa(C.grey, 0.7) : C.teal });
+        });
+      }
+      tx(ctx, 'Si una capa lineal alcanza para clasificar bien, la representación ya tenía la información ordenada. Probabilidades ilustrativas.', 24, H - 12, { color: C.grey2, size: 13.5 });
+    };
+    K.pasos(root, [0.185, 0.545, 0.725, 1], draw);
+  });
+})();
+</script>

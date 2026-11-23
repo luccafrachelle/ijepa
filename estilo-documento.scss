@@ -1,0 +1,239 @@
+/* Versión documento (HTML) del tema de las slides Chizat–Bach.
+   Misma paleta y tipografía que estilo-slides.scss:
+   Rubik / Poppins, blanco, azul oscuro, separadores coral. */
+
+/*-- scss:defaults --*/
+$font-family-sans-serif: 'Poppins', 'Helvetica Neue', sans-serif;
+$headings-font-family: 'Rubik', sans-serif;
+$headings-font-weight: 600;
+$headings-color: #16213e;
+$body-color: #1a1a2e;
+$body-bg: #ffffff;
+$primary: #0f3460;
+$link-color: #e94560;
+$code-bg: #f4f4f8;
+$code-color: #1a1a2e;
+$toc-active-border: #f28482;
+$toc-color: #6b7280;
+$toc-font-size: 0.8rem;
+$line-height-base: 1.72;
+
+/*-- scss:rules --*/
+$navy: #16213e;
+$blue: #0f3460;
+$coral: #f28482;
+$coral-d: #ce5553;
+$teal: #2a9d8f;
+$grey: #6b7280;
+$grey2: #8b91a0;
+$light: #f4f4f8;
+$grid: #e6e7ec;
+
+html { font-size: 16.5px; scroll-behavior: smooth; }
+body { color: #1a1a2e; }
+p, li { line-height: 1.72; }
+strong { font-weight: 600; }
+li::marker { color: $blue; }
+a { text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3, h4 { font-family: 'Rubik', sans-serif; color: $navy; letter-spacing: 0; }
+h2 { font-size: 1.6rem; line-height: 1.25; margin-top: 3rem; padding-bottom: 0.4rem; border-bottom: 1px solid $grid; }
+h3 { font-size: 1.22rem; margin-top: 2rem; }
+.header-section-number { color: $coral; margin-right: 0.15em; }
+
+/* ---------- portada ---------- */
+#title-block-header { display: none; }
+.cover {
+  display: grid; grid-template-columns: 2.3fr 1fr; gap: 42px; align-items: end;
+  margin: 1.2rem 0 1.4rem; padding: 3.2rem 0 2.4rem; border-bottom: 3px solid $coral;
+}
+.cover h1.cover-title { font-size: 2.75rem; font-weight: 700; line-height: 1.08; margin: 0; border: 0; }
+.cover-aside { border-left: 3px solid $blue; padding-left: 24px; color: $grey; }
+.cover-aside .eyebrow { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; color: $blue; margin: 0; }
+.cover-aside .name { font-size: 1.45rem; line-height: 1.25; margin: 18px 0; color: #1a1a2e; }
+.cover-aside .details { font-size: 0.85rem; line-height: 1.5; margin: 0; }
+.lead { font-size: 1.1rem; line-height: 1.7; color: #2c2f45; }
+.acciones { display: flex; flex-wrap: wrap; gap: 10px; margin: 0.4rem 0 1.6rem; }
+.acciones button, .acciones a {
+  font: 500 0.82rem 'Poppins', sans-serif; color: $blue; background: $light; border: 1px solid $grid;
+  border-radius: 999px; padding: 6px 14px; cursor: pointer; text-decoration: none;
+}
+.acciones button:hover, .acciones a:hover { background: #e9eaf2; text-decoration: none; }
+
+/* ---------- títulos de parte: texto coral, sin recuadro ---------- */
+section.parte > h1 {
+  color: $coral; border: 0; font-size: 2.05rem; line-height: 1.2; font-weight: 600;
+  margin: 4.5rem 0 0.3rem;
+}
+section.parte > h1 .header-section-number { color: $coral; }
+section.parte > h1 .header-section-number::before { content: "Parte "; }
+section.parte > h1 .header-section-number::after { content: " ·"; }
+section.parte > h1 + p.sub, section.parte > p.sub:first-of-type {
+  color: $grey; font-size: 1.05rem; margin: 0 0 2rem;
+}
+
+/* ---------- cajas: teoremas, pruebas, ideas ---------- */
+.theorem, .caja, .proof {
+  background: $light; border-left: 5px solid $blue; border-radius: 6px;
+  padding: 14px 22px; margin: 1.1rem 0 1.4rem;
+}
+.theorem-title, .proof-title, .caja .tag {
+  display: block; font-family: 'Rubik', sans-serif; font-weight: 600; font-size: 0.93rem;
+  color: $blue; margin-bottom: 4px; font-style: normal;
+}
+.theorem-title strong { font-weight: 600; }
+.proof-title em { font-style: normal; }
+.theorem.definition { background: #f7f7fb; border-left-color: $navy; }
+.proof { background: #fff6f5; border-left-color: $coral; }
+.proof .proof-title { color: $coral-d; }
+.proof.remark { background: #f7f7fb; border-left-color: $grey2; }
+.proof.remark .proof-title { color: $navy; }
+.caja.idea { background: #f1f8f7; border-left-color: $teal; }
+.caja.idea .tag { color: $teal; }
+.caja.prueba { background: #fff6f5; border-left-color: $coral; }
+.caja.prueba .tag { color: $coral-d; }
+.theorem > :last-child, .caja > :last-child, .proof > :last-child { margin-bottom: 0; }
+body.sin-pruebas .proof:not(.remark) > :not(:first-child) { display: none; }
+body.sin-pruebas .proof:not(.remark) > p:first-child { margin: 0; font-size: 0; }
+body.sin-pruebas .proof:not(.remark) > p:first-child .proof-title { font-size: 0.93rem; margin: 0; }
+body.sin-pruebas .proof:not(.remark) > p:first-child .proof-title::after { content: " (oculta)"; font-weight: 400; color: $grey2; }
+body.sin-pruebas .proof:not(.remark) { padding: 8px 20px; }
+
+/* ---------- figuras y leyendas ---------- */
+.quarto-figure { margin: 1.4rem 0 1.6rem; }
+.quarto-figure img, .figure-img { border-radius: 6px; max-width: 100%; height: auto; }
+.quarto-figure figcaption, .figure-caption {
+  color: $grey; font-size: 0.84rem; line-height: 1.5; margin-top: 8px; text-align: left;
+}
+.leyenda { color: $grey; font-size: 0.84rem; line-height: 1.5; margin: 6px 0 1rem; }
+.credito { color: $grey2; font-size: 0.74rem; line-height: 1.45; margin: 6px 0 1rem; }
+.tres-img { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.tres-img img { width: 100%; border-radius: 6px; }
+.tres-img p { margin: 0; }
+
+/* ---------- columnas (como en las slides) ---------- */
+.columns { display: flex; gap: 30px; align-items: flex-start; margin: 1rem 0; }
+.column { min-width: 0; }
+.column > :last-child { margin-bottom: 0; }
+.column img { max-width: 100%; }
+@media (max-width: 760px) {
+  .columns { flex-direction: column; gap: 10px; }
+  .column { width: 100% !important; }
+  .cover { grid-template-columns: 1fr; gap: 24px; padding-top: 1.8rem; }
+  .cover h1.cover-title { font-size: 2.05rem; }
+  .tres-img { grid-template-columns: 1fr; }
+  section.parte > h1 { font-size: 1.55rem; }
+}
+
+/* ---------- widgets animados ---------- */
+.ot-widget { margin: 1.2rem 0 0.4rem; background: #fff; border: 1px solid $grid; border-radius: 10px; padding: 12px 14px 8px; }
+.ot-widget canvas { display: block; width: 100%; height: auto; }
+.ot-controls { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.ot-play {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; border: 0; background: $blue; color: #fff;
+  display: grid; place-items: center; cursor: pointer; padding: 0;
+}
+.ot-play svg { fill: currentColor; }
+.ot-play:hover { background: $navy; }
+.ot-controls input[type=range] { flex: 1; accent-color: $coral; min-width: 80px; }
+.ot-hint { flex: none; font-size: 0.74rem; color: $grey2; }
+@media (max-width: 560px) { .ot-hint { display: none; } }
+.ot-controls-wrap { flex-wrap: wrap; row-gap: 8px; }
+.ot-btn {
+  font: 500 0.78rem 'Poppins', sans-serif; color: $blue; background: $light; border: 1px solid $grid;
+  border-radius: 999px; padding: 5px 13px; cursor: pointer;
+}
+.ot-btn:hover { background: #e9eaf2; }
+.ot-field { display: inline-flex; align-items: center; gap: 8px; font-size: 0.8rem; color: $grey; margin: 0; }
+.ot-field input[type=range] { width: 130px; accent-color: $coral; }
+.ot-field b { font-weight: 600; color: $navy; min-width: 2.2em; }
+.ot-readout { flex: 1 1 260px; font-size: 0.8rem; color: $navy; font-variant-numeric: tabular-nums; text-align: right; }
+canvas.arrastrable { touch-action: none; }
+canvas.arrastrando { cursor: grabbing !important; }
+.ot-widget.vivo { border-color: $coral; }
+.ot-widget .vivo-tag {
+  display: inline-block; font: 600 0.68rem 'Poppins', sans-serif; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #fff; background: $coral; border-radius: 4px; padding: 2px 8px; margin-bottom: 6px;
+}
+
+/* ---------- preguntas de repaso ---------- */
+details.repaso {
+  border: 1px solid $grid; border-left: 5px solid $teal; border-radius: 6px; padding: 10px 18px; margin: 1rem 0 1.4rem; background: #fbfcfc;
+}
+details.repaso > summary { cursor: pointer; font-family: 'Rubik', sans-serif; font-weight: 600; color: $teal; list-style: none; }
+details.repaso > summary::-webkit-details-marker { display: none; }
+details.repaso > summary::before { content: "▸ "; }
+details.repaso[open] > summary::before { content: "▾ "; }
+details.repaso[open] > summary { margin-bottom: 0.5rem; }
+details.repaso > :last-child { margin-bottom: 0; }
+
+/* ---------- tablas, citas, varios ---------- */
+.ruta { width: 100%; border-collapse: collapse; font-size: 0.95rem; margin: 1rem 0 1.6rem; }
+.ruta td { padding: 10px 12px; border-bottom: 1px solid $grid; vertical-align: top; }
+.ruta td:first-child { font-family: 'Rubik', sans-serif; font-weight: 600; color: $blue; white-space: nowrap; }
+.ruta tr:last-child td { border-bottom: 0; }
+blockquote, .blockquote {
+  border-left: 5px solid $coral; background: none; margin: 1.2rem 0; padding: 4px 20px;
+  font-style: normal; color: #1a1a2e; font-size: 1rem;
+}
+.dice { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 1rem 0 1.4rem; }
+.dice > div { border-radius: 6px; padding: 14px 20px; }
+.dice > div > :last-child { margin-bottom: 0; }
+@media (max-width: 760px) { .dice { grid-template-columns: 1fr; } }
+.katex-display { margin: 0.9em 0 1em; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+.theorem .katex-display, .proof .katex-display, .caja .katex-display { margin: 0.6em 0; }
+#refs .csl-entry { margin-bottom: 0.6em; font-size: 0.92rem; }
+
+/* barra de lectura: la línea coral de progreso de las slides */
+#lectura {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px; background: $coral;
+  transform: scaleX(0); transform-origin: 0 50%; z-index: 2000; pointer-events: none;
+}
+.pie { margin-top: 3.5rem; padding-top: 1rem; border-top: 1px solid $grid; font-size: 0.78rem; color: $grey; }
+
+/* aparición suave al hacer scroll */
+.aparece { opacity: 0; transform: translateY(14px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.aparece.visto { opacity: 1; transform: none; }
+
+@media print {
+  #lectura, .acciones, .ot-controls { display: none !important; }
+  .aparece { opacity: 1 !important; transform: none !important; }
+  section.parte > h1 { break-before: page; }
+}
+
+/* ---------- ejercicios (filtro capitulos/filtros.lua) ---------- */
+.ejercicio {
+  border: 1px solid $grid; border-left: 5px solid $teal; border-radius: 6px;
+  padding: 12px 20px; margin: 1.1rem 0 1.4rem; background: #fbfcfc;
+}
+.ejercicio .ej-tag {
+  font-family: 'Rubik', sans-serif; font-weight: 600; font-size: 0.93rem; color: $teal; margin: 0 0 4px;
+}
+.ejercicio details.repaso { border: 0; border-top: 1px dashed $grid; border-radius: 0; background: none; padding: 8px 0 0; margin: 10px 0 0; }
+.ejercicio > :last-child { margin-bottom: 0; }
+
+/* ---------- agregados para I-JEPA ---------- */
+.ot-grupo { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.ot-btn.activo { background: $blue; border-color: $blue; color: #fff; }
+.ot-btn:disabled { opacity: 0.45; cursor: default; }
+.ot-field.apagado { opacity: 0.35; pointer-events: none; }
+.ot-widget + .leyenda { margin-top: 8px; }
+.caja.pendiente { background: #fffaf0; border-left-color: #e0a100; border-style: dashed; border-width: 1px 1px 1px 4px; border-color: #e0a100; }
+.caja.pendiente .tag { color: #a87900; }
+figure.original { margin: 1.4rem 0 0.4rem; }
+figure.original img { width: 100%; border: 1px solid $grid; border-radius: 8px; }
+.formula-clave { background: $light; border-radius: 8px; padding: 6px 16px; margin: 1rem 0; overflow-x: auto; }
+table.datos { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1rem 0 0.4rem; font-variant-numeric: tabular-nums; }
+table.datos th { font-family: 'Rubik', sans-serif; font-weight: 600; color: $blue; text-align: left; border-bottom: 2px solid $grid; padding: 6px 10px; }
+table.datos td { padding: 6px 10px; border-bottom: 1px solid $grid; }
+table.datos tr.destaca td { font-weight: 600; color: $coral-d; }
+@media (max-width: 700px) { .ot-widget { overflow-x: auto; } .ot-widget canvas { min-width: 640px; } }
+@media (max-width: 700px) { table.datos { display: block; overflow-x: auto; } }
+
+// animaciones por pasos
+.ot-pasos { gap: 10px; flex-wrap: wrap; }
+.ot-puntos { display: inline-flex; gap: 6px; align-items: center; }
+.ot-puntos i { width: 9px; height: 9px; border-radius: 50%; background: #e6e7ec; display: inline-block; }
+.ot-puntos i.ya { background: #8b91a0; }
+.ot-puntos i.on { background: #0f3460; width: 12px; height: 12px; }

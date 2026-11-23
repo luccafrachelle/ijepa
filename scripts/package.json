@@ -1,0 +1,7 @@
+{
+  "name": "ijepa-charla-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Compila las fórmulas de los widgets (MathJax) y verifica slides y blog",
+  "dependencies": { "mathjax-full": "3.2.2" }
+}

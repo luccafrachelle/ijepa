@@ -1,0 +1,9 @@
+# Quarto / sistema
+.quarto/
+*_files/
+.DS_Store
+node_modules/
+
+# Papers y código de terceros descargados localmente (ver papers/README.md)
+papers/*
+!papers/README.md

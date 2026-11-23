@@ -1,0 +1,167 @@
+/* Tema de Lucca Frachelle para las slides Chizat–Bach.
+   Adaptación para Reveal.js de la referencia visual de Nathan Lambert (Colloquium):
+   https://github.com/natolambert/rlhf-book/blob/main/teach/course/lec1-chap1-3.md
+   Rubik / Poppins, blanco, azul oscuro y separadores azul oscuro. Licencias en fonts/. */
+/*-- scss:defaults --*/
+$font-family-sans-serif: 'Poppins', 'Helvetica Neue', sans-serif;
+$presentation-heading-font: 'Rubik', sans-serif;
+$presentation-font-size-root: 24px;
+$presentation-heading-color: #16213e;
+$body-color: #1a1a2e;
+$body-bg: #ffffff;
+$link-color: #1d4e89;
+$code-block-bg: #f4f4f8;
+$code-color: #1a1a2e;
+$presentation-heading-text-transform: none;
+/*-- scss:rules --*/
+.reveal { font-family: 'Poppins', sans-serif; font-size: 24px; color: #1a1a2e; }
+.reveal .slides { text-align: left; }
+.reveal .slides > section { padding: 42px 52px 56px; box-sizing: border-box; height: 720px; }
+.reveal h1, .reveal h2, .reveal h3 { font-family: 'Rubik', sans-serif; color: #16213e; text-transform: none; letter-spacing: 0; font-weight: 600; }
+.reveal h2 { font-size: 1.6em; line-height: 1.2; margin: 0 0 0.65em; }
+.reveal p { margin: 0 0 0.8em; line-height: 1.5; }
+.reveal ul, .reveal ol { display: block; margin: 0 0 0.8em; padding-left: 1.3em; line-height: 1.5; }
+.reveal li { margin-bottom: 0.3em; }
+.reveal li::marker { color: #0f3460; }
+.reveal strong { font-weight: 600; }
+.reveal pre { width: 100%; margin: 0 0 22px; padding: 16px 18px; box-shadow: none; border: 0; border-radius: 7px; background: #f4f4f8; font-size: 0.72em; line-height: 1.45; }
+.reveal pre code { padding: 0; max-height: none; background: transparent; white-space: pre-wrap; overflow: visible; font-size: inherit; }
+.reveal code { font-size: 0.84em; background: #f4f4f8; border-radius: 3px; padding: 0.07em 0.2em; }
+.reveal .columns { gap: 34px; align-items: start; }
+.reveal .column { min-width: 0; }
+.reveal .column p:last-child { margin-bottom: 0; }
+.reveal img { object-fit: contain; max-width: 100%; height: auto; max-height: 450px; margin: 0; }
+.reveal .cell-output-display img { display: block; margin: 0 auto; }
+.reveal figure, .reveal .cell-output-display p { margin: 0; }
+.reveal .column .cell-output-display img { width: 100%; }
+.reveal .figure-caption, .reveal .caption { color: #6b7280; font-size: 0.72em; line-height: 1.4; margin-top: 14px; }
+.reveal .small { font-size: 0.85em; }
+.reveal .sourceCode { border: 0; }
+.reveal .cell-output-stdout pre { background: #fafafa; font-size: 0.7em; }
+.reveal .slide-logo { display: none; }
+.reveal .footer { font-family: 'Poppins', sans-serif; color: #6b7280; font-size: 12px; bottom: 13px; }
+.reveal .slide-number { font-family: 'Poppins', sans-serif; color: #8b91a0; font-size: 12px; background: none; bottom: 13px; right: 24px; }
+.reveal .progress { color: #0f3460; height: 3px; }
+.reveal .controls { color: #0f3460; }
+.reveal .slides section.cover { padding: 0; }
+.cover-layout { position: absolute; left: 70px; right: 70px; bottom: 92px; display: grid; grid-template-columns: 2.4fr 1fr; gap: 46px; align-items: start; }
+.reveal .cover h2 { font-size: 2.5em; font-weight: 700; line-height: 1.08; margin: 0; }
+.cover-aside { border-left: 3px solid #0f3460; padding-left: 26px; color: #6b7280; }
+.reveal .cover-aside .eyebrow { font-size: 0.7em; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; color: #0f3460; }
+.reveal .cover-aside .name { font-size: 1.4em; margin: 24px 0; }
+.reveal .cover-aside .details { font-size: 0.85em; }
+.reveal .slides section.section-break { display: flex !important; flex-direction: column; justify-content: center; text-align: center; background: #0f3460; }
+.reveal .section-break h2 { color: #ffffff; font-size: 2.15em; line-height: 1.2; }
+.reveal .section-break p { color: #ffffff; }
+.reveal .practice h2 { color: #16213e; }
+.reveal .practice { border-top: 8px solid #0f3460; }
+.reveal .statement { font-size: 1.2em; line-height: 1.5; margin: 28px 0; }
+.reveal .slides section.anatomy h2 { margin-bottom: 0.3em; }
+.reveal .slides section.anatomy .cell-output-display img { max-height: 330px; }
+.reveal ul.partes {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 0.2em 1.1em;
+  list-style: none;
+  padding-left: 0;
+  margin: 0.55em 0 0;
+  font-size: 0.76em;
+  line-height: 1.35;
+}
+.reveal ul.partes li { margin: 0; }
+.reveal .marca {
+  font-weight: 600;
+  border-bottom: 3px solid;
+  padding-bottom: 0.02em;
+}
+.reveal .slides section.pkg-intro img.logo-pkg {
+  display: block;
+  max-height: 170px;
+  width: auto;
+  margin: 0.2em auto 0;
+  object-fit: contain;
+}
+@media print { .reveal .slides > section { height: 720px !important; } }
+
+/* Complementos de la presentación Chizat–Bach. */
+.reveal .caja { background: #f4f4f8; border-left: 5px solid #0f3460; border-radius: 6px; padding: 12px 20px; margin: 4px 0 16px; }
+.reveal .caja.prueba { border-left-color: #f28482; background: #fff6f5; }
+.reveal .caja.idea { border-left-color: #2a9d8f; background: #f1f8f7; }
+.reveal .caja p:last-child, .reveal .caja ul:last-child, .reveal .caja ol:last-child { margin-bottom: 0; }
+.reveal .caja .tag { display: block; font-weight: 600; font-size: 0.9em; color: #0f3460; margin-bottom: 4px; }
+.reveal .caja.prueba .tag { color: #ce5553; }
+.reveal .caja.idea .tag { color: #2a9d8f; }
+.reveal .credito { font-size: 0.5em; color: #8b91a0; line-height: 1.35; margin: 6px 0 0; }
+.reveal .leyenda { font-size: 0.66em; color: #6b7280; line-height: 1.4; margin: 6px 0 0; }
+.reveal img.retrato { max-height: 330px; border-radius: 6px; display: block; }
+.reveal .fotos { display: flex; gap: 20px; align-items: flex-end; }
+.reveal .fotos figure, .reveal .fotos div { margin: 0; }
+.reveal .fotos img { max-height: 230px; border-radius: 6px; display: block; }
+.reveal .centro { text-align: center; }
+.reveal .centro img { margin: 0 auto; display: block; }
+.reveal .compacto { font-size: 0.88em; }
+.reveal .compacto li { margin-bottom: 0.15em; }
+.reveal .pasos li { margin-bottom: 0.45em; }
+.reveal .ruta { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.reveal .ruta td { padding: 9px 12px; border-bottom: 1px solid #e6e7ec; vertical-align: top; }
+.reveal .ruta td:first-child { font-family: 'Rubik', sans-serif; font-weight: 600; color: #0f3460; white-space: nowrap; }
+.reveal .section-break p.sub { font-size: 1.05em; opacity: 0.95; margin-top: 0; }
+.reveal .tres-img { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.reveal .tres-img img { width: 100%; max-height: 300px; }
+.reveal blockquote { border-left: 5px solid #f28482; background: none; box-shadow: none; margin: 10px 0; padding: 4px 18px; width: auto; font-style: normal; }
+.reveal .refs-col { font-size: 0.7em; line-height: 1.4; }
+.reveal .refs-col .csl-entry { margin-bottom: 0.5em; }
+/* Ecuaciones en display: aire arriba y abajo para que se lean separadas del texto. */
+.reveal .MathJax_Display, .reveal mjx-container[display="true"] { margin: 0.7em 0 0.9em !important; }
+.reveal .caja .MathJax_Display, .reveal .caja mjx-container[display="true"] { margin: 0.5em 0 0.5em !important; }
+.reveal li .MathJax_Display, .reveal li mjx-container[display="true"] { margin: 0.4em 0 0.5em !important; }
+
+.reveal #refs.refs-col { column-count: 2; column-gap: 26px; font-size: 0.56em; line-height: 1.32; }
+.reveal #refs.refs-col .csl-entry { break-inside: avoid; margin-bottom: 0.4em; }
+
+/* ---------- agregados para I-JEPA: widgets dentro de Reveal ---------- */
+.reveal .ot-widget { margin: 4px 0 0; position: relative; }
+.reveal .ot-widget canvas { display: block; width: 100%; height: auto; }
+.reveal .ot-controls { display: flex; align-items: center; gap: 12px; margin-top: 4px; font-size: 15px; }
+.reveal .ot-controls-wrap { flex-wrap: wrap; row-gap: 6px; }
+.reveal .ot-play { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 0; background: #0f3460; color: #fff; display: grid; place-items: center; cursor: pointer; padding: 0; }
+.reveal .ot-play svg { fill: currentColor; }
+.reveal .ot-controls input[type=range] { flex: 1; accent-color: #f28482; min-width: 80px; margin: 0; }
+.reveal .ot-hint { flex: none; font-size: 13px; color: #8b91a0; }
+.reveal .ot-btn { font: 500 14px 'Poppins', sans-serif; color: #0f3460; background: #f4f4f8; border: 1px solid #e6e7ec; border-radius: 999px; padding: 4px 13px; cursor: pointer; }
+.reveal .ot-btn.activo { background: #0f3460; border-color: #0f3460; color: #fff; }
+.reveal .ot-btn:disabled { opacity: 0.45; cursor: default; }
+.reveal .ot-grupo { display: inline-flex; gap: 4px; }
+.reveal .ot-field { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: #6b7280; margin: 0; }
+.reveal .ot-field input[type=range] { width: 110px; flex: none; }
+.reveal .ot-field b { font-weight: 600; color: #16213e; min-width: 2.2em; }
+.reveal .ot-field.apagado { opacity: 0.35; pointer-events: none; }
+.reveal .ot-readout { flex: 1 1 200px; font-size: 14px; color: #16213e; font-variant-numeric: tabular-nums; text-align: right; }
+.reveal .fragment.paso { display: none; }
+.reveal .caja.pendiente { background: #fffaf0; border: 1px dashed #e0a100; border-left: 5px solid #e0a100; }
+.reveal .caja.pendiente .tag { color: #a87900; }
+.reveal .cover h2 .subtitulo { display: block; font-size: 0.5em; font-weight: 500; line-height: 1.25; color: #0f3460; margin-top: 0.5em; }
+.reveal .grande { font-size: 1.25em; line-height: 1.45; }
+.reveal .dato { font-family: 'Rubik', sans-serif; font-weight: 700; color: #ce5553; font-size: 1.9em; line-height: 1; display: block; }
+.reveal .datos-fila { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 14px; }
+.reveal .datos-fila > div { background: #f4f4f8; border-radius: 8px; padding: 14px 18px; font-size: 0.78em; line-height: 1.4; }
+.reveal img.original { max-height: 400px; width: 100%; border: 1px solid #e6e7ec; border-radius: 6px; }
+.reveal table.datos { width: 100%; border-collapse: collapse; font-size: 0.72em; font-variant-numeric: tabular-nums; }
+.reveal table.datos th { font-family: 'Rubik', sans-serif; font-weight: 600; color: #0f3460; text-align: left; border-bottom: 2px solid #e6e7ec; padding: 5px 10px; }
+.reveal table.datos td { padding: 5px 10px; border-bottom: 1px solid #e6e7ec; }
+.reveal table.datos tr.destaca td { font-weight: 600; color: #ce5553; }
+.reveal #refs.refs-col { font-size: 0.7em; line-height: 1.36; }
+.reveal .ot-widget { margin-bottom: 14px; }
+
+// animaciones por pasos
+.reveal .pasos-frag { position: absolute; width: 0; height: 0; overflow: hidden; }
+.reveal .ot-pasos { gap: 10px; }
+.reveal .ot-puntos { display: inline-flex; gap: 6px; align-items: center; }
+.reveal .ot-puntos i { width: 9px; height: 9px; border-radius: 50%; background: #e6e7ec; display: inline-block; }
+.reveal .ot-puntos i.ya { background: #8b91a0; }
+.reveal .ot-puntos i.on { background: #0f3460; width: 12px; height: 12px; }
+
+// en las slides las animaciones por pasos se manejan con la flecha: sin barra de controles
+.reveal .ot-pasos { display: none; }
+.reveal .ot-widget[data-widget="arquitectura"] .ot-controls { display: none; }
+.reveal .ot-widget[data-widget="grilla"] .ot-controls { display: none; }

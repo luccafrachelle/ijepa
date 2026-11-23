@@ -1,0 +1,370 @@
+---
+title: "I-JEPA: aprender a ver prediciendo representaciones"
+author: "Lucca Frachelle"
+lang: es
+bibliography: references.bib
+csl: estilo-citas.csl
+link-citations: true
+nocite: |
+  @assran2023ijepa, @lecun2022path, @he2022mae, @grill2020byol, @bardes2022vicreg, @baevski2022data2vec, @dosovitskiy2021vit, @caron2021dino, @tian2021understanding, @bardes2024vjepa, @garrido2024iwm, @assran2025vjepa2, @balestriero2025lejepa, @nicollier2026spherejepa
+format:
+  revealjs:
+    output-file: slides.html
+    theme: [default, estilo-slides.scss]
+    css: fonts.css
+    template-partials: [title-slide.html]
+    include-after-body:
+      - widgets/nucleo.html
+      - widgets/ijepa.html
+      - widgets/pasos.html
+      - widgets/experimento.html
+    include-in-header:
+      text: |
+        <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({"HTML-CSS": {availableFonts: [], preferredFont: null, webFont: "TeX"}});
+        </script>
+    width: 1280
+    height: 720
+    margin: 0
+    embed-resources: true
+    slide-number: c
+    controls: true
+    auto-stretch: false
+    footer: "I-JEPA · Redes Neuronales para Visión Artificial"
+---
+
+## {.cover}
+
+<div class="cover-layout">
+<div><h2>I-JEPA<br><span class="subtitulo">Por qué Yann LeCun está tan enojado con los LLMs</span></h2></div>
+<div class="cover-aside">
+<p class="eyebrow">Proyecto final</p>
+<p class="name">Lucca<br>Frachelle</p>
+<p class="details"> DLviS<br> UDELAR - FING · 26/11/2026</p>
+</div>
+</div>
+
+## ¿Cómo se aprende tanto con tan poca supervisión?
+
+::: {.grande}
+Un adolescente aprende a manejar en unas **20 horas** (a mí me llevó más).
+Un sistema automático necesita enormes cantidades de datos etiquetados o de ensayos.
+:::
+
+::: {.caja .idea}
+<span class="tag">La hipótesis de LeCun</span>
+La diferencia es el **conocimiento previo de cómo funciona el mundo**, y casi todo se adquiere **observando**, sin etiquetas.
+:::
+
+Auto-supervisión: esconder parte del dato y predecirla a partir del resto.
+La pregunta de la charla es **qué** conviene predecir.
+
+## La idea {.section-break background-color="#0f3460"}
+
+<p class="sub">LeCun (2022), *A Path Towards Autonomous Machine Intelligence*</p>
+
+## Mi historia con Yann LeCun
+
+![](img/lecun-eth.webp){style="max-height:480px; width:auto; display:block; margin:0 auto; border-radius:8px;" fig-alt="Yann LeCun en ETH Zürich frente a su slide «Recommendations to my fellow AI scientists»: abandonar los modelos generativos, los probabilísticos, los métodos contrastivos y el aprendizaje por refuerzo; y en rojo: «If you are interested in human-level AI, don't work on LLMs»"}
+
+<p class="credito">Yann LeCun, «World Models: Enabling the next AI revolution», ciclo Frontiers of Embodied AI, ETH Zürich, 2026 (captura del video del Computer Vision and Geometry Group, min. 55).</p>
+
+## Una arquitectura para un agente que predice
+
+```{=html}
+<div class="ot-widget" data-widget="mundo" data-alt="Arquitectura de seis módulos propuesta por LeCun">
+  <canvas width="1100" height="430"></canvas>
+</div>
+<p class="leyenda">Los seis módulos de LeCun (2022), redibujados. Para esta charla importa el modelo del mundo.</p>
+```
+
+## El modelo del mundo, en concreto
+
+::: {.columns}
+::: {.column width="55%"}
+- Trabaja sobre un **estado abstracto** $s_t$, no sobre la observación cruda.
+- Predice el próximo estado dada una acción:
+$$
+s_{t+1} = \text{Pred}(s_t,\ a_t,\ z_t)
+$$
+- $z_t$ es una **variable latente**: cubre lo que no se puede saber y permite varios desenlaces.
+- **Planificar** es buscar la secuencia de acciones que minimiza un costo sobre lo predicho.
+:::
+::: {.column width="45%"}
+::: {.caja .idea}
+<span class="tag">El problema de aprendizaje</span>
+Antes de planificar hay que aprender, sin etiquetas, un encoder que produzca $s$ y un predictor que funcione en ese espacio.
+:::
+
+::: {.caja .prueba}
+<span class="tag">Dónde entra I-JEPA</span>
+Resuelve sólo esa pieza, en imágenes estáticas: sin tiempo, sin acciones y sin $z$.
+:::
+:::
+:::
+
+## Predecir lo que falta. ¿Pero en qué espacio?
+
+::: {.columns}
+::: {.column width="50%"}
+**Opción directa: predecir el dato**
+
+- Predecir los píxeles que faltan.
+- Es lo que hace un autoencoder enmascarado (MAE).
+- El objetivo es fijo y no hay colapso, pero lo aprendido suele ser de menor nivel semántico.
+:::
+::: {.column width="50%"}
+**Propuesta de LeCun: predecir una representación**
+
+- Codificar lo que falta con un encoder.
+- Predecir **esa representación**.
+- El encoder puede descartar el detalle de píxel innecesario.
+:::
+:::
+
+::: {.caja .idea}
+<span class="tag">La tesis</span>
+Un modelo del mundo tiene que predecir en un **espacio de representaciones**, porque buena parte de los detalles del mundo son impredecibles e irrelevantes.
+:::
+
+## El problema de predecir píxeles
+
+```{=html}
+<div class="ot-widget" data-widget="pixlat" data-alt="Un futuro posible, la predicción promedio en píxeles y la predicción en representación">
+  <canvas width="1100" height="430"></canvas>
+</div>
+```
+
+## Tres maneras de armar el problema
+
+```{=html}
+<div class="ot-widget" data-widget="tres" data-alt="Arquitecturas joint-embedding, generativa y JEPA">
+  <canvas width="1100" height="400"></canvas>
+</div>
+<p class="leyenda">Redibujado de la figura 2 de Assran et al. (2023). D marca dónde se mide la distancia.</p>
+```
+
+## El precio: el colapso
+
+```{=html}
+<div class="ot-widget" data-widget="energia" style="width: 86%; margin: 0 auto;" data-param="de bien formada a colapsada" data-alt="Paisaje de energía que se aplana">
+  <canvas width="1100" height="360"></canvas>
+</div>
+```
+
+Si el encoder devuelve **lo mismo para toda entrada**, la pérdida es mínima y la representación no sirve.
+
+## Evitar el colapso: contrastivo o regularizado
+
+En términos de energía, JEPA mide la incompatibilidad entre $x$ e $y$ como
+$$
+F(x, y) = \min_z\ D\big(s_y,\ \text{Pred}(s_x, z)\big)
+$$
+y el entrenamiento tiene que dejarla **baja en los pares compatibles y alta en el resto**.
+
+::: {.columns}
+::: {.column width="50%"}
+**Contrastivo**
+
+- Sube la energía de pares negativos.
+- En alta dimensión hacen falta muchísimos negativos: LeCun lo descarta.
+:::
+::: {.column width="50%"}
+**Regularizado** (lo que propone LeCun)
+
+- Maximizar la información de $s_x$ y $s_y$, minimizar la de $z$ (estilo VICReg).
+- I-JEPA usa otra salida: **asimetría** entre ramas y EMA, sin regularizador explícito.
+:::
+:::
+
+## I-JEPA {.section-break background-color="#0f3460"}
+
+<p class="sub">Assran, Duval, Misra, Bojanowski, Vincent, Rabbat, LeCun y Ballas · CVPR 2023</p>
+
+## I-JEPA en una figura
+
+```{=html}
+<div class="ot-widget" data-widget="arquitectura" data-alt="I-JEPA en siete pasos">
+  <canvas width="1100" height="430"></canvas>
+</div>
+```
+
+[]{.fragment .paso}[]{.fragment .paso}[]{.fragment .paso}[]{.fragment .paso}[]{.fragment .paso}[]{.fragment .paso}
+
+## Paso 1 · De la imagen a los tokens
+
+```{=html}
+<div class="ot-widget" data-widget="parches" data-alt="La imagen se corta en parches, cada parche se proyecta a un vector y se le suma su posición">
+  <canvas width="1100" height="430"></canvas>
+</div>
+<p class="leyenda">Como en cualquier ViT. Cada token lleva su posición, así que el encoder puede procesar <strong>sólo algunos</strong>.</p>
+```
+
+## Paso 2 · El enmascarado multi-bloque
+
+```{=html}
+<div class="ot-widget" data-widget="mascaras" data-alt="Muestreo de bloques de contexto y objetivo">
+  <canvas width="1100" height="430"></canvas>
+</div><p class="leyenda">El objetivo <strong>no</strong> es el complemento del contexto. Lo gris no es ni uno ni otro: sólo lo ve el encoder objetivo.</p>
+```
+
+## Paso 3 · El encoder de contexto
+
+```{=html}
+<div class="ot-widget" data-widget="contexto" data-alt="Los tokens que no son contexto se descartan y el encoder de contexto procesa sólo los visibles">
+  <canvas width="1100" height="430"></canvas>
+</div>
+<p class="leyenda">Procesa sólo los tokens de contexto; los objetivos nunca entran por esta rama.</p>
+```
+
+## Paso 4 · El encoder objetivo
+
+```{=html}
+<div class="ot-widget" data-widget="objetivo" data-alt="El encoder objetivo procesa la imagen completa y recién a la salida se recortan los bloques objetivo">
+  <canvas width="1100" height="430"></canvas>
+</div>
+<p class="leyenda">Procesa la imagen entera y recorta los bloques <strong>a la salida</strong>: cada objetivo ya trae información de la escena.</p>
+```
+
+## Paso 5 · El predictor
+
+```{=html}
+<div class="ot-widget" data-widget="predictor" data-alt="El predictor recibe el contexto y tokens de máscara con la posición de cada parche objetivo, y devuelve la predicción">
+  <canvas width="1100" height="430"></canvas>
+</div>
+<p class="leyenda">Angosto a propósito: con ancho 1024 en vez de 384, el ajuste fino con 1 % de etiquetas baja de 70,7 a 68,4.</p>
+```
+
+## Paso 6 · La pérdida
+
+```{=html}
+<div class="ot-widget" data-widget="perdida" data-alt="Barras de la predicción y del objetivo para cada parche del bloque, con la distancia de cada uno y la curva de la pérdida">
+  <canvas width="1100" height="430"></canvas>
+</div>
+```
+
+::: {.leyenda}
+Paper: $\frac{1}{M}\sum_{i}\sum_{j\in B_i}\lVert \hat s_{y_j} - s_{y_j}\rVert_2^2$. Código: smooth L1 promediada, contra objetivos con layer norm.
+:::
+
+## Paso 7 · La actualización por EMA
+
+```{=html}
+<div class="ot-widget" data-widget="ema" data-alt="Trayectorias de los pesos del encoder de contexto, ruidosa, y del encoder objetivo, suave y con retraso">
+  <canvas width="1100" height="430"></canvas>
+</div>
+```
+
+::: {.leyenda}
+Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA, **sin demostración**.
+:::
+
+## Después de entrenar: la evaluación
+
+```{=html}
+<div class="ot-widget" data-widget="evaluacion" data-alt="Se descartan el encoder de contexto y el predictor; el encoder objetivo congelado produce vectores que se promedian y alimentan un clasificador lineal">
+  <canvas width="1100" height="430"></canvas>
+</div>
+<p class="leyenda">Lineal (tabla 1): encoder objetivo congelado y una capa lineal. Los resultados con 1 % de etiquetas son con ajuste fino.</p>
+```
+
+## Resultados
+
+```{=html}
+<div class="ot-widget" data-widget="resultados" data-alt="Resultados reportados en evaluación lineal, 1 por ciento de etiquetas y bajo nivel">
+  <canvas width="1100" height="430"></canvas>
+</div>
+<p class="leyenda"><strong>El fuerte es el costo</strong>: ViT-H/14 en menos de 72 h con 16 A100; una sola vista frente a iBOT, ~5× menos iteraciones que MAE.</p>
+```
+
+## Experimento propio {.section-break background-color="#0f3460"}
+
+<p class="sub">¿Un regularizador puede reemplazar al EMA? · 16 corridas en una RTX 5090 Laptop</p>
+
+## La pregunta
+
+::: {.columns}
+::: {.column width="52%"}
+- I-JEPA evita el colapso con una **heurística**: EMA y stop-gradient.
+- **LeJEPA** (Balestriero y LeCun, 2025) y **SPHERE-JEPA** (Nicollier y otros, entre ellos Musé, 2026) usan un **regularizador** que fija la forma de la distribución de los embeddings.
+- Ambos se probaron con **vistas aumentadas**, no con máscaras; y aun ahí, sin EMA pierden 8 a 12 puntos.
+- **¿Reemplazan al EMA dentro de I-JEPA?**
+:::
+::: {.column width="48%"}
+```{=html}
+<table class="datos">
+<tr><th></th><th>con EMA</th><th>sin EMA</th></tr>
+<tr><td>sin regularizador</td><td class="destaca"><strong>C1</strong> I-JEPA</td><td><strong>C2</strong> control</td></tr>
+<tr><td>SIGReg (gaussiana)</td><td><strong>C3</strong></td><td><strong>C4</strong></td></tr>
+<tr><td>SUSReg (esfera)</td><td><strong>C5</strong></td><td><strong>C6</strong></td></tr>
+</table>
+<p class="credito">ViT-Tiny/16 · ImageNet-100 · 224 px · 100 épocas · 3 semillas (C2: 1) · ~40 h de GPU la grilla. Tubería validada reproduciendo SPHERE-JEPA con su código: 72,8 contra 71,9 publicado.</p>
+```
+:::
+:::
+
+## Dos regularizadores, por arriba
+
+```{=html}
+<div class="ot-widget" data-widget="regs" data-alt="Tres nubes de puntos: sin regularizador se achica a una recta, SIGReg la lleva a una gaussiana redonda, SUSReg la normaliza y la reparte parejo sobre un círculo; abajo, el histograma de la proyección sobre una dirección al azar contra la forma buscada">
+  <canvas width="1100" height="430"></canvas>
+</div>
+<p class="leyenda">Actúan sobre una cabeza MLP sobre el contexto: \(L = L_\text{pred} + \lambda\,L_\text{reg}\), con \(\lambda = 0{,}05\) barrido sin EMA.</p>
+```
+
+## Resultados de la grilla
+
+```{=html}
+<div class="ot-widget" data-widget="grilla" data-alt="Tabla 2 por 3 y barras de precisión lineal por celda, con las comparaciones de cada pregunta">
+  <canvas width="1100" height="430"></canvas>
+</div>
+```
+
+[]{.fragment .paso}[]{.fragment .paso}[]{.fragment .paso}
+
+## Qué pasó con el colapso
+
+```{=html}
+<div class="ot-widget" data-widget="rango" data-alt="Curvas de rango efectivo por época para las seis celdas">
+  <canvas width="1100" height="430"></canvas>
+</div>
+<p class="leyenda">Con regularizador, el rango sube rápido pero se estanca en 57–69; C1 llega a ~102 y C2 se queda en ~28.</p>
+```
+
+## Límites y lo que vino después
+
+::: {.columns}
+::: {.column width="48%"}
+**Límites de I-JEPA**
+
+- Muy sensible a la máscara, que también es **diseño a mano**.
+- No gana en todo: iNaturalist, conteo, ajuste fino.
+- El colapso se evita **sin garantía**.
+- Sin tiempo, sin acciones y sin variable latente para varios desenlaces: lejos del programa de 2022.
+
+**Límites de mi experimento**: escala chica, $\lambda$ elegido sin EMA y un control que colapsó sólo en parte.
+:::
+::: {.column width="52%"}
+```{=html}
+<table class="ruta">
+<tr><td>2024 · V-JEPA</td><td>El mismo principio en video.</td></tr>
+<tr><td>2025 · V-JEPA 2</td><td>Modelo del mundo <strong>condicionado por acciones</strong>, usado para planificar con un brazo robótico.</td></tr>
+<tr><td>2025 · LeJEPA</td><td>Un regularizador gaussiano en lugar de las heurísticas contra el colapso.</td></tr>
+<tr><td>2026 · SPHERE-JEPA</td><td>Lo mismo, sobre la esfera.</td></tr>
+</table>
+```
+:::
+:::
+
+## Para llevarse
+
+1. Importa **qué** se predice: JEPA predice **representaciones** y puede dejar afuera lo impredecible.
+2. I-JEPA: encoder de contexto, encoder objetivo (EMA) y un predictor angosto que recibe la posición de cada objetivo.
+3. **La máscara define la tarea**: objetivos grandes, contexto informativo.
+4. El colapso se evita con **asimetría**: EMA y stop-gradient. Funciona, sin garantías.
+5. En mi experimento, **ningún regularizador reemplazó al EMA**: evitan el colapso dimensional, pero sin EMA quedan 16 a 22 puntos debajo de I-JEPA; sumados al EMA, restan.
+
+## Referencias
+
+::: {#refs .refs-col}
+:::

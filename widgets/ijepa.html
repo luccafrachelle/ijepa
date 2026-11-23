@@ -1,0 +1,626 @@
+<script>
+/* Widgets de I-JEPA. Todos los números que aparecen salen de Assran et al. (2023):
+   tablas 1 a 6 y apéndices A y C. Requiere widgets/nucleo.html. */
+(function () {
+  const K = window.OTK;
+  const { C, setupCanvas, text, parrafo, dot, caja, flecha, sobre, ease, clamp, alfa, mulberry, gauss } = K;
+  const num = (v, d = 1) => v.toFixed(d).replace('.', ',');
+
+  // texto con subíndice, centrado en x
+  function sub(ctx, base, s, x, y, opt = {}) {
+    const size = opt.size || 18;
+    ctx.font = (opt.weight || '600') + ' ' + size + 'px ' + K.FONT; const wb = ctx.measureText(base).width;
+    ctx.font = (opt.weight || '600') + ' ' + size * 0.68 + 'px ' + K.FONT; const ws = ctx.measureText(s).width;
+    const x0 = opt.align === 'left' ? x : x - (wb + ws) / 2;
+    text(ctx, base, x0, y, { ...opt, size, weight: opt.weight || '600', align: 'left' });
+    text(ctx, s, x0 + wb + 1, y + size * 0.22, { ...opt, size: size * 0.68, weight: opt.weight || '600', align: 'left' });
+    return wb + ws;
+  }
+
+  // ------------------------------------------------------------ escena dibujada (sin fotos externas)
+  let _escena = null;
+  function escena() {
+    if (_escena) return _escena;
+    const S = 448, cv = document.createElement('canvas'); cv.width = cv.height = S;
+    const g = cv.getContext('2d');
+    let gr = g.createLinearGradient(0, 0, 0, S * 0.62); gr.addColorStop(0, '#9fc9e8'); gr.addColorStop(1, '#e8f1f5');
+    g.fillStyle = gr; g.fillRect(0, 0, S, S);
+    g.fillStyle = '#ffd98a'; g.beginPath(); g.arc(352, 86, 38, 0, 7); g.fill();
+    g.fillStyle = '#ffffff';
+    for (const [x, y, r] of [[80, 70, 22], [106, 62, 28], [136, 72, 20], [236, 118, 14], [254, 112, 18], [274, 120, 13]]) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+    g.fillStyle = '#7fa6b8'; g.beginPath(); g.moveTo(0, 270); g.lineTo(90, 150); g.lineTo(170, 240); g.lineTo(250, 130); g.lineTo(360, 250); g.lineTo(448, 190); g.lineTo(448, 300); g.lineTo(0, 300); g.fill();
+    g.fillStyle = '#f4f7f9'; g.beginPath(); g.moveTo(250, 130); g.lineTo(226, 162); g.lineTo(244, 156); g.lineTo(256, 168); g.lineTo(276, 160); g.fill();
+    g.fillStyle = '#5fae8c'; g.beginPath(); g.moveTo(0, 300); g.quadraticCurveTo(120, 232, 260, 286); g.quadraticCurveTo(360, 318, 448, 268); g.lineTo(448, 448); g.lineTo(0, 448); g.fill();
+    g.fillStyle = '#4c9a79'; g.beginPath(); g.moveTo(0, 360); g.quadraticCurveTo(200, 316, 448, 372); g.lineTo(448, 448); g.lineTo(0, 448); g.fill();
+    g.fillStyle = '#6fb3d6'; g.beginPath(); g.ellipse(330, 372, 96, 26, 0, 0, 7); g.fill();
+    // casa
+    g.fillStyle = '#f6efe4'; g.fillRect(76, 262, 96, 70);
+    g.fillStyle = '#ce5553'; g.beginPath(); g.moveTo(64, 266); g.lineTo(124, 218); g.lineTo(184, 266); g.fill();
+    g.fillStyle = '#16213e'; g.fillRect(112, 292, 24, 40);
+    g.fillStyle = '#9fc9e8'; g.fillRect(84, 278, 20, 20); g.fillRect(144, 278, 20, 20);
+    // árbol
+    g.fillStyle = '#7a5a43'; g.fillRect(256, 250, 14, 70);
+    g.fillStyle = '#2a9d8f'; for (const [x, y, r] of [[263, 222, 40], [236, 246, 28], [292, 244, 30]]) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+    // pájaros
+    g.strokeStyle = '#16213e'; g.lineWidth = 3; g.lineCap = 'round';
+    for (const [x, y] of [[180, 96], [212, 78]]) { g.beginPath(); g.moveTo(x - 12, y - 6); g.quadraticCurveTo(x - 4, y - 10, x, y); g.quadraticCurveTo(x + 4, y - 10, x + 12, y - 6); g.stroke(); }
+    return (_escena = cv);
+  }
+  K.escena = escena;
+
+  // ============================================================ 1. enmascarado multi-bloque
+  K.register('mascaras', root => {
+    const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
+    const N = 14, IM = { x: 20, y: 19, s: 392 }, p = IM.s / N;
+    // ablaciones del apéndice C (ViT-B/16, 300 épocas, evaluación lineal con 1 % de etiquetas)
+    const TS = [[0.075, 0.2, 19.2], [0.1, 0.2, 39.2], [0.125, 0.2, 42.4], [0.15, 0.2, 54.2], [0.2, 0.25, 38.9], [0.2, 0.3, 33.6]];
+    const CS = [[0.40, 1.0, 31.2], [0.65, 1.0, 47.1], [0.75, 1.0, 49.3], [0.85, 1.0, 54.2]];
+    const NT = { 1: 9.0, 2: 22.0, 3: 48.5, 4: 54.2 };
+    const EST = [['multi', 'multi-bloque', 54.2], ['raster', 'rasterizado', 15.5], ['bloque', 'un bloque', 20.2], ['azar', 'aleatorio', 17.6]];
+    let est = root.dataset.estrategia || 'multi', iT = 3, iC = 3, nT = 4, auto = false, reloj = 0, entra = 1;
+    let enCtx = new Uint8Array(N * N), enObj = new Uint8Array(N * N), bloques = [], cajaCtx = null;
+    const rnd = Math.random;
+    // como en src/masks/multiblock.py: el tamaño (escala y aspecto, con un mismo número al azar) se sortea una vez
+    // y lo comparten los bloques de ese tipo; la posición se sortea por bloque
+    function tamano(lo, hi, arLo, arHi) {
+      const r = rnd(), s = lo + (hi - lo) * r, ar = arLo + (arHi - arLo) * r, keep = Math.floor(N * N * s);
+      return { h: Math.min(N - 1, Math.max(1, Math.round(Math.sqrt(keep * ar)))), w: Math.min(N - 1, Math.max(1, Math.round(Math.sqrt(keep / ar)))) };
+    }
+    const ubica = ({ h, w }) => ({ top: Math.floor(rnd() * (N - h)), left: Math.floor(rnd() * (N - w)), h, w });
+    const bloque = (lo, hi, arLo, arHi) => ubica(tamano(lo, hi, arLo, arHi));
+    const pinta = (m, b, v) => { for (let i = b.top; i < b.top + b.h; i++) for (let j = b.left; j < b.left + b.w; j++) m[i * N + j] = v; };
+    function muestrea() {
+      enCtx.fill(0); enObj.fill(0); bloques = []; cajaCtx = null; entra = 0;
+      if (est === 'multi') {
+        const tm = tamano(TS[iT][0], TS[iT][1], 0.75, 1.5);
+        for (let k = 0; k < nT; k++) { const b = ubica(tm); bloques.push(b); pinta(enObj, b, k + 1); }
+        cajaCtx = bloque(CS[iC][0], CS[iC][1], 1, 1); pinta(enCtx, cajaCtx, 1);
+        for (let i = 0; i < N * N; i++) if (enObj[i]) enCtx[i] = 0;
+      } else if (est === 'raster') {
+        const q = Math.floor(rnd() * 4), h = N / 2; let k = 1;
+        for (let a = 0; a < 4; a++) { const b = { top: (a >> 1) * h, left: (a & 1) * h, h, w: h };
+          if (a === q) { pinta(enCtx, b, 1); cajaCtx = b; } else { bloques.push(b); pinta(enObj, b, k++); } }
+      } else if (est === 'bloque') {
+        const b = bloque(0.6, 0.6, 0.75, 1.5); bloques.push(b); pinta(enObj, b, 1);
+        for (let i = 0; i < N * N; i++) enCtx[i] = enObj[i] ? 0 : 1;
+      } else {
+        const idx = [...Array(N * N).keys()].sort(() => rnd() - 0.5).slice(0, Math.round(0.6 * N * N));
+        for (const i of idx) enObj[i] = 1;
+        for (let i = 0; i < N * N; i++) enCtx[i] = enObj[i] ? 0 : 1;
+      }
+    }
+    function reportado() {
+      if (est !== 'multi') return EST.find(e => e[0] === est)[2];
+      const d = (iT !== 3) + (iC !== 3) + (nT !== 4);
+      if (d === 0) return 54.2; if (d > 1) return null;
+      return iT !== 3 ? TS[iT][2] : iC !== 3 ? CS[iC][2] : NT[nT];
+    }
+    function mini(x, y, s, mask, color) {
+      const q = s / N;
+      ctx.drawImage(escena(), x, y, s, s);
+      ctx.fillStyle = C.light;
+      for (let i = 0; i < N * N; i++) if (!mask[i]) ctx.fillRect(x + (i % N) * q - 0.3, y + Math.floor(i / N) * q - 0.3, q + 0.6, q + 0.6);
+      caja(ctx, x, y, s, s, { r: 4, stroke: color, lw: 2 });
+    }
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      const a = ease(entra);
+      ctx.drawImage(escena(), IM.x, IM.y, IM.s, IM.s);
+      for (let i = 0; i < N * N; i++) {
+        const x = IM.x + (i % N) * p, y = IM.y + Math.floor(i / N) * p;
+        if (!enCtx[i] && !enObj[i]) { ctx.fillStyle = `rgba(140,145,160,${0.8 * a})`; ctx.fillRect(x, y, p, p); }
+        if (enObj[i]) { ctx.fillStyle = alfa('#ffffff', 0.45 * a); ctx.fillRect(x, y, p, p); ctx.fillStyle = alfa(C.coral, 0.5 * a); ctx.fillRect(x, y, p, p); }
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1; ctx.beginPath();
+      for (let k = 1; k < N; k++) { ctx.moveTo(IM.x + k * p, IM.y); ctx.lineTo(IM.x + k * p, IM.y + IM.s); ctx.moveTo(IM.x, IM.y + k * p); ctx.lineTo(IM.x + IM.s, IM.y + k * p); }
+      ctx.stroke();
+      if (cajaCtx) caja(ctx, IM.x + cajaCtx.left * p, IM.y + cajaCtx.top * p, cajaCtx.w * p, cajaCtx.h * p, { r: 3, stroke: alfa(C.teal, a), lw: 3, dash: [8, 5] });
+      bloques.forEach((b, k) => {
+        const x = IM.x + b.left * p, y = IM.y + b.top * p;
+        caja(ctx, x, y, b.w * p, b.h * p, { r: 3, stroke: alfa(C.coralD, a), lw: 3 });
+        if (est !== 'bloque' || true) { caja(ctx, x + 4, y + 4, 22, 22, { r: 5, fill: alfa(C.coralD, a) }); text(ctx, String(k + 1), x + 15, y + 21, { color: '#fff', size: 15, weight: '600', align: 'center' }); }
+      });
+      caja(ctx, IM.x, IM.y, IM.s, IM.s, { r: 2, stroke: C.grid, lw: 1 });
+      // derecha: lo que recibe cada red
+      const nc = enCtx.reduce((s, v) => s + v, 0), no = enObj.reduce((s, v) => s + (v ? 1 : 0), 0), nn = N * N - nc - no;
+      const X1 = 450, X2 = 772, TY = 40, MS = 140;
+      mini(X1, TY, MS, enCtx, C.teal);
+      text(ctx, 'Contexto', X1 + MS + 14, TY + 22, { color: C.teal, size: 19, weight: '600' });
+      text(ctx, 'lo único que ve el', X1 + MS + 14, TY + 48, { color: C.grey2, size: 15 });
+      text(ctx, 'encoder de contexto', X1 + MS + 14, TY + 68, { color: C.grey2, size: 15 });
+      text(ctx, nc + ' de 196', X1 + MS + 14, TY + 104, { color: C.navy, size: 22, weight: '600' });
+      text(ctx, 'parches (' + Math.round(100 * nc / 196) + ' %)', X1 + MS + 14, TY + 126, { color: C.grey2, size: 15 });
+      mini(X2, TY, MS, enObj, C.coralD);
+      text(ctx, 'Objetivos', X2 + MS + 14, TY + 22, { color: C.coralD, size: 19, weight: '600' });
+      text(ctx, 'lo que se predice', X2 + MS + 14, TY + 48, { color: C.grey2, size: 15 });
+      text(ctx, '(unión de bloques)', X2 + MS + 14, TY + 68, { color: C.grey2, size: 15 });
+      text(ctx, no + ' de 196', X2 + MS + 14, TY + 104, { color: C.navy, size: 22, weight: '600' });
+      text(ctx, 'parches', X2 + MS + 14, TY + 126, { color: C.grey2, size: 15 });
+      // los que no son ni contexto ni objetivo
+      caja(ctx, X1, TY + 156, 16, 16, { r: 3, fill: 'rgba(140,145,160,0.8)' });
+      text(ctx, nn ? `Gris: ${nn} parches que no son contexto ni objetivo (sólo los ve el encoder objetivo)` : 'Acá el contexto es todo lo que no es objetivo', X1 + 24, TY + 169, { color: C.grey2, size: 14.5, weight: '600' });
+      // ablación de estrategias (tabla 6 del paper)
+      const BY = 240;
+      text(ctx, 'Qué reporta el paper', X1, BY, { color: C.navy, size: 17, weight: '600' });
+      text(ctx, 'top-1 lineal en ImageNet con 1 % de etiquetas · ViT-B/16, 300 épocas', X1, BY + 21, { color: C.grey2, size: 13.5 });
+      EST.forEach((e, k) => {
+        const y = BY + 44 + k * 34, on = e[0] === est, col = on ? (e[0] === 'multi' ? C.teal : C.coralD) : '#c9ccd6';
+        text(ctx, e[1], X1, y + 17, { color: on ? C.navy : C.grey2, size: 15.5, weight: on ? '600' : '400' });
+        caja(ctx, X1 + 118, y + 3, 250 * e[2] / 60, 20, { r: 4, fill: col });
+        text(ctx, num(e[2]), X1 + 118 + 250 * e[2] / 60 + 8, y + 18, { color: on ? C.navy : C.grey2, size: 15.5, weight: on ? '600' : '400' });
+      });
+      const r = reportado(), RX = 965;
+      caja(ctx, RX - 105, BY + 40, 210, 132, { r: 12, fill: C.light });
+      text(ctx, 'esta configuración', RX, BY + 66, { color: C.grey2, size: 14.5, align: 'center' });
+      if (r === null) {
+        text(ctx, '—', RX, BY + 116, { color: C.grey, size: 44, weight: '600', align: 'center' });
+        text(ctx, 'combinación no reportada', RX, BY + 152, { color: C.grey2, size: 13.5, align: 'center' });
+      } else {
+        text(ctx, num(r), RX, BY + 122, { color: r >= 54 ? C.teal : C.coralD, size: 46, weight: '700', align: 'center' });
+        text(ctx, '% top-1 reportado', RX, BY + 152, { color: C.grey2, size: 13.5, align: 'center' });
+      }
+    }
+    const b = K.bar(root);
+    const play = K.iconButton(b, K.ICON_PLAY, 'Remuestrear solo cada pocos segundos', () => { auto = !auto; play.innerHTML = auto ? K.ICON_PAUSE : K.ICON_PLAY; });
+    K.textButton(b, 'Remuestrear', () => { muestrea(); reloj = 0; });
+    const cambia = () => { muestrea(); reloj = 0; sl.forEach(s => s.closest('label').classList.toggle('apagado', est !== 'multi')); };
+    K.opciones(b, EST.map(e => [e[0], e[1]]), est, v => { est = v; cambia(); });
+    const sl = [
+      K.choice(b, 'escala objetivos', TS.map((_, i) => i), iT, i => '(' + String(TS[i][0]).replace('.', ',') + '; ' + String(TS[i][1]).replace('.', ',') + ')', v => { iT = v; cambia(); }),
+      K.choice(b, 'escala contexto', CS.map((_, i) => i), iC, i => '(' + CS[i][0].toFixed(2).replace('.', ',') + '; 1)', v => { iC = v; cambia(); }),
+      K.choice(b, 'objetivos', [1, 2, 3, 4], nT, v => String(v), v => { nT = v; cambia(); })];
+    sl.forEach(s => s.closest('label').classList.toggle('apagado', est !== 'multi'));
+    root._entrar = () => { muestrea(); reloj = 0; };
+    K.frame(root, (now, dt) => {
+      entra = Math.min(1, entra + dt / 450);
+      if (auto) { reloj += dt; if (reloj > 2600) { muestrea(); reloj = 0; } }
+      draw();
+    });
+    muestrea(); entra = 1; draw();
+  });
+
+  // ============================================================ 2. píxeles vs. representación
+  K.register('pixlat', root => {
+    const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
+    const G = 48, KS = 240, P = [{ x: 30 }, { x: 400 }, { x: 770 }], PY = 62, PS = 300;
+    let u = +(root.dataset.u || 0.7), media = new Float32Array(G * G), mse = 0, actual = null, reloj = 0, seed = 1;
+    const r = mulberry(11);
+    const tmp = document.createElement('canvas'); tmp.width = tmp.height = G; const tctx = tmp.getContext('2d'), img = tctx.createImageData(G, G);
+    // un futuro posible: la pelota sale del mismo lugar con una dirección incierta; el fondo tiene textura impredecible
+    function futuro() {
+      const th = (r() * 2 - 1) * u * 1.15, d = 0.46, cx = 0.5 + d * Math.sin(th), cy = 0.82 - d * Math.cos(th);
+      const I = new Float32Array(G * G);
+      for (let i = 0; i < G; i++) for (let j = 0; j < G; j++) {
+        const x = (j + 0.5) / G, y = (i + 0.5) / G, dd = Math.hypot(x - cx, y - cy);
+        const bola = clamp((0.105 - dd) / 0.03, 0, 1), fondo = clamp(0.82 + 0.28 * u * gauss(r), 0, 1);
+        I[i * G + j] = (1 - bola) * fondo + bola * 0.08;
+      }
+      return { I, th };
+    }
+    function recalcula() {
+      media.fill(0); const todos = [];
+      for (let k = 0; k < KS; k++) { const f = futuro(); todos.push(f.I); for (let i = 0; i < G * G; i++) media[i] += f.I[i] / KS; }
+      mse = 0; for (const I of todos) for (let i = 0; i < G * G; i++) mse += (I[i] - media[i]) ** 2 / (KS * G * G);
+      actual = futuro();
+    }
+    function pinta(I, x, y, s) {
+      for (let i = 0; i < G * G; i++) {  // de claro (fondo) a azul marino (pelota)
+        const v = I[i], k = clamp((v - 0.08) / 0.74, 0, 1.25);
+        img.data[4 * i] = clamp(22 + (236 - 22) * k, 0, 255); img.data[4 * i + 1] = clamp(33 + (238 - 33) * k, 0, 255);
+        img.data[4 * i + 2] = clamp(62 + (244 - 62) * k, 0, 255); img.data[4 * i + 3] = 255;
+      }
+      tctx.putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = false; ctx.drawImage(tmp, x, y, s, s); ctx.imageSmoothingEnabled = true;
+      caja(ctx, x, y, s, s, { r: 2, stroke: C.grid, lw: 1.5 });
+    }
+    // panel derecho: la representación de este futuro (objetivo) y la predicción
+    function tabla() {
+      const x = P[2].x, cO = x + 238, cP = x + 306, y0 = PY + 22, dy = 44, nitido = u < 0.06;
+      K.rich(ctx, '$s_y$', cO, y0, { color: C.teal, size: 17, align: 'right' });
+      K.rich(ctx, '$\\hat s_y$', cP, y0, { color: C.blue, size: 17, align: 'right' });
+      const F = [['hay una pelota', 'sí', 'sí', true], ['tamaño', '0,21', '0,21', true], ['distancia recorrida', '0,46', '0,46', true],
+                 ['dirección', nitido ? '0°' : '', nitido ? '0°' : '', nitido], ['textura del fondo', '', '', false]];
+      F.forEach(([n, o, pr, ok], k) => {
+        const y = y0 + 36 + k * dy;
+        ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y - 26); ctx.lineTo(x + 310, y - 26); ctx.stroke();
+        text(ctx, n, x, y, { color: ok ? C.navy : C.grey, size: 15, weight: ok ? '600' : '400' });
+        if (ok) { text(ctx, o, cO, y, { color: C.teal, size: 15, weight: '600', align: 'right' }); text(ctx, pr, cP, y, { color: C.blue, size: 15, weight: '600', align: 'right' }); }
+        else text(ctx, 'no se representa', cP, y, { color: C.grey, size: 13.5, align: 'right' });
+      });
+    }
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      text(ctx, 'Un futuro posible', P[0].x, 30, { color: C.navy, size: 18, weight: '600' });
+      text(ctx, 'cambia cada segundo y medio', P[0].x, 51, { color: C.grey2, size: 14 });
+      pinta(actual.I, P[0].x, PY, PS);
+      // posición de partida y dirección sorteada
+      const sx = P[0].x + 0.5 * PS, sy = PY + 0.82 * PS;
+      ctx.strokeStyle = C.coralD; ctx.lineWidth = 2.5; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.arc(sx, sy, 0.105 * PS, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+      flecha(ctx, [[sx, sy], [sx + 0.3 * PS * Math.sin(actual.th), sy - 0.3 * PS * Math.cos(actual.th)]], C.coralD, { lw: 2.5, dash: [5, 4] });
+      text(ctx, 'Predicción en píxeles', P[1].x, 30, { color: C.coralD, size: 18, weight: '600' });
+      text(ctx, 'la que minimiza el error cuadrático: el promedio', P[1].x, 51, { color: C.grey2, size: 14 });
+      pinta(media, P[1].x, PY, PS);
+      text(ctx, 'error medio por píxel: ' + num(mse, 3), P[1].x, PY + PS + 26, { color: C.coralD, size: 16, weight: '600' });
+      text(ctx, u < 0.06 ? 'sin incertidumbre, el promedio es nítido' : 'no se parece a ningún futuro real', P[1].x, PY + PS + 48, { color: C.grey2, size: 14 });
+      text(ctx, 'Predicción en representación', P[2].x, 30, { color: C.teal, size: 18, weight: '600' });
+      K.rich(ctx, 'objetivo $s_y$ y predicción $\\hat s_y$', P[2].x, 51, { color: C.grey2, size: 14 });
+      tabla();
+      text(ctx, 'error en lo representado: 0', P[2].x, PY + PS + 26, { color: C.teal, size: 16, weight: '600' });
+      text(ctx, 'mismo objetivo para todos los futuros', P[2].x, PY + PS + 48, { color: C.grey2, size: 14 });
+      text(ctx, 'punto de partida', P[0].x, PY + PS + 26, { color: C.coralD, size: 14 });
+      text(ctx, 'y dirección de este futuro', P[0].x, PY + PS + 46, { color: C.coralD, size: 14 });
+    }
+    const b = K.bar(root);
+    K.choice(b, 'incertidumbre del futuro', [0, 0.15, 0.3, 0.5, 0.7, 0.85, 1], u, v => Math.round(v * 100) + ' %', v => { u = v; recalcula(); draw(); });
+    K.frame(root, (now, dt) => { reloj += dt; if (reloj > 1700) { reloj = 0; actual = futuro(); draw(); } });
+    recalcula(); draw();
+  });
+
+  // ============================================================ 3. colapso, stop-gradient y EMA
+  // Simulación real, en chico: encoder lineal W (2×4), predictor lineal P (2×2), encoder objetivo W̄.
+  // Pérdida ‖P W x − W̄ y‖² sobre dos vistas ruidosas (x, y) del mismo punto. No es I-JEPA: es una ilustración.
+  K.register('colapso', root => {
+    const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
+    const CEN = [[1.2, 0.2], [-0.9, 0.9], [-0.2, -1.3]], A = [[1, 0], [0, 1], [0.6, -0.4], [-0.3, 0.7]];
+    const COL = [C.blue, C.teal, C.coral], LR = 0.02, T = 1800, B = 32;
+    let sg = root.dataset.sg !== 'no', m = 0.99, Wm, Wb, Pm, t, hist, r, ev, corriendo = true, varE = 0, lossS = 0;
+    const mv = (M, v) => M.map(row => row.reduce((s, a, i) => s + a * v[i], 0));
+    const vista = c => { const z = [c[0] + 0.25 * gauss(r), c[1] + 0.25 * gauss(r)]; return A.map(a => a[0] * z[0] + a[1] * z[1] + 0.35 * gauss(r)); };
+    function reset() {
+      r = mulberry(1);
+      Wm = [0, 1].map(() => [0, 1, 2, 3].map(() => 0.5 * gauss(r))); Wb = Wm.map(q => q.slice()); Pm = [[1, 0], [0, 1]];
+      ev = []; for (let k = 0; k < 150; k++) ev.push({ k: k % 3, x: vista(CEN[k % 3]) });
+      t = 0; hist = []; lossS = 0; mide(); hist.push([0, varE, null]); corriendo = true; sync();
+    }
+    function mide() {
+      const S = ev.map(e => mv(Wm, e.x)), mu = [0, 1].map(k => S.reduce((s, v) => s + v[k], 0) / S.length);
+      varE = S.reduce((s, v) => s + (v[0] - mu[0]) ** 2 + (v[1] - mu[1]) ** 2, 0) / S.length;
+    }
+    function paso() {
+      const gW = [[0, 0, 0, 0], [0, 0, 0, 0]], gP = [[0, 0], [0, 0]]; let loss = 0;
+      for (let b = 0; b < B; b++) {
+        const c = CEN[Math.floor(r() * 3)], x = vista(c), y = vista(c);
+        const sx = mv(Wm, x), pr = mv(Pm, sx), sy = mv(sg ? Wb : Wm, y), e = [pr[0] - sy[0], pr[1] - sy[1]];
+        loss += (e[0] * e[0] + e[1] * e[1]) / B;
+        const Pte = [Pm[0][0] * e[0] + Pm[1][0] * e[1], Pm[0][1] * e[0] + Pm[1][1] * e[1]];
+        for (let i = 0; i < 2; i++) {
+          for (let j = 0; j < 2; j++) gP[i][j] += 2 * e[i] * sx[j] / B;
+          for (let j = 0; j < 4; j++) { gW[i][j] += 2 * Pte[i] * x[j] / B; if (!sg) gW[i][j] -= 2 * e[i] * y[j] / B; }  // sin stop-gradient, el objetivo también recibe gradiente
+        }
+      }
+      for (let i = 0; i < 2; i++) { for (let j = 0; j < 2; j++) Pm[i][j] -= LR * gP[i][j]; for (let j = 0; j < 4; j++) Wm[i][j] -= LR * gW[i][j]; }
+      if (sg) for (let i = 0; i < 2; i++) for (let j = 0; j < 4; j++) Wb[i][j] = m * Wb[i][j] + (1 - m) * Wm[i][j];
+      lossS = t ? 0.9 * lossS + 0.1 * loss : loss; t++;
+      if (t % 3 === 0) { mide(); hist.push([t, varE, lossS]); }
+    }
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      // izquierda: los embeddings s = W x
+      const L = { x: 30, y: 46, s: 350 }, cx = L.x + L.s / 2, cy = L.y + L.s / 2, sc = L.s / 7;
+      text(ctx, 'Embeddings del encoder de contexto', L.x, 30, { color: C.navy, size: 17, weight: '600' });
+      caja(ctx, L.x, L.y, L.s, L.s, { r: 8, fill: '#fafafc', stroke: C.grid, lw: 1.5 });
+      ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L.x, cy); ctx.lineTo(L.x + L.s, cy); ctx.moveTo(cx, L.y); ctx.lineTo(cx, L.y + L.s); ctx.stroke();
+      ctx.save(); ctx.beginPath(); ctx.rect(L.x, L.y, L.s, L.s); ctx.clip();
+      for (const e of ev) { const s = mv(Wm, e.x); dot(ctx, cx + s[0] * sc, cy - s[1] * sc, COL[e.k], 5); }
+      ctx.restore();
+      const colapsado = varE < 0.02;
+      text(ctx, colapsado ? 'colapso: todas las entradas dan el mismo vector' : 'tres grupos de datos, tres colores', L.x, L.y + L.s + 24, { color: colapsado ? C.coralD : C.grey2, size: 14.5, weight: colapsado ? '600' : '400' });
+      // derecha: varianza y pérdida
+      const R = { x: 470, y: 76, w: 540, h: 290 }, YM = 4;
+      const X = v => R.x + v / T * R.w, Y = v => R.y + R.h - clamp(v, 0, YM) / YM * R.h;
+      text(ctx, sg ? 'Con stop-gradient y encoder objetivo por EMA (m = ' + String(m).replace('.', ',') + ')' : 'Sin stop-gradient: un solo encoder, gradiente por las dos ramas', R.x - 30, 30, { color: sg ? C.teal : C.coralD, size: 17, weight: '600' });
+      ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+      for (let v = 0; v <= YM; v++) { ctx.beginPath(); ctx.moveTo(R.x, Y(v)); ctx.lineTo(R.x + R.w, Y(v)); ctx.stroke(); text(ctx, String(v), R.x - 10, Y(v) + 5, { align: 'right', color: C.grey, size: 13 }); }
+      for (const v of [0, 600, 1200, 1800]) text(ctx, String(v), X(v), R.y + R.h + 20, { align: 'center', color: C.grey, size: 13 });
+      text(ctx, 'pasos de entrenamiento', R.x + R.w, R.y + R.h + 42, { align: 'right', color: C.grey2, size: 13.5 });
+      const linea = (k, color) => { ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.beginPath(); let ini = true;
+        for (const h of hist) { if (h[k] === null) continue; ini ? ctx.moveTo(X(h[0]), Y(h[k])) : ctx.lineTo(X(h[0]), Y(h[k])); ini = false; } ctx.stroke(); };
+      linea(2, C.coral); linea(1, C.teal);
+      const u = hist[hist.length - 1], yv = Y(u[1]), yl = Y(u[2] || 0), piso = Y(0) - 10;
+      dot(ctx, X(u[0]), yv, C.teal, 5); if (u[2] !== null) dot(ctx, X(u[0]), yl, C.coral, 5);
+      // las dos etiquetas no se pisan entre sí ni con el eje
+      let a1 = Math.min(yv + 5, piso), a2 = Math.min(yl + 5, piso);
+      if (Math.abs(a1 - a2) < 19) { if (yv <= yl) a1 = a2 - 19; else a2 = a1 - 19; }
+      text(ctx, 'varianza', X(u[0]) + 10, a1, { color: C.teal, size: 14.5, weight: '600' });
+      if (u[2] !== null) text(ctx, 'pérdida', X(u[0]) + 10, a2, { color: C.coralD, size: 14.5, weight: '600' });
+      out.textContent = 'paso ' + t + '  ·  varianza de los embeddings = ' + num(varE, 3) + '  ·  pérdida = ' + num(lossS, 3);
+    }
+    const b = K.bar(root);
+    const play = K.iconButton(b, K.ICON_PAUSE, 'Pausar o reproducir', () => { if (t >= T) reset(); else corriendo = !corriendo; sync(); });
+    const sync = () => { if (play) play.innerHTML = corriendo ? K.ICON_PAUSE : K.ICON_PLAY; };
+    K.iconButton(b, K.ICON_RESET, 'Reiniciar', () => { reset(); draw(); });
+    const fijaSg = K.opciones(b, [['si', 'con stop-gradient + EMA'], ['no', 'sin stop-gradient']], sg ? 'si' : 'no', v => { sg = v === 'si'; mom.closest('label').classList.toggle('apagado', !sg); reset(); draw(); });
+    const mom = K.choice(b, 'momentum <i>m</i>', [0, 0.9, 0.99, 0.996], m, v => String(v).replace('.', ','), v => { m = v; reset(); draw(); });
+    mom.closest('label').classList.toggle('apagado', !sg);
+    const out = K.readout(b);
+    root._entrar = () => { reset(); };
+    root._sim = cfg => { sg = cfg.sg; m = cfg.m; fijaSg(sg ? 'si' : 'no'); reset(); while (t < T) paso(); mide(); draw(); return { varianza: varE, perdida: lossS }; };  // para las pruebas
+    K.frame(root, () => { if (corriendo) { for (let k = 0, n = t < 240 ? 1 : 6; k < n && t < T; k++) paso(); if (t >= T) { corriendo = false; sync(); } } draw(); });
+    reset(); draw();
+  });
+
+  // ============================================================ 4. arquitectura paso a paso
+  K.register('arquitectura', root => {
+    const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
+    const PASOS = [
+      'Una imagen se parte en parches, igual que en cualquier Vision Transformer',
+      'Se sortean un bloque de contexto (punteado verde) y bloques objetivo (coral); lo gris no es ninguno',
+      'El encoder de contexto recibe sólo lo verde: el bloque de contexto sin los parches objetivo',
+      'El encoder objetivo ve la imagen completa; los bloques objetivo se recortan recién a la salida',
+      'El predictor recibe el contexto y tokens de máscara que indican qué posición predecir',
+      'La pérdida compara predicción y objetivo en el espacio de representaciones',
+      'El gradiente actualiza contexto y predictor; el encoder objetivo sigue al de contexto por EMA'];
+    const NP = PASOS.length - 1;
+    let paso = +(root.dataset.paso || 0), al = PASOS.map((_, k) => (k <= paso ? 1 : 0)), fase = 0;
+    const conFragments = () => { const sec = root.closest('.reveal .slides section'); return sec && sec.querySelector('.fragment.paso') ? sec : null; };
+    const N = 6, IM = { x: 24, y: 131, s: 168 }, q = IM.s / N;
+    const OBJ = [{ top: 0, left: 3, h: 2, w: 3 }, { top: 3, left: 0, h: 3, w: 2 }], CTX = { top: 1, left: 0, h: 5, w: 5 };
+    const enObj = (i, j) => OBJ.some(b => i >= b.top && i < b.top + b.h && j >= b.left && j < b.left + b.w);
+    const enCtx = (i, j) => i >= CTX.top && i < CTX.top + CTX.h && j >= CTX.left && j < CTX.left + CTX.w && !enObj(i, j);
+    const F = {  // recorridos de las flechas
+      ctx: [[196, 168], [207, 168], [207, 120], [220, 120]], ctx2: [[276, 120], [296, 120]], sx: [[490, 120], [520, 120]], pred: [[620, 120], [666, 120]],
+      mask: [[700, 196], [700, 159]], sh: [[840, 120], [900, 120]],
+      obj: [[196, 262], [207, 262], [207, 330], [220, 330]], obj2: [[276, 330], [296, 330]], sy: [[490, 330], [900, 330]],
+      g1: [[884, 228], [800, 228], [800, 159]], g2: [[755, 81], [755, 58], [395, 58], [395, 81]], ema: [[395, 157], [395, 291]] };
+    function tokens(x, y, cols, rows, color, a, hueco) {
+      for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++)
+        caja(ctx, x + j * 13, y + i * 13, 10, 10, { r: 2.5, fill: hueco ? alfa('#ffffff', a) : alfa(color, a), stroke: hueco ? alfa(color, a) : null, lw: 1.6, dash: hueco === 'punteado' ? [3, 2] : [] });
+    }
+    function red(x, y, w, h, titulo, simbolo, color, a, barra) {
+      caja(ctx, x, y, w, h, { r: 12, fill: alfa('#ffffff', a), stroke: alfa(color, a), lw: 2.5 });
+      text(ctx, titulo, x + w / 2, y + 30, { color: alfa(color, a), size: 16, weight: '600', align: 'center' });
+      K.rich(ctx, simbolo, x + w / 2, y + 54, { color: alfa(C.navy, a), size: 18, align: 'center' });
+    }
+    // miniaturas de lo que entra a cada encoder
+    function mini(x, y, s, soloCtx, borde, a) {
+      if (a <= 0.01) return;
+      const qq = s / N; ctx.globalAlpha = a; ctx.drawImage(escena(), x, y, s, s);
+      if (soloCtx) { ctx.fillStyle = '#f4f4f8'; for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) if (!enCtx(i, j)) ctx.fillRect(x + j * qq - 0.3, y + i * qq - 0.3, qq + 0.6, qq + 0.6); }
+      ctx.globalAlpha = 1; caja(ctx, x, y, s, s, { r: 3, stroke: alfa(borde, a), lw: 2 });
+    }
+    const viaja = (pts, color, activo, desfase = 0) => { if (!activo) return; for (let k = 0; k < 2; k++) { const p = sobre(pts, (fase + desfase + k * 0.5) % 1); dot(ctx, p[0], p[1], color, 4.5); } };
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      caja(ctx, 24, 12, 36, 28, { r: 8, fill: C.blue }); text(ctx, String(paso + 1), 42, 33, { color: '#fff', size: 17, weight: '600', align: 'center' });
+      text(ctx, PASOS[paso], 72, 33, { color: C.navy, size: 18.5, weight: '600' });
+      // imagen y parches
+      ctx.drawImage(escena(), IM.x, IM.y, IM.s, IM.s);
+      for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+        const x = IM.x + j * q, y = IM.y + i * q;
+        if (!enCtx(i, j) && !enObj(i, j)) { ctx.fillStyle = `rgba(150,155,170,${0.78 * al[1]})`; ctx.fillRect(x, y, q, q); }
+        if (enObj(i, j)) { ctx.fillStyle = alfa(C.coral, 0.55 * al[1]); ctx.fillRect(x, y, q, q); }
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.2; ctx.beginPath();
+      for (let k = 1; k < N; k++) { ctx.moveTo(IM.x + k * q, IM.y); ctx.lineTo(IM.x + k * q, IM.y + IM.s); ctx.moveTo(IM.x, IM.y + k * q); ctx.lineTo(IM.x + IM.s, IM.y + k * q); }
+      ctx.stroke();
+      caja(ctx, IM.x, IM.y, IM.s, IM.s, { r: 3, stroke: C.grid, lw: 1.5 });
+      caja(ctx, IM.x + CTX.left * q + 1.5, IM.y + CTX.top * q + 1.5, CTX.w * q - 3, CTX.h * q - 3, { r: 2, stroke: alfa(C.teal, al[1]), lw: 2.5, dash: [6, 4] });
+      for (const b of OBJ) caja(ctx, IM.x + b.left * q, IM.y + b.top * q, b.w * q, b.h * q, { r: 2, stroke: alfa(C.coralD, al[1]), lw: 2.5 });
+      if (al[1] > 0.5) { text(ctx, 'gris: ni contexto ni objetivo', IM.x + IM.s / 2, IM.y + IM.s + 22, { color: C.grey2, size: 13, align: 'center' }); }
+      else text(ctx, 'imagen en parches', IM.x + IM.s / 2, IM.y + IM.s + 22, { color: C.grey2, size: 14, align: 'center' });
+      // rama de contexto
+      let a = al[2];
+      flecha(ctx, F.ctx, alfa(C.teal, a), { t: a }); mini(222, 94, 52, true, C.teal, a); flecha(ctx, F.ctx2, alfa(C.teal, a), { t: a });
+      text(ctx, 'verde sin coral', 248, 84, { color: alfa(C.teal, a), size: 13, weight: '600', align: 'center' });
+      red(300, 85, 190, 70, 'Encoder de contexto', '$f_\\theta$', C.teal, a);
+      flecha(ctx, F.sx, alfa(C.teal, a), { t: a }); tokens(527, 101, 7, 3, C.teal, a);
+      if (a > 0.02) K.rich(ctx, '$s_x$', 572, 164, { color: alfa(C.teal, a), size: 19, align: 'center' });
+      viaja(F.ctx, C.teal, paso === 2); viaja(F.ctx2, C.teal, paso === 2);
+      // rama objetivo
+      a = al[3];
+      flecha(ctx, F.obj, alfa(C.navy, a), { t: a }); mini(222, 304, 52, false, C.navy, a); flecha(ctx, F.obj2, alfa(C.navy, a), { t: a });
+      text(ctx, 'imagen completa', 248, 376, { color: alfa(C.navy, a), size: 13, weight: '600', align: 'center' });
+      red(300, 295, 190, 70, 'Encoder objetivo', '$f_{\\bar\\theta}$', C.navy, a);
+      flecha(ctx, F.sy, alfa(C.coralD, a), { t: a });
+      text(ctx, 'se recortan los bloques objetivo', 695, 318, { color: alfa(C.grey2, a), size: 13.5, align: 'center' });
+      tokens(912, 311, 3, 2, C.coral, a); tokens(968, 304, 2, 3, C.coral, a);
+      if (a > 0.02) K.rich(ctx, '$s_y$', 1030, 338, { color: alfa(C.coralD, a), size: 19, align: 'center' });
+      viaja(F.obj, C.navy, paso === 3); viaja(F.obj2, C.navy, paso === 3); viaja(F.sy, C.coralD, paso === 3, 0.25);
+      // predictor
+      a = al[4];
+      flecha(ctx, F.pred, alfa(C.blue, a), { t: a });
+      red(670, 85, 170, 70, 'Predictor', '$g_\\phi$', C.blue, a);
+      tokens(675, 200, 4, 1, C.blue, a, 'punteado'); flecha(ctx, F.mask, alfa(C.blue, a), { t: a, lw: 2 });
+      text(ctx, 'tokens de máscara', 700, 234, { color: alfa(C.blue, a), size: 13.5, weight: '600', align: 'center' });
+      text(ctx, '+ posición del objetivo', 700, 252, { color: alfa(C.blue, a), size: 13.5, align: 'center' });
+      flecha(ctx, F.sh, alfa(C.blue, a), { t: a });
+      tokens(912, 108, 3, 2, C.blue, a, 'lleno'); tokens(968, 101, 2, 3, C.blue, a, 'lleno');
+      if (a > 0.02) K.rich(ctx, '$\\hat s_y$', 1030, 128, { color: alfa(C.blue, a), size: 19, align: 'center' });
+      viaja(F.pred, C.blue, paso === 4); viaja(F.sh, C.blue, paso === 4, 0.3);
+      // pérdida
+      a = al[5];
+      flecha(ctx, [[950, 204], [950, 152]], alfa(C.navy, a), { t: a, lw: 2 }); flecha(ctx, [[950, 252], [950, 296]], alfa(C.navy, a), { t: a, lw: 2 });
+      caja(ctx, 886, 208, 190, 40, { r: 20, fill: alfa(C.navy, a) });
+      K.rich(ctx, 'distancia  $D(\\hat s_y, s_y)$', 981, 236, { color: alfa('#ffffff', a), size: 15, weight: '600', align: 'center' });
+      // gradiente y EMA
+      a = al[6];
+      flecha(ctx, F.g1, alfa(C.navy, a), { t: a, dash: [6, 5], lw: 2 }); flecha(ctx, F.g2, alfa(C.navy, a), { t: a, dash: [6, 5], lw: 2 });
+      text(ctx, 'gradiente', 843, 221, { color: alfa(C.navy, a), size: 13.5, weight: '600', align: 'center' });
+      K.rich(ctx, 'gradiente: se actualizan $\\theta$ y $\\phi$', 575, 76, { color: alfa(C.navy, a), size: 13.5, weight: '600', align: 'center' });
+      flecha(ctx, F.ema, alfa(C.teal, a), { t: a, dash: [2, 6], lw: 3 });
+      text(ctx, 'promedio móvil (EMA)', 408, 218, { color: alfa(C.teal, a), size: 13.5, weight: '600' });
+      text(ctx, 'de los pesos del contexto', 408, 236, { color: alfa(C.teal, a), size: 13.5 });
+      text(ctx, 'sin gradiente por esta rama', 695, 352, { color: alfa(C.coralD, a), size: 13.5, weight: '600', align: 'center' });
+      viaja(F.ema, C.teal, paso === 6);
+      // puntos de avance
+      for (let k = 0; k <= NP; k++) { ctx.fillStyle = k === paso ? C.blue : k < paso ? C.grey : C.grid; ctx.beginPath(); ctx.arc(W / 2 - NP * 11 + k * 22, H - 16, k === paso ? 6 : 4.5, 0, 7); ctx.fill(); }
+    }
+    const b = K.bar(root);
+    const va = n => { paso = clamp(n, 0, NP); ant.disabled = paso === 0; sig.textContent = paso === NP ? 'Volver al inicio' : 'Siguiente paso'; };
+    const ant = K.textButton(b, 'Paso anterior', () => { const sec = conFragments(); if (sec && window.Reveal) Reveal.prevFragment(); else va(paso - 1); });
+    const sig = K.textButton(b, 'Siguiente paso', () => { const sec = conFragments(); if (sec && window.Reveal && paso < NP) Reveal.nextFragment(); else va(paso === NP ? 0 : paso + 1); });
+    va(paso);
+    root._sync = () => { const sec = conFragments(); if (sec) va(sec.querySelectorAll('.fragment.paso.visible').length); };
+    root._paso = va;
+    K.frame(root, (now, dt) => {
+      fase = (fase + dt / 1600) % 1;
+      for (let k = 0; k <= NP; k++) al[k] = clamp(al[k] + (k <= paso ? 1 : -1) * dt / 450, 0, 1);
+      draw();
+    });
+    draw();
+  });
+
+  // ============================================================ paisaje de energía y colapso
+  K.register('energia', root => {
+    const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
+    const DAT = [-2.1, -0.4, 1.7], PRU = 0.75;
+    const E0 = y => Math.min(...DAT.map(d => 1 - Math.exp(-((y - d) ** 2) / (2 * 0.32 ** 2))));
+    const draw = t => {
+      ctx.clearRect(0, 0, W, H);
+      const L = { x: 60, y: 70, w: W - 120, h: H - 150 }, X = y => L.x + (y + 3) / 6 * L.w, Y = e => L.y + L.h - e * L.h * 0.9;
+      const E = y => (1 - t) * E0(y);
+      text(ctx, t < 0.5 ? 'Energía bien formada: baja sólo donde x e y son compatibles' : 'Colapso: la energía es baja para cualquier par', L.x, 34, { color: t < 0.5 ? C.teal : C.coralD, size: 19, weight: '600' });
+      text(ctx, 'energía  F(x, y)', L.x, 58, { color: C.grey2, size: 14 });
+      ctx.fillStyle = alfa(C.blue, 0.1); ctx.beginPath(); ctx.moveTo(X(-3), Y(0));
+      for (let i = 0; i <= 300; i++) { const y = -3 + 6 * i / 300; ctx.lineTo(X(y), Y(E(y))); }
+      ctx.lineTo(X(3), Y(0)); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = C.blue; ctx.lineWidth = 3.5; ctx.lineJoin = 'round'; ctx.beginPath();
+      for (let i = 0; i <= 300; i++) { const y = -3 + 6 * i / 300; i ? ctx.lineTo(X(y), Y(E(y))) : ctx.moveTo(X(y), Y(E(y))); }
+      ctx.stroke();
+      ctx.strokeStyle = C.grey; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(L.x, Y(0)); ctx.lineTo(L.x + L.w, Y(0)); ctx.stroke();
+      for (const d of DAT) dot(ctx, X(d), Y(E(d)), C.teal, 8);
+      ctx.strokeStyle = C.coralD; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(X(PRU), Y(0)); ctx.lineTo(X(PRU), Y(E(PRU))); ctx.stroke(); ctx.setLineDash([]);
+      dot(ctx, X(PRU), Y(E(PRU)), C.coralD, 8);
+      text(ctx, 'par incompatible: energía ' + num(E(PRU), 2), X(PRU) + 18, Math.min(Y(E(PRU)) + 5, Y(0) - 12), { color: C.coralD, size: 15.5, weight: '600' });
+      text(ctx, 'pares compatibles (datos)', X(DAT[0]), Y(0) + 26, { color: C.teal, size: 15, weight: '600', align: 'center' });
+      text(ctx, 'posibles y para un x fijo', L.x + L.w, Y(0) + 26, { color: C.grey2, size: 14, align: 'right' });
+    };
+    K.pasos(root, [0, 1], draw, { ms: 3000 });
+  });
+
+  // ============================================================ las tres arquitecturas
+  K.register('tres', root => {
+    const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
+    const solo = root.dataset.solo;
+    const nodo = (x, y, s, color, a) => K.rich(ctx, s, x, y + 7, { color: alfa(color, a), size: 21, align: 'center' });
+    const red = (x, y, t, color, a, w = 104) => { caja(ctx, x - w / 2, y - 20, w, 40, { r: 9, fill: alfa('#ffffff', a), stroke: alfa(color, a), lw: 2.2 }); text(ctx, t, x, y + 6, { color: alfa(color, a), size: 14.5, weight: '600', align: 'center' }); };
+    const lin = (pts, color, a) => flecha(ctx, pts, alfa(color, a), { lw: 2, cabeza: 7 });
+    function columna(k, cx, a, activo) {
+      const T = [['Joint-embedding', 'compara dos representaciones'], ['Generativa', 'reconstruye y en píxeles'], ['JEPA', 'predice la representación de y']][k];
+      const EJ = ['SimCLR, DINO, iBOT…', 'MAE (autoencoder enmascarado)', 'I-JEPA'][k];
+      const xl = cx - 78, xr = cx + 78, col = [C.blue, C.coralD, C.teal][k];
+      text(ctx, T[0], cx, 30, { color: alfa(col, a), size: 20, weight: '600', align: 'center' });
+      text(ctx, T[1], cx, 53, { color: alfa(C.grey2, a), size: 14.5, align: 'center' });
+      nodo(xl, 352, '$x$', C.navy, a); nodo(xr, 352, '$y$', C.navy, a);
+      const D = [cx, 106];
+      if (k === 0) {
+        lin([[xl, 338], [xl, 306]], C.grey, a); red(xl, 284, 'encoder', col, a); lin([[xl, 262], [xl, 222]], C.grey, a); nodo(xl, 204, '$s_x$', col, a);
+        lin([[xr, 338], [xr, 306]], C.grey, a); red(xr, 284, 'encoder', col, a); lin([[xr, 262], [xr, 222]], C.grey, a); nodo(xr, 204, '$s_y$', col, a);
+        lin([[xl, 188], [xl, 106], [cx - 28, 106]], C.grey, a); lin([[xr, 188], [xr, 106], [cx + 28, 106]], C.grey, a);
+      } else if (k === 1) {
+        lin([[xl, 338], [xl, 306]], C.grey, a); red(xl, 284, 'encoder', col, a); lin([[xl, 262], [xl, 232]], C.grey, a); red(xl, 210, 'decoder', col, a);
+        lin([[xl, 188], [xl, 166]], C.grey, a); nodo(xl, 150, '$\\hat y$', col, a); lin([[xl, 134], [xl, 106], [cx - 28, 106]], C.grey, a);
+        lin([[xr, 338], [xr, 106], [cx + 28, 106]], C.grey, a);
+        nodo(xl - 86, 210, '$z$', C.grey2, a); lin([[xl - 74, 210], [xl - 56, 210]], C.grey, a);
+      } else {
+        lin([[xl, 338], [xl, 322]], C.grey, a); red(xl, 300, 'encoder', col, a); lin([[xl, 278], [xl, 264]], C.grey, a); nodo(xl, 248, '$s_x$', col, a);
+        lin([[xl, 234], [xl, 218]], C.grey, a); red(xl, 196, 'predictor', C.blue, a); lin([[xl, 174], [xl, 160]], C.grey, a); nodo(xl, 144, '$\\hat s_y$', C.blue, a);
+        lin([[xl, 130], [xl, 106], [cx - 28, 106]], C.grey, a);
+        lin([[xr, 338], [xr, 322]], C.grey, a); red(xr, 300, 'encoder', col, a); lin([[xr, 278], [xr, 222]], C.grey, a); nodo(xr, 204, '$s_y$', col, a);
+        lin([[xr, 188], [xr, 106], [cx + 28, 106]], C.grey, a);
+        nodo(xl - 86, 196, '$z$', C.grey2, a); lin([[xl - 74, 196], [xl - 56, 196]], C.grey, a);
+      }
+      ctx.fillStyle = alfa(activo ? C.coral : '#ffffff', a); ctx.strokeStyle = alfa(C.coralD, a); ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(D[0], D[1], 22, 0, 7); ctx.fill(); ctx.stroke();
+      text(ctx, 'D', D[0], D[1] + 7, { color: alfa(activo ? '#ffffff' : C.coralD, a), size: 18, weight: '700', align: 'center' });
+      text(ctx, k === 1 ? 'distancia en píxeles' : 'distancia entre representaciones', cx, 74, { color: alfa(C.coralD, a), size: 13.5, weight: '600', align: 'center' });
+      text(ctx, EJ, cx, 388, { color: alfa(C.grey2, a), size: 14, align: 'center' });
+    }
+    const draw = t => {
+      ctx.clearRect(0, 0, W, H);
+      const act = solo !== undefined ? +solo : Math.round(t);
+      [0, 1, 2].forEach(k => { const v = solo !== undefined ? (k === act ? 1 : 0) : clamp(1 - Math.abs(t - k), 0, 1); columna(k, 190 + k * 360, 0.32 + 0.68 * v, k === act); });
+      ctx.strokeStyle = C.grid; ctx.lineWidth = 1.5; for (const x of [370, 730]) { ctx.beginPath(); ctx.moveTo(x, 20); ctx.lineTo(x, H - 16); ctx.stroke(); }
+    };
+    if (solo !== undefined) draw(0);
+    else K.pasos(root, [0, 1, 2], draw, { ms: 700 });
+  });
+
+  // ============================================================ resultados reportados
+  K.register('resultados', root => {
+    const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
+    // [método, arquitectura, valor, grupo (0 sin aumentos, 1 con aumentos), nota]
+    const V = {
+      lineal: { titulo: 'Evaluación lineal en ImageNet-1k (top-1, %)', min: 74, max: 83, filas: [
+        ['MAE', 'ViT-H/14', 77.2, 0, '1600 épocas'], ['data2vec', 'ViT-L/16', 77.3, 0, '1600 épocas'], ['CAE', 'ViT-L/16', 78.1, 0, '1600 épocas'],
+        ['I-JEPA', 'ViT-H/14', 79.3, 0, '300 épocas'], ['I-JEPA', 'ViT-H/16 a 448 px', 81.1, 0, '300 épocas'],
+        ['SimCLR v2', 'RN152 (2×)', 79.1, 1, ''], ['DINO', 'ViT-B/8', 80.1, 1, ''], ['iBOT', 'ViT-L/16', 81.0, 1, '']] },
+      uno: { titulo: 'ImageNet con el 1 % de las etiquetas, con ajuste fino (top-1, %)', min: 66, max: 79, filas: [
+        ['MAE', 'ViT-H/14', 71.5, 0, ''], ['data2vec', 'ViT-L/16', 73.3, 0, ''],
+        ['I-JEPA', 'ViT-H/14', 73.3, 0, ''], ['I-JEPA', 'ViT-H/16 a 448 px', 77.3, 0, ''],
+        ['iBOT', 'ViT-B/16', 69.7, 1, ''], ['DINO', 'ViT-B/8', 70.0, 1, ''], ['MSN', 'ViT-B/4', 75.7, 1, '']] },
+      bajo: { titulo: 'Tarea de bajo nivel: profundidad en Clevr/Dist (lineal, %)', min: 50, max: 76, filas: [
+        ['data2vec', 'ViT-L/16', 71.3, 0, 'conteo 85,3'], ['MAE', 'ViT-H/14', 72.4, 0, 'conteo 90,5'], ['I-JEPA', 'ViT-H/14', 72.4, 0, 'conteo 86,7'],
+        ['DINO', 'ViT-B/8', 53.4, 1, 'conteo 86,6'], ['iBOT', 'ViT-L/16', 62.8, 1, 'conteo 85,7']] } };
+    let vista = root.dataset.vista || 'lineal', crece = 0;
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      const D = V[vista], X0 = 330, X1 = 960, X = v => X0 + (v - D.min) / (D.max - D.min) * (X1 - X0), g = ease(crece);
+      text(ctx, D.titulo, 30, 32, { color: C.navy, size: 19, weight: '600' });
+      const paso = D.filas.length > 7 ? 37 : D.filas.length > 5 ? 41 : 50; let y = 62, grupo = -1;
+      const yEje = 62 + D.filas.length * paso + 2 * 28;
+      ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+      for (let v = Math.ceil(D.min / 2) * 2; v <= D.max; v += (D.max - D.min > 15 ? 4 : 2)) { ctx.beginPath(); ctx.moveTo(X(v), 52); ctx.lineTo(X(v), yEje - 6); ctx.stroke(); text(ctx, String(v), X(v), yEje + 12, { color: C.grey, size: 13, align: 'center' }); }
+      for (const f of D.filas) {
+        if (f[3] !== grupo) { grupo = f[3]; text(ctx, grupo ? 'Con aumentos de vista diseñados a mano' : 'Sin aumentos de vista diseñados a mano', 30, y + 18, { color: C.grey2, size: 13.5, weight: '600' }); y += 28; }
+        const yo = y + paso / 2, ij = f[0] === 'I-JEPA', col = ij ? C.coralD : grupo ? C.grey : C.blue, xv = X0 + (X(f[2]) - X0) * g;
+        text(ctx, f[0], 30, yo + 5, { color: ij ? C.coralD : C.navy, size: 16, weight: ij ? '700' : '600' });
+        text(ctx, f[1], 140, yo + 5, { color: C.grey2, size: 14 });
+        ctx.strokeStyle = alfa(col, 0.45); ctx.lineWidth = ij ? 4 : 2.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(X0, yo); ctx.lineTo(xv, yo); ctx.stroke();
+        dot(ctx, xv, yo, col, ij ? 9 : 7);
+        text(ctx, num(f[2]), xv + 16, yo + 5, { color: ij ? C.coralD : C.navy, size: 16, weight: ij ? '700' : '600' });
+        if (f[4]) text(ctx, f[4], xv + 62, yo + 5, { color: C.grey2, size: 13.5 });
+        y += paso;
+      }
+      text(ctx, 'el eje no empieza en cero', X1, 32, { color: C.grey, size: 13, align: 'right' });
+    }
+    const b = K.bar(root);
+    K.opciones(b, [['lineal', 'evaluación lineal'], ['uno', '1 % de etiquetas'], ['bajo', 'bajo nivel']], vista, v => { vista = v; crece = 0; });
+    K.hint(b, 'números de las tablas 1, 2 y 4 del paper');
+    root._entrar = () => { crece = 0; };
+    K.frame(root, (now, dt) => { crece = Math.min(1, crece + dt / 900); draw(); });
+    crece = 1; draw();
+  });
+
+  // ============================================================ la arquitectura cognitiva de LeCun (2022)
+  K.register('mundo', root => {
+    const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
+    const M = [
+      { n: 'Configurador', x: 410, y: 22, w: 280, h: 52, rol: 'Control ejecutivo: prepara a los demás módulos para la tarea que toca.' },
+      { n: 'Percepción', x: 40, y: 150, w: 210, h: 70, rol: 'Estima el estado actual del mundo a partir de los sensores.' },
+      { n: 'Modelo del mundo', x: 445, y: 140, w: 210, h: 90, rol: 'Completa lo que no se observa y predice estados futuros, incluidos los que resultan de una acción.' },
+      { n: 'Costo', x: 850, y: 150, w: 210, h: 70, s: 'intrínseco + crítico', rol: 'Mide el «malestar» en un número: un costo intrínseco fijo y un crítico entrenable que lo anticipa.' },
+      { n: 'Actor', x: 850, y: 280, w: 210, h: 60, rol: 'Propone secuencias de acciones que minimizan el costo futuro estimado.' },
+      { n: 'Memoria de corto plazo', x: 430, y: 284, w: 240, h: 52, rol: 'Guarda el estado actual y los predichos, junto con sus costos.' }];
+    const fijo = root.dataset.fijo;
+    const draw = t => {
+      ctx.clearRect(0, 0, W, H);
+      const act = fijo !== undefined ? +fijo : Math.min(5, Math.floor(t));
+      const g = C.grey;
+      // el configurador modula a todos
+      for (const p of [[[410, 48], [145, 48], [145, 146]], [[550, 74], [550, 136]], [[690, 48], [955, 48], [955, 146]], [[955, 48], [1084, 48], [1084, 310], [1064, 310]]])
+        flecha(ctx, p, alfa(g, 0.8), { lw: 1.6, dash: [4, 5], cabeza: 7 });
+      flecha(ctx, [[250, 185], [441, 185]], C.navy); text(ctx, 'estado', 345, 176, { color: C.grey2, size: 13.5, align: 'center' });
+      flecha(ctx, [[655, 170], [846, 170]], C.navy); text(ctx, 'estados predichos', 750, 161, { color: C.grey2, size: 13.5, align: 'center' });
+      flecha(ctx, [[955, 220], [955, 276]], C.navy); text(ctx, 'costo', 965, 254, { color: C.grey2, size: 13.5 });
+      flecha(ctx, [[850, 310], [740, 310], [740, 210], [659, 210]], C.navy); text(ctx, 'acciones propuestas', 750, 330, { color: C.grey2, size: 13.5, align: 'center' });
+      flecha(ctx, [[550, 280], [550, 234]], C.navy, { lw: 2 }); flecha(ctx, [[530, 230], [530, 280]], C.navy, { lw: 2 });
+      text(ctx, 'sensores', 145, 262, { color: C.grey2, size: 13.5, align: 'center' }); flecha(ctx, [[145, 246], [145, 224]], C.grey, { lw: 2 });
+      M.forEach((m, k) => {
+        const on = k === act, mundo = k === 2;
+        caja(ctx, m.x, m.y, m.w, m.h, { r: 12, fill: on ? (mundo ? '#fff6f5' : '#f1f8f7') : '#ffffff', stroke: on ? (mundo ? C.coralD : C.teal) : mundo ? C.coral : C.blue, lw: on ? 4 : 2.2 });
+        text(ctx, m.n, m.x + m.w / 2, m.y + m.h / 2 + (m.s || mundo ? -3 : 6), { color: mundo ? C.coralD : C.navy, size: 17, weight: '600', align: 'center' });
+        if (m.s) text(ctx, m.s, m.x + m.w / 2, m.y + m.h / 2 + 18, { color: C.grey2, size: 13.5, align: 'center' });
+        if (mundo) text(ctx, 'acá entra JEPA', m.x + m.w / 2, m.y + m.h / 2 + 20, { color: C.coralD, size: 13.5, weight: '600', align: 'center' });
+      });
+      const m = M[act];
+      caja(ctx, 40, 362, W - 80, 54, { r: 10, fill: C.light });
+      text(ctx, m.n, 60, 385, { color: act === 2 ? C.coralD : C.teal, size: 17, weight: '600' });
+      ctx.font = '600 17px ' + K.FONT; const w0 = ctx.measureText(m.n).width;
+      parrafo(ctx, m.rol, 60 + w0 + 16, 385, W - 140 - w0, { color: C.text, size: 15.5 });
+    };
+    if (fijo !== undefined) draw(0);
+    else { let t0 = 0; root._entrar = now => { t0 = now; }; K.frame(root, now => draw(((now - t0) / 3000) % 6)); draw(0); }
+  });
+})();
+</script>
