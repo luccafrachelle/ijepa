@@ -220,72 +220,7 @@
     K.pasos(root, [0.155, 0.355, 0.505, 0.805, 1], draw);
   });
 
-  // ============================================================ 3. el encoder objetivo
-  K.register('objetivo', root => {
-    const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
-    const MAP = { x: 30, y: 92, s: 156 }, X0 = 222, DX = 23.6, RY = 76, TW = 14, TH = 58;
-    const BOX = { x: 210, y: 166, w: 870, h: 116 }, OY = 298;
-    const xFila = k => X0 + k * DX;
-    const OBJS = [...OBJK[0], ...OBJK[1]];
-    const xGrupo = k => { const b = bloqueDe(k), n = OBJK[b].indexOf(k); return (b === 0 ? 420 : 760) + n * 24; };
-    const xEntrada = k => { const b = bloqueDe(k), n = OBJK[b].indexOf(k); return (b === 0 ? 380 : 720) + n * 30; };
-    const PARES = paresDe(NT, 11), PB = [paresDe(6, 4), paresDe(6, 8)];
-    let modo = root.dataset.modo || 'salida';
-    const draw = (t, now = performance.now()) => {
-      ctx.clearRect(0, 0, W, H);
-      const a = fase(t, 0.02, 0.12);
-      mapa(ctx, MAP.x, MAP.y, MAP.s, { color: k => (ROL[k].r === 'obj' ? alfa(C.coral, 0.6) : null) });
-      tx(ctx, 'bloques objetivo', MAP.x + MAP.s / 2, MAP.y + MAP.s + 20, { color: C.grey2, size: 13.5, align: 'center' });
-      red(ctx, BOX.x, BOX.y, BOX.w, BOX.h, 'Encoder objetivo $f_{\\bar\\theta}$', 'misma arquitectura · sin gradiente (stop-gradient)', C.navy, 1);
-      if (modo === 'salida') {
-        const b = fase(t, 0.14, 0.44), c = fase(t, 0.46, 0.6), d = fase(t, 0.62, 0.72), e = fase(t, 0.74, 0.94);
-        encabezado(ctx, 4, t < 0.13 ? 'El encoder objetivo recibe la imagen completa: los 36 tokens'
-          : t < 0.27 ? 'Entran todos los tokens, sin quitar ninguno'
-          : t < 0.45 ? 'Atención completa: cada token mira a los 36, también a los que no son objetivo'
-          : t < 0.61 ? 'Sale un vector por parche, para toda la imagen'
-          : t < 0.73 ? 'Cada vector se normaliza (layer norm)'
-          : 'Recién ahora se recortan las posiciones de los bloques: son los objetivos $s_y$');
-        for (let k = 0; k < NT; k++) {
-          const esObj = ROL[k].r === 'obj';
-          let x = xFila(k), y = lerp(RY, BOX.y + 50, fase(b, 0, 0.36));
-          if (c > 0) y = lerp(BOX.y + 50, OY, c);
-          let al = a, col = C.blue;
-          if (e > 0) { if (esObj) { x = lerp(xFila(k), xGrupo(k), e); col = C.coralD; } else al = 1 - e; }
-          const vals = mezcla(k, fase(b, 0.4, 1));
-          if (d > 0 && d < 1) { const pulso = Math.sin(Math.PI * d); ctx.fillStyle = alfa(C.navy, 0.15 * pulso); ctx.fillRect(x - 3, y - 3, TW + 6, TH + 6); }
-          vec(ctx, x, y, TW, TH, k, col, al, { vals, borde: e > 0.6 && esObj ? C.coralD : null });
-        }
-        if (b > 0.3 && c < 0.6) todosConTodos(ctx, [...Array(NT)].map((_, k) => xFila(k) + TW / 2), BOX.y + 48, now, C.coralD, fase(b, 0.3, 0.5) * (1 - fase(c, 0, 0.6)), TW);
-        if (d > 0 && e < 0.3) tx(ctx, 'layer norm', 222 + 36 * DX / 2, OY + TH + 24, { color: C.navy, size: 14, weight: '600', align: 'center' });
-        if (e > 0.5) {
-          tx(ctx, '$s_y$ bloque 1', 420 + 2.5 * 24 + 7, OY + TH + 24, { color: C.coralD, size: 14, weight: '600', align: 'center' });
-          tx(ctx, '$s_y$ bloque 2', 760 + 2.5 * 24 + 7, OY + TH + 24, { color: C.coralD, size: 14, weight: '600', align: 'center' });
-        }
-      } else {
-        const b = fase(t, 0.12, 0.3), c = fase(t, 0.32, 0.6), e = fase(t, 0.62, 0.9);
-        encabezado(ctx, 4, t < 0.31 ? 'Alternativa (ablación): recortar los bloques antes de entrar a la red'
-          : t < 0.61 ? 'Cada bloque se codifica solo: sus tokens no ven el resto de la escena'
-          : 'Los objetivos salen sin información del resto de la escena');
-        for (let k = 0; k < NT; k++) {
-          const esObj = ROL[k].r === 'obj';
-          if (!esObj) { if (b < 1) vec(ctx, xFila(k), RY + b * 70, TW, TH, k, C.blue, a * (1 - b)); continue; }
-          let x = lerp(xFila(k), xEntrada(k), fase(c, 0, 0.4)), y = lerp(RY, BOX.y + 50, fase(c, 0.3, 1));
-          if (e > 0) y = lerp(BOX.y + 50, OY, e);
-          vec(ctx, x, y, TW, TH, k, C.coralD, a, { vals: mezcla(k, 0.35 * fase(c, 0.5, 1)), borde: e > 0.6 ? C.coralD : null });
-        }
-        if (c > 0.9 && e < 0.6) [0, 1].forEach(bb => arcos(ctx, OBJK[bb].map(k => xEntrada(k) + TW / 2), BOX.y + 48, t, C.coralD, (1 - fase(e, 0, 0.6)), PB[bb]));
-      }
-      // resultado de la ablación (tabla 11 del paper)
-      const on = modo === 'salida';
-      tx(ctx, 'Top-1 con 1 % de etiquetas (ViT-H/16, 300 épocas):', 560, H - 12, { color: C.grey2, size: 13.5 });
-      tx(ctx, 'salida 67,3', 905, H - 12, { color: on ? C.teal : C.grey, size: 14, weight: on ? '700' : '400' });
-      tx(ctx, 'entrada 56,1', 1000, H - 12, { color: !on ? C.coralD : C.grey, size: 14, weight: !on ? '700' : '400' });
-    };
-    const ST = { salida: [0.125, 0.265, 0.445, 0.605, 0.725, 1], entrada: [0.11, 0.305, 0.605, 1] };
-    const L = K.pasos(root, ST.salida, draw, { nMax: 5 });
-    const b = root.querySelector('.ot-controls'); b.classList.add('ot-controls-wrap');
-    K.opciones(b, [['salida', 'recortar a la salida (I-JEPA)'], ['entrada', 'recortar a la entrada (ablación)']], modo, v => { modo = v; L.setStops(ST[v]); L.va(0, true); });
-  });
+  // ============================================================ 3. el encoder objetivo: migrado a SVG + GSAP en widgets/objetivo.html
 
   // ============================================================ 4. el predictor
   K.register('predictor', root => {

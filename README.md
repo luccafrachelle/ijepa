@@ -12,8 +12,11 @@ Tiene dos partes:
 ```
 slides.qmd, slides.html        charla (Reveal.js, 1280×720), HTML autocontenido
 blog.qmd, blog.html            blog interactivo, HTML autocontenido
-widgets/                       animaciones en canvas, compartidas por slides y blog
+widgets/                       animaciones (canvas y SVG + GSAP), compartidas por slides y blog
   nucleo.html                  librería: canvas, pasos, controles, fórmulas compiladas
+  anim.html                    base SVG + GSAP (A.pasos, helpers); instrucciones al principio del archivo
+  vendor/gsap.min.js           GSAP 3.13.0 (cdnjs), incrustado en el HTML: funciona sin internet
+  objetivo.html                paso 4, el encoder objetivo (SVG + GSAP)
   ijepa.html                   figura general, máscaras, píxeles vs. representación, energía, resultados…
   pasos.html                   los siete pasos de I-JEPA y la evaluación
   experimento.html             regularizadores, grilla de resultados y rango efectivo

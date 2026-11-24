@@ -13,7 +13,8 @@ const raiz = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const adaptor = liteAdaptor(); RegisterHTMLHandler(adaptor);
 const doc = mathjax.document('', { InputJax: new TeX({ packages: AllPackages }), OutputJax: new SVG({ fontCache: 'none' }) });
 const fuentes = new Set();
-for (const f of ['ijepa.html', 'pasos.html', 'experimento.html']) {
+// todos los widgets salvo nucleo.html (que guarda el resultado) y lo que está en vendor/
+for (const f of fs.readdirSync(path.join(raiz, 'widgets')).filter(f => f.endsWith('.html') && f !== 'nucleo.html').sort()) {
   const src = fs.readFileSync(path.join(raiz, 'widgets', f), 'utf8');
   for (const m of src.matchAll(/\$(?!\{)([^$`'"\n]+?)\$/g)) fuentes.add(m[1].replace(/\\\\/g, '\\'));
 }

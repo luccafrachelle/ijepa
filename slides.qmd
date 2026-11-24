@@ -15,9 +15,18 @@ format:
     template-partials: [title-slide.html]
     include-after-body:
       - widgets/nucleo.html
+      - widgets/anim.html
       - widgets/ijepa.html
       - widgets/pasos.html
+      - widgets/objetivo.html
       - widgets/experimento.html
+      - widgets/m-pasos13.html
+      - widgets/m-predeval.html
+      - widgets/m-perdema.html
+      - widgets/m-figura.html
+      - widgets/m-colapso.html
+      - widgets/m-intro.html
+      - widgets/m-datos.html
     include-in-header:
       text: |
         <script type="text/x-mathjax-config">

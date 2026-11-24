@@ -12,9 +12,18 @@ format:
     css: fonts.css
     include-after-body:
       - widgets/nucleo.html
+      - widgets/anim.html
       - widgets/ijepa.html
       - widgets/pasos.html
+      - widgets/objetivo.html
       - widgets/experimento.html
+      - widgets/m-pasos13.html
+      - widgets/m-predeval.html
+      - widgets/m-perdema.html
+      - widgets/m-figura.html
+      - widgets/m-colapso.html
+      - widgets/m-intro.html
+      - widgets/m-datos.html
     html-math-method: katex
     embed-resources: true
     toc: true
@@ -219,10 +228,10 @@ El encoder objetivo, $f_{\bar\theta}$, tiene la misma arquitectura que el de con
 
 ::: {.column-page-right}
 ```{=html}
-<div class="ot-widget" data-widget="objetivo" data-alt="Animación: el encoder objetivo procesa los 36 tokens, se normalizan las salidas y se recortan las posiciones de los bloques objetivo; un botón muestra la alternativa de recortar a la entrada">
+<div class="ot-widget" data-widget="objetivo" data-alt="Animación: el encoder objetivo procesa los 36 tokens, se normalizan las salidas y se recortan las posiciones de los bloques objetivo; al final, el resultado de la alternativa de recortar a la entrada">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Paso 4: el diseño de I-JEPA (recortar a la salida) frente a la alternativa de la ablación (recortar a la entrada). Números de la tabla 11 del paper.</p>
+<p class="leyenda">Paso 4: el encoder objetivo ve la imagen entera y recién a la salida se recortan los bloques. La última parada compara con la alternativa de recortar a la entrada (tabla 11 del paper).</p>
 ```
 :::
 

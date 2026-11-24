@@ -1,0 +1,209 @@
+<script>
+/* Paso 4: el encoder objetivo (SVG + GSAP, sobre widgets/anim.html).
+   Sigue el código oficial: el encoder objetivo procesa los 36 tokens, las salidas se normalizan
+   con layer norm y recién después se recortan las posiciones de los bloques objetivo.
+   Paradas (cada una una sola idea):
+     s0 imagen y encoder · s1 parches → tokens · s2 entran todos · s3 atención completa
+     s4 sale un vector por parche · s5 layer norm · s6 recorte de los bloques → s_y
+     s7 ablación: recortar a la entrada (tabla 11 del paper, 67,3 vs 56,1) */
+(function () {
+  const K = window.OTK, A = window.OTA, C = A.C, G = A.G;
+  const { N, NT, OBJ, OBJK, bloqueDe, VAL, VAL2 } = G;
+
+  K.register('objetivo', root => {
+    const W = 1100, H = 560;
+    const S = A.svg(root, W, H);
+    A.cuandoFuentes(() => construir(root, S, W, H));
+  });
+
+  function construir(root, S, W, H) {
+    const el = A.el, tr = A.tr;
+    // ---------------------------------------------------------------- geometría
+    const MAP = { x: 0, y: 78, s: 190 }, q = MAP.s / N;
+    const X0 = 234, DX = 23.4, TW = 15, TH = 64;
+    const RY = 86, BOX = { x: 220, y: 170, w: 868, h: 160 }, EY = 250, OY = 352;
+    const xFila = k => X0 + k * DX;
+    // al recortar, cada bloque se rearma con la forma que tiene en la imagen
+    const SC = 0.66, GX = 19, GY = 50, GRUPO = [{ x: 300, y: 346 }, { x: 540, y: 346 }];
+    const destino = k => { const b = bloqueDe(k), o = OBJ[b];
+      return { x: GRUPO[b].x + (k % N - o.left) * GX, y: GRUPO[b].y + (Math.floor(k / N) - o.top) * GY }; };
+    const NORM = VAL2.map(v => { const m = v.reduce((a, b) => a + b) / 8, s = Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / 8) || 1;
+      return v.map(x => Math.min(1, Math.max(0, 0.5 + 0.32 * (x - m) / s))); });
+
+    // ---------------------------------------------------------------- dibujo (estado inicial)
+    const head = A.encabezado(S, 4, [
+      'El encoder objetivo recibe la imagen completa: los 36 tokens',
+      'Cada parche de la imagen se convierte en un token',
+      'Entran todos los tokens, sin quitar ninguno',
+      'Atención completa: cada token mira a los 36, también a los que no son objetivo',
+      'Sale un vector por parche, para toda la imagen',
+      'Cada vector se normaliza (layer norm)',
+      'Recién ahora se recortan las posiciones de los bloques: son los objetivos $s_y$',
+      'Ablación: recortar a la entrada aísla cada bloque del resto de la escena'
+    ]);
+    head.set(0);
+
+    const M = A.mapa(S, MAP.x, MAP.y, MAP.s, { color: k => (bloqueDe(k) >= 0 ? C.coral : null) });
+    M.celdas.forEach((c, k) => { if (bloqueDe(k) >= 0) c.setAttribute('fill-opacity', 0.6); });
+    const marcoMapa = OBJ.map(o => el('rect', { x: MAP.x + o.left * q, y: MAP.y + o.top * q, width: o.w * q, height: o.h * q,
+      fill: 'none', stroke: C.coralD, 'stroke-width': 3.5, opacity: 0 }, S));
+    const numMapa = OBJ.map((o, b) => { const t = el('text', { x: MAP.x + (o.left + o.w / 2) * q, y: MAP.y + (o.top + o.h / 2) * q + 8,
+      'text-anchor': 'middle', 'font-size': 22, 'font-weight': 600, fill: '#fff' }, S); t.textContent = b + 1; t.style.opacity = 0; return t; });
+    A.texto(S, 'bloques objetivo', MAP.x + MAP.s / 2, MAP.y + MAP.s + 28, { size: 19, color: C.grey2, anchor: 'middle' });
+
+    const R = A.red(S, BOX.x, BOX.y, BOX.w, BOX.h, 'Encoder objetivo $f_{\\bar\\theta}$', 'misma arquitectura · sin gradiente (stop-gradient)', C.navy);
+    const lnBand = el('rect', { x: X0 - 70, y: OY - 10, width: 70, height: TH + 20, rx: 8, fill: C.navy }, S); lnBand.style.opacity = 0;
+    const lnLabel = A.texto(S, 'layer norm', xFila(17.5) + TW / 2, OY + TH + 34, { size: 19, weight: '600', color: C.navy, anchor: 'middle' });
+    lnLabel.style.opacity = 0;
+    const arcsG = el('g', {}, S);
+    const hl = el('rect', { x: xFila(0) - 4, y: EY - 4, width: TW + 8, height: TH + 8, rx: 5, fill: 'none', stroke: C.coralD, 'stroke-width': 2.6 }, S);
+    hl.style.opacity = 0;
+
+    // tokens: el parche (imagen) y su vector
+    const toksG = el('g', {}, S), imgsG = el('g', {}, S);
+    const T = [...Array(NT)].map((_, k) => {
+      const v = A.vector(toksG, VAL[k], { w: TW, h: TH, color: C.blue });
+      v.g.setAttribute('transform', tr(xFila(k), RY, 1, 0.25)); v.g.style.opacity = 0;
+      const img = el('image', { href: A.parcheURL(k, N), x: MAP.x + (k % N) * q, y: MAP.y + Math.floor(k / N) * q, width: q, height: q, preserveAspectRatio: 'none' }, imgsG);
+      img.style.opacity = 0;
+      return { ...v, img };
+    });
+
+    // a la salida: marcos de cada bloque y rótulos s_y
+    const marcos = OBJ.map((o, b) => el('rect', { x: GRUPO[b].x - 8, y: GRUPO[b].y - 8, width: (o.w - 1) * GX + TW * SC + 16, height: (o.h - 1) * GY + TH * SC + 16,
+      rx: 6, fill: 'none', stroke: C.coralD, 'stroke-width': 2.2 }, S));
+    marcos.forEach(m => { m.style.opacity = 0; });
+    const rotSy = OBJ.map((o, b) => {
+      const g = A.texto(S, '$s_y$ bloque ' + (b + 1), GRUPO[b].x + (o.w - 1) * GX + TW * SC + 22, GRUPO[b].y + ((o.h - 1) * GY + TH * SC) / 2 + 7,
+        { size: 19, weight: '600', color: C.coralD });
+      g.style.opacity = 0; return g;
+    });
+
+    // ablación: barras con el dato de la tabla 11
+    const AB = { x: 780, y: 360, esc: 3.5 };
+    const abG = el('g', {}, S); abG.style.opacity = 0;
+    A.texto(abG, 'Top-1 con 1 % de etiquetas', AB.x, AB.y, { size: 19, weight: '600', color: C.navy });
+    A.texto(abG, 'ViT-H/16, 300 épocas', AB.x, AB.y + 26, { size: 19, color: C.grey2 });
+    const filas = [['recortar a la salida', 67.3, '67,3', C.teal], ['recortar a la entrada', 56.1, '56,1', C.grey]].map(([s, v, vs, col], i) => {
+      const y = AB.y + 64 + i * 56;
+      A.texto(abG, s, AB.x, y, { size: 19, weight: i ? '400' : '600', color: i ? C.grey2 : C.teal });
+      const bar = el('rect', { x: AB.x, y: y + 9, width: 0, height: 16, rx: 3, fill: col }, abG);
+      const val = A.texto(abG, vs, AB.x + v * AB.esc + 10, y + 24, { size: 19, weight: '600', color: i ? C.grey2 : C.teal });
+      val.style.opacity = 0;
+      return { bar, val, w: v * AB.esc };
+    });
+
+    // fórmula por piezas
+    const F = A.formula(S, limpiar({
+      sy: '$s_y$', eq: '$=$', lb: '$\\big[$', ln: '$\\mathrm{LN}$', lp: '$($', f: '$f_{\\bar\\theta}$', xl: '$($', x: '$x$', xr: '$)$', rp: '$)$', rb: '$\\big]_{B_1,\\,B_2}$'
+    }), [
+      ['x'], ['x'], ['f', 'xl', 'x', 'xr'], ['f', 'xl', 'x', 'xr'], ['f', 'xl', 'x', 'xr'],
+      ['ln', 'lp', 'f', 'xl', 'x', 'xr', 'rp'], ['sy', 'eq', 'lb', 'ln', 'lp', 'f', 'xl', 'x', 'xr', 'rp', 'rb'], ['sy', 'eq', 'lb', 'ln', 'lp', 'f', 'xl', 'x', 'xr', 'rp', 'rb']
+    ], { cx: BOX.x + BOX.w / 2, y: 546, size: 26, gap: { eq: 10 },
+      color: { sy: C.coralD, lb: C.coralD, rb: C.coralD, f: C.navy, ln: C.navy, lp: C.navy, rp: C.navy, eq: C.text } });
+    F.set(0);
+
+    // atención: arcos desde un token hacia los otros 35
+    const AY = EY - 4;
+    function arcosDe(h) {
+      const g = el('g', {}, arcsG), xh = xFila(h) + TW / 2;
+      g.style.opacity = 0;
+      const paths = [];
+      for (let j = 0; j < NT; j++) {
+        if (j === h) continue;
+        const xj = xFila(j) + TW / 2, dy = 8 + Math.min(20, 0.05 * Math.abs(xj - xh));
+        paths.push(A.flecha(g, `M${xh},${AY} Q${(xh + xj) / 2},${AY - 2 * dy} ${xj},${AY}`, C.coralD, { lw: 1.4 }));
+      }
+      paths.forEach(p => { p.setAttribute('stroke-opacity', 0.65); p.setAttribute('stroke-dasharray', '1 1'); p.setAttribute('stroke-dashoffset', 1); });
+      return { g, paths };
+    }
+
+    // ---------------------------------------------------------------- línea de tiempo
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    const cellsTo = (vals, at, dur, stagger = 0) => T.forEach((t, k) =>
+      tl.to(t.cells, { attr: { 'fill-opacity': i => A.op(vals(k)[i]) }, duration: dur }, at + stagger * k));
+    const desdeCentro = k => Math.abs(k - 17.5);
+    tl.addLabel('s0', 0);
+
+    // s1: cada parche viaja a su lugar en la fila y se convierte en un vector (≈ 2,2 s)
+    let at = 0;
+    head.a(tl, 1, at);
+    T.forEach((t, k) => {
+      const t0 = at + 0.4 + 0.02 * k;
+      tl.to(t.img, { opacity: 1, duration: 0.15 }, t0)
+        .to(t.img, { attr: { x: xFila(k) - 3.5, y: RY - 30, width: 22, height: 22 }, duration: 0.8 }, t0 + 0.05)
+        .to(t.img, { attr: { x: xFila(k), y: RY, width: TW, height: TH * 0.25 }, opacity: 0, duration: 0.45, ease: 'power2.in' }, t0 + 0.85)
+        .to(t.g, { opacity: 1, attr: { transform: tr(xFila(k), RY, 1, 1) }, duration: 0.5, ease: 'power2.out' }, t0 + 1.05);
+    });
+    at = tl.duration(); tl.addLabel('s1', at);
+
+    // s2: entran todos los tokens (≈ 1,5 s)
+    head.a(tl, 2, at);
+    T.forEach((t, k) => tl.to(t.g, { attr: { transform: tr(xFila(k), EY) }, duration: 1.0 }, at + 0.35 + 0.008 * desdeCentro(k)));
+    F.a(tl, 2, at + 0.4);
+    at = tl.duration(); tl.addLabel('s2', at);
+
+    // s3: atención completa, con tres tokens de ejemplo; los vectores se van mezclando (≈ 4 s)
+    head.a(tl, 3, at);
+    const ejemplos = [14, 0, 10];
+    ejemplos.forEach((h, n) => {
+      const t0 = at + 0.6 + n * 1.15, Ar = arcosDe(h);
+      if (n === 0) tl.fromTo(hl, { attr: { x: xFila(h) - 4 }, opacity: 0 }, { opacity: 1, duration: 0.3, immediateRender: false }, t0 - 0.3);
+      else tl.to(hl, { attr: { x: xFila(h) - 4 }, duration: 0.4 }, t0 - 0.4);
+      tl.to(Ar.g, { opacity: 1, duration: 0.15 }, t0)
+        .to(Ar.paths, { attr: { 'stroke-dashoffset': 0 }, duration: 0.6, ease: 'power1.out', stagger: 0.004 }, t0)
+        .to(Ar.g, { opacity: n < ejemplos.length - 1 ? 0 : 0.35, duration: 0.35 }, t0 + 0.8);
+      const u = (n + 1) / ejemplos.length;
+      cellsTo(k => VAL[k].map((v, c) => v + (VAL2[k][c] - v) * u), t0 + 0.2, 0.7);
+    });
+    at = tl.duration(); tl.addLabel('s3', at);
+
+    // s4: sale un vector por parche (≈ 1,6 s)
+    head.a(tl, 4, at);
+    tl.to([hl, arcsG], { opacity: 0, duration: 0.4 }, at);
+    T.forEach((t, k) => tl.to(t.g, { attr: { transform: tr(xFila(k), OY) }, duration: 1.0 }, at + 0.4 + 0.008 * desdeCentro(k)));
+    at = tl.duration(); tl.addLabel('s4', at);
+
+    // s5: layer norm: una banda barre la fila y normaliza cada vector a su paso (≈ 2 s)
+    head.a(tl, 5, at);
+    tl.to(lnLabel, { opacity: 1, duration: 0.5 }, at + 0.3)
+      .fromTo(lnBand, { attr: { x: X0 - 70 }, opacity: 0 }, { attr: { x: X0 + NT * DX }, opacity: 0.14, duration: 1.4, ease: 'none', immediateRender: false }, at + 0.4)
+      .to(lnBand, { opacity: 0, duration: 0.25 }, at + 1.6);
+    cellsTo(k => NORM[k], at + 0.45, 0.35, 1.35 / NT);
+    F.a(tl, 5, at + 0.4);
+    at = tl.duration(); tl.addLabel('s5', at);
+
+    // s6: recién ahora se recortan los bloques; cada uno recupera su forma de la imagen (≈ 2,6 s)
+    head.a(tl, 6, at);
+    tl.to(lnLabel, { opacity: 0, duration: 0.35 }, at)
+      .to(marcoMapa, { opacity: 1, duration: 0.5 }, at + 0.3)
+      .to(numMapa, { opacity: 1, duration: 0.5 }, at + 0.3)
+      .to(M.celdas.filter((_, k) => bloqueDe(k) >= 0), { attr: { 'fill-opacity': 0.8 }, duration: 0.5 }, at + 0.3);
+    T.forEach((t, k) => {
+      if (bloqueDe(k) < 0) { tl.to(t.g, { opacity: 0, attr: { transform: tr(xFila(k), OY + 24) }, duration: 0.6 }, at + 0.5 + 0.005 * k); return; }
+      const d = destino(k);
+      tl.to(t.cells, { attr: { fill: C.coralD }, duration: 0.5 }, at + 0.5)
+        .to(t.g, { attr: { transform: tr(d.x, d.y, SC, SC) }, duration: 1.1 }, at + 0.8 + 0.02 * k);
+    });
+    tl.to([R.rect, R.titulo, R.sub], { opacity: 0.35, duration: 0.6 }, at + 0.5)
+      .fromTo(marcos, { opacity: 0 }, { opacity: 1, duration: 0.5, immediateRender: false }, at + 2.0)
+      .to(rotSy, { opacity: 1, duration: 0.5 }, at + 2.1);
+    F.a(tl, 6, at + 1.0);
+    at = tl.duration(); tl.addLabel('s6', at);
+
+    // s7: ablación: si se recortara a la entrada, cada bloque se codificaría aislado (≈ 2 s)
+    head.a(tl, 7, at);
+    tl.to(abG, { opacity: 1, duration: 0.5 }, at + 0.35);
+    filas.forEach((f, i) => {
+      tl.to(f.bar, { attr: { width: f.w }, duration: 0.9, ease: 'power2.out' }, at + 0.6 + i * 0.45)
+        .to(f.val, { opacity: 1, duration: 0.35 }, at + 1.3 + i * 0.45);
+    });
+    at = tl.duration(); tl.addLabel('s7', at);
+
+    A.pasos(root, tl);
+  }
+
+  // las claves con signos de pesos se escriben así para que scripts/compilar_tex.mjs las encuentre
+  function limpiar(o) { const r = {}; for (const k in o) r[k] = o[k].slice(1, -1); return r; }
+})();
+</script>

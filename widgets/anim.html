@@ -1,0 +1,374 @@
+<script src="widgets/vendor/gsap.min.js"></script>
+<style>
+/* animaciones SVG (widgets/anim.html) */
+.ot-widget svg.anim-svg { display: block; width: 100%; height: auto; overflow: visible; user-select: none; -webkit-user-select: none; }
+.ot-widget svg.anim-svg text { font-family: 'Poppins', 'Helvetica Neue', sans-serif; }
+@media (max-width: 700px) { .ot-widget svg.anim-svg { min-width: 640px; } }
+</style>
+<script>
+/* ============================================================================================
+   Base común para animaciones en SVG + GSAP (window.OTA, alias corto A).
+   GSAP 3.13.0 (gsap.min.js, sin plugins) está copiado en widgets/vendor/gsap.min.js, bajado de
+   cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js. Quarto lo incrusta en el HTML
+   autocontenido (embed-resources), así que la charla funciona sin internet.
+   Orden de inclusión en slides.qmd y blog.qmd (include-after-body):
+     nucleo.html → anim.html → ijepa.html → pasos.html → … → widgets nuevos.
+   Las fórmulas NO se compilan en el navegador: scripts/compilar_tex.mjs busca todas las cadenas
+   entre signos de pesos en widgets/*.html (salvo nucleo.html) y las compila con MathJax a SVG en
+   window.OTK_TEX. Después de agregar o cambiar fórmulas hay que correr
+     (cd scripts && npm install) && node scripts/compilar_tex.mjs
+   y volver a renderizar. En la fuente JS se escribe con barra doble, como en cualquier cadena.
+
+   CÓMO ESCRIBIR UN WIDGET NUEVO
+   -----------------------------
+   (function () {
+     const K = window.OTK, A = window.OTA, C = A.C;
+     K.register('nombre', root => {            // mismo nombre que data-widget en slides.qmd/blog.qmd
+       const S = A.svg(root, 1100, 560);       // reemplaza el <canvas> del qmd por un <svg viewBox>
+       A.cuandoFuentes(() => {                 // medir textos con Poppins ya cargada
+         // 1. dibujar todo el estado inicial con A.el / A.texto / A.vector / A.mapa / A.red …
+         //    y fijar los valores iniciales (opacidad, A.tr(…)) antes de armar la timeline.
+         // 2. una timeline pausada con un rótulo por parada: 's0' (estado inicial) … 'sN' (final).
+         const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+         tl.addLabel('s0');
+         let at = tl.duration();               // parada 1: arranca donde terminó la anterior
+         tl.to(algo, { opacity: 1, duration: 1.4 }, at);
+         tl.addLabel('s1', tl.duration());     // ojo: addLabel sin posición usa el final actual
+         // …
+         A.pasos(root, tl);                    // fragments en Reveal, botones en el blog
+       });
+     });
+   })();
+
+   Reglas para que ida, vuelta y reentrada funcionen:
+   - Todo cambio va en la timeline (nada de estado JS que dependa del paso): A.pasos sólo hace
+     tl.tweenTo('sN') al avanzar uno y tl.seek('sN') para todo lo demás (entrar, volver, saltar).
+   - Mover elementos SVG con attr: { transform: A.tr(x, y, sx, sy) } y fijar el transform inicial
+     con el mismo formato (A.tr). No usar x/y/scale/transformOrigin de GSAP sobre SVG: necesitan
+     getBBox, que da 0 en las slides ocultas de Reveal.
+   - Opacidad con { opacity } (estilo), atributos con { attr: { … } }.
+   - Ritmo: una idea por parada, transiciones de 1,2 a 2 s; primero cambia el rótulo, después
+     se mueve el resto (A.rotulos(…).a(tl, i, at) ya lo escalona).
+   - En las slides el widget suele ir al 75 % (con mapaJepa al costado): un viewBox de 1100 de
+     ancho se ve a escala ≈ 0,8, así que los textos van a 19 o más unidades (≥ 15 px).
+
+   API
+   ---
+   A.C                       colores (los de K.C)
+   A.el(tag, attrs, padre)   crea un elemento SVG
+   A.tr(x, y, sx=1, sy=sx)   'translate(x,y) scale(sx,sy)' (formato fijo para interpolar con GSAP)
+   A.svg(root, w, h)         <svg class="anim-svg" viewBox="0 0 w h"> en lugar del canvas; S.defs, S.uid(p)
+   A.medir(s, size, weight)  ancho de un texto en Poppins (canvas)
+   A.tex(padre, src, x, y, o)    fórmula compilada como <svg> anidado con su línea de base en y.
+                                 o: { size, color, anchor: 'start'|'middle'|'end' }. Devuelve <g> con .ancho
+   A.texto(padre, s, x, y, o)    texto con fórmulas entre signos de pesos (cada pieza es un nodo aparte).
+                                 o: { size, weight, color, anchor, italic }. Devuelve <g> con .ancho
+   A.formula(padre, piezas, estados, o)   fórmula por piezas que se reacomoda entre estados:
+                                 piezas = { clave: fuente TeX }, estados = [[claves], …],
+                                 o: { cx, y, size, color: { clave: col }, gap: { clave: px } }.
+                                 Devuelve F con F.set(st) y F.a(tl, st, at, dur) (se deslizan las que
+                                 quedan, aparecen las nuevas, se van las que sobran).
+   A.rotulos(padre, textos, o)   textos que se reemplazan uno a otro en el mismo lugar.
+                                 o: { x, y, size, weight, color, anchor }. Devuelve R con R.set(i),
+                                 R.a(tl, i, at) y R.items.
+   A.encabezado(S, n, textos, o) cuadradito con el número del paso + A.rotulos arriba a la izquierda.
+   A.op(v)                   opacidad de una celda de vector para un valor v ∈ [0, 1]
+   A.vector(padre, vals, o)  token como pila de celdas en coordenadas locales (0,0)-(w,h).
+                             o: { w, h, color }. Devuelve { g, cells }; animar celdas con
+                             attr: { 'fill-opacity': i => A.op(vals[i]) } y moverlo con A.tr.
+   A.escenaURL(), A.parcheURL(k, N=6)   la escena de la casa (K.escena) y sus parches como dataURL
+   A.mapa(padre, x, y, s, o) escena como <image> con grilla N×N, una capa por celda (o.color(k)
+                             → color o null), o.cbox (marco punteado del bloque de contexto).
+                             Devuelve { g, celdas, cbox, q }.
+   A.red(padre, x, y, w, h, titulo, sub, color)   caja de red con título y subtítulo → { g, rect, titulo, sub }
+   A.flecha(padre, pts, color, o)  poligonal [[x,y],…] con punta (marker). o: { lw, dash, punta }.
+                             Usa pathLength=1: para dibujarla, A.trazar(tl, path, at, dur).
+   A.G                       grilla de juguete 6×6 de widgets/pasos.html: N, NT, OBJ, CBOX, bloqueDe,
+                             enCBox, ROL, CTX, OBJK, NADA, colRol, VAL, VAL2, mezcla(k, u)
+   A.reducido()              true si el usuario pidió menos movimiento
+   A.cuandoFuentes(fn)       corre fn cuando las fuentes están cargadas (al instante si ya lo están)
+   A.pasos(root, tl, o)      navegación por paradas (ver abajo). o: { n } (si no, cuenta los rótulos sN).
+                             Expone root._pasos = P con la forma de K.pasos: P.i, P.stops = [0…N],
+                             P.t, P.dur (> 0 mientras anima), P.nMax, P.va(n, inmediato), P.tl.
+   ============================================================================================ */
+(function () {
+  const K = window.OTK;
+  const C = K.C;
+  const NS = 'http://www.w3.org/2000/svg';
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const reducido = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const fmt = v => Math.round(v * 1000) / 1000;
+  const tr = (x, y, sx = 1, sy = sx) => `translate(${fmt(x)},${fmt(y)}) scale(${fmt(sx)},${fmt(sy)})`;
+
+  function el(tag, attrs = {}, padre) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== null) e.setAttribute(k, attrs[k]);
+    if (padre) padre.appendChild(e);
+    return e;
+  }
+
+  let nSvg = 0;
+  function svg(root, w, h) {
+    const cv = root.querySelector('canvas');
+    const S = el('svg', { viewBox: `0 0 ${w} ${h}`, class: 'anim-svg', role: 'img', preserveAspectRatio: 'xMidYMid meet' });
+    S.setAttribute('aria-label', (cv && cv.getAttribute('aria-label')) || root.dataset.alt || '');
+    if (cv) cv.replaceWith(S); else root.prepend(S);
+    S.style.aspectRatio = w + ' / ' + h;
+    S.defs = el('defs', {}, S);
+    const pref = 'a' + (++nSvg) + '-';
+    let n = 0;
+    S.uid = p => pref + (p || 'id') + (++n);
+    S.W = w; S.H = h;
+    return S;
+  }
+
+  // ------------------------------------------------------------ textos y fórmulas
+  const ctx2 = document.createElement('canvas').getContext('2d');
+  function medir(s, size = 19, weight = '400', italic) {
+    ctx2.font = (italic ? 'italic ' : '') + weight + ' ' + size + 'px ' + K.FONT;
+    return ctx2.measureText(s).width;
+  }
+  const texInfo = src => (window.OTK_TEX || {})[src];
+  const texAncho = (src, size) => { const T = texInfo(src); return T ? T.w / 1000 * size * 1.16 : 0; };
+  // fórmula como <svg> anidado dentro de un <g>; y es la línea de base
+  function tex(padre, src, x, y, o = {}) {
+    const g = el('g', {}, padre), T = texInfo(src);
+    g.ancho = 0;
+    if (!T) { console.warn('fórmula sin compilar:', src); return g; }
+    const em = (o.size || 19) * 1.16 / 1000, w = T.w * em;
+    const x0 = o.anchor === 'middle' ? x - w / 2 : o.anchor === 'end' ? x - w : x;
+    g.innerHTML = T.svg;
+    const s = g.firstElementChild;
+    s.setAttribute('x', fmt(x0)); s.setAttribute('y', fmt(y + T.y * em));
+    s.setAttribute('width', fmt(w)); s.setAttribute('height', fmt(T.h * em));
+    s.setAttribute('overflow', 'visible');
+    s.setAttribute('color', o.color || C.text);
+    g.ancho = w;
+    return g;
+  }
+  // texto con fórmulas: 'Sale $s_y$ por bloque' → <g> con <text> y <svg> anidados
+  function texto(padre, s, x, y, o = {}) {
+    const size = o.size || 19, weight = String(o.weight || '400'), color = o.color || C.text;
+    const g = el('g', {}, padre);
+    const partes = String(s).split('$');
+    const anchos = partes.map((p, i) => (i % 2 ? texAncho(p, size) : medir(p, size, weight, o.italic)));
+    const total = anchos.reduce((a, b) => a + b, 0);
+    let cx = o.anchor === 'middle' ? x - total / 2 : o.anchor === 'end' ? x - total : x;
+    partes.forEach((p, i) => {
+      if (i % 2) tex(g, p, cx, y, { size, color });
+      else if (p.trim()) {
+        const lead = p.length - p.trimStart().length;
+        const t = el('text', { x: fmt(cx + (lead ? medir(p.slice(0, lead), size, weight, o.italic) : 0)), y: fmt(y),
+          'font-size': size, 'font-weight': weight, fill: color, 'font-style': o.italic ? 'italic' : null }, g);
+        t.textContent = p.trim();
+      }
+      cx += anchos[i];
+    });
+    g.ancho = total;
+    return g;
+  }
+  // fórmula por piezas que se reacomoda entre estados
+  function formula(padre, piezas, estados, o = {}) {
+    const size = o.size || 26, cx = o.cx || 0, y = o.y || 0, gap = o.gap || {}, col = o.color || {};
+    const F = { nodos: {}, estados };
+    const g = el('g', {}, padre);
+    for (const k in piezas) {
+      const n = tex(g, piezas[k], 0, y, { size, color: col[k] || C.text });
+      n.setAttribute('transform', tr(0, 0)); n.style.opacity = 0; F.nodos[k] = n;
+    }
+    F.g = g;
+    F.pos = st => {
+      const claves = estados[st], ws = claves.map(k => F.nodos[k].ancho + 2 * (gap[k] || 0) + 1);
+      let x = cx - ws.reduce((a, b) => a + b, 0) / 2; const pos = {};
+      claves.forEach((k, i) => { pos[k] = x + (gap[k] || 0); x += ws[i]; });
+      return pos;
+    };
+    F.set = st => { const p = F.pos(st); for (const k in F.nodos) { const n = F.nodos[k];
+      if (p[k] === undefined) n.style.opacity = 0; else { n.setAttribute('transform', tr(p[k], 0)); n.style.opacity = 1; } } };
+    F.a = (tl, st, at, dur = 0.9) => {
+      const p = F.pos(st), prev = st > 0 ? estados[st - 1] : [];
+      for (const k in F.nodos) {
+        const n = F.nodos[k];
+        if (p[k] === undefined) { if (prev.includes(k)) tl.to(n, { opacity: 0, duration: 0.4 }, at); continue; }
+        if (prev.includes(k)) tl.to(n, { attr: { transform: tr(p[k], 0) }, duration: dur }, at);
+        else tl.fromTo(n, { attr: { transform: tr(p[k], 14) }, opacity: 0 }, { attr: { transform: tr(p[k], 0) }, opacity: 1, duration: dur * 0.75, immediateRender: false }, at + dur * 0.35);
+      }
+    };
+    return F;
+  }
+  // rótulos que se reemplazan uno a otro
+  function rotulos(padre, textos, o = {}) {
+    const R = { items: textos.map(s => { const g = texto(padre, s, o.x || 0, o.y || 0, o); g.setAttribute('transform', tr(0, 0)); g.style.opacity = 0; return g; }) };
+    R.set = i => R.items.forEach((g, j) => { g.style.opacity = j === i ? 1 : 0; });
+    R.a = (tl, i, at) => {
+      tl.to(R.items.filter((_, j) => j !== i), { opacity: 0, attr: { transform: tr(0, -8) }, duration: 0.35 }, at)
+        .fromTo(R.items[i], { opacity: 0, attr: { transform: tr(0, 10) } }, { opacity: 1, attr: { transform: tr(0, 0) }, duration: 0.55, immediateRender: false }, at + 0.25);
+    };
+    return R;
+  }
+  function encabezado(S, n, textos, o = {}) {
+    const g = el('g', {}, S);
+    el('rect', { x: 0, y: 8, width: 36, height: 32, rx: 8, fill: C.blue }, g);
+    const t = el('text', { x: 18, y: 31, 'text-anchor': 'middle', 'font-size': 20, 'font-weight': 600, fill: '#fff' }, g); t.textContent = n;
+    const R = rotulos(g, textos, { x: 50, y: 32, size: o.size || 22, weight: '600', color: C.navy });
+    R.g = g;
+    return R;
+  }
+
+  // ------------------------------------------------------------ tokens, escena, mapa, redes, flechas
+  const op = v => 0.22 + 0.78 * v;
+  function vector(padre, vals, o = {}) {
+    const w = o.w || 15, h = o.h || 64, n = vals.length, ch = h / n;
+    const g = el('g', { transform: tr(o.x || 0, o.y || 0) }, padre);
+    const cells = vals.map((v, c) => el('rect', { x: 0, y: fmt(c * ch), width: w, height: fmt(Math.max(0.5, ch - 0.9)), rx: 1.5,
+      fill: o.color || C.blue, 'fill-opacity': fmt(op(v)) }, g));
+    return { g, cells };
+  }
+  let _escURL = null; const _parches = {};
+  const escenaURL = () => _escURL || (_escURL = K.escena().toDataURL());
+  function parcheURL(k, N = 6) {
+    const key = N + ':' + k; if (_parches[key]) return _parches[key];
+    const E = K.escena(), ps = E.width / N, c = document.createElement('canvas'); c.width = c.height = Math.round(ps);
+    c.getContext('2d').drawImage(E, (k % N) * ps, Math.floor(k / N) * ps, ps, ps, 0, 0, c.width, c.height);
+    return (_parches[key] = c.toDataURL());
+  }
+  function mapa(padre, x, y, s, o = {}) {
+    const N = o.N || 6, q = s / N, g = el('g', {}, padre);
+    el('image', { href: escenaURL(), x, y, width: s, height: s, preserveAspectRatio: 'none' }, g);
+    const celdas = [];
+    for (let k = 0; k < N * N; k++) {
+      const col = o.color ? o.color(k) : null;
+      celdas.push(el('rect', { x: fmt(x + (k % N) * q), y: fmt(y + Math.floor(k / N) * q), width: fmt(q), height: fmt(q),
+        fill: col || '#ffffff', 'fill-opacity': col ? 1 : 0 }, g));
+    }
+    if (o.grilla !== false) el('path', { d: [...Array(N - 1)].map((_, i) => `M${fmt(x + (i + 1) * q)},${y}v${s}M${x},${fmt(y + (i + 1) * q)}h${s}`).join(''),
+      stroke: 'rgba(255,255,255,0.85)', 'stroke-width': 1, fill: 'none' }, g);
+    el('rect', { x, y, width: s, height: s, rx: 3, fill: 'none', stroke: C.grid, 'stroke-width': 1.5 }, g);
+    let cbox = null;
+    if (o.cbox) { const B = o.cbox === true ? G.CBOX : o.cbox;
+      cbox = el('rect', { x: fmt(x + B.left * q + 1.5), y: fmt(y + B.top * q + 1.5), width: fmt(B.w * q - 3), height: fmt(B.h * q - 3), rx: 2,
+        fill: 'none', stroke: C.teal, 'stroke-width': 2.5, 'stroke-dasharray': '6 4' }, g); }
+    return { g, celdas, cbox, q };
+  }
+  function red(padre, x, y, w, h, titulo, sub, color = C.navy) {
+    const g = el('g', {}, padre);
+    const rect = el('rect', { x, y, width: w, height: h, rx: 14, fill: '#fff', stroke: color, 'stroke-width': 2.5 }, g);
+    const t = titulo ? texto(g, titulo, x + 16, y + 30, { size: 20, weight: '600', color }) : null;
+    const s = sub ? texto(g, sub, x + w - 16, y + 30, { size: 19, color: C.grey2, anchor: 'end' }) : null;
+    return { g, rect, titulo: t, sub: s };
+  }
+  function marcador(S, color) {
+    S._marc = S._marc || {};
+    if (S._marc[color]) return S._marc[color];
+    const id = S.uid('punta');
+    const m = el('marker', { id, viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse', markerUnits: 'strokeWidth' }, S.defs);
+    el('path', { d: 'M0,1 L10,5 L0,9 z', fill: color }, m);
+    return (S._marc[color] = 'url(#' + id + ')');
+  }
+  function flecha(padre, pts, color = C.navy, o = {}) {
+    const S = padre.ownerSVGElement || padre;
+    const d = typeof pts === 'string' ? pts : 'M' + pts.map(p => p.map(fmt).join(',')).join(' L');
+    return el('path', { d, fill: 'none', stroke: color, 'stroke-width': o.lw || 2.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+      'stroke-dasharray': o.dash || null, pathLength: o.dash ? null : 1, 'marker-end': o.punta === false ? null : marcador(S, color) }, padre);
+  }
+  function trazar(tl, path, at, dur = 0.8) {
+    tl.fromTo(path, { attr: { 'stroke-dasharray': '1 1', 'stroke-dashoffset': 1 } }, { attr: { 'stroke-dashoffset': 0 }, duration: dur, ease: 'power1.out', immediateRender: false }, at);
+  }
+
+  // ------------------------------------------------------------ grilla de juguete (la misma de widgets/pasos.html)
+  const G = (() => {
+    const N = 6, NT = N * N;
+    const OBJ = [{ top: 0, left: 3, h: 2, w: 3 }, { top: 3, left: 0, h: 3, w: 2 }];
+    const CBOX = { top: 1, left: 0, h: 5, w: 5 };
+    const bloqueDe = k => { const i = Math.floor(k / N), j = k % N; return OBJ.findIndex(b => i >= b.top && i < b.top + b.h && j >= b.left && j < b.left + b.w); };
+    const enCBox = k => { const i = Math.floor(k / N), j = k % N; return i >= CBOX.top && i < CBOX.top + CBOX.h && j >= CBOX.left && j < CBOX.left + CBOX.w; };
+    const ROL = [...Array(NT)].map((_, k) => { const b = bloqueDe(k); return b >= 0 ? { r: 'obj', b } : (enCBox(k) ? { r: 'ctx' } : { r: 'nada' }); });
+    const CTX = ROL.map((r, k) => (r.r === 'ctx' ? k : -1)).filter(k => k >= 0);
+    const NADA = ROL.filter(r => r.r === 'nada').length;
+    const OBJK = [0, 1].map(b => ROL.map((r, k) => (r.r === 'obj' && r.b === b ? k : -1)).filter(k => k >= 0));
+    const colRol = k => (ROL[k].r === 'ctx' ? C.teal : ROL[k].r === 'obj' ? C.coralD : C.grey);
+    const R = K.mulberry(5), VAL = [...Array(NT)].map(() => [...Array(8)].map(() => R()));
+    const VAL2 = [...Array(NT)].map(() => [...Array(8)].map(() => R()));
+    const mezcla = (k, u) => VAL[k].map((v, c) => v + (VAL2[k][c] - v) * u);
+    return { N, NT, OBJ, CBOX, bloqueDe, enCBox, ROL, CTX, NADA, OBJK, colRol, VAL, VAL2, mezcla };
+  })();
+
+  function cuandoFuentes(fn) {
+    if (!document.fonts || document.fonts.status === 'loaded') fn();
+    else document.fonts.ready.then(fn);
+  }
+
+  // ------------------------------------------------------------ navegación por paradas
+  // En Reveal: un fragment .paso por parada (como K.pasos); avanzar uno anima, todo lo demás salta.
+  // En el blog: ← Anterior / Siguiente →, puntitos y clic en la figura.
+  const pendientes = []; let syncPedido = false;
+  function pedirSync(root) {
+    pendientes.push(root);
+    if (syncPedido || !window.Reveal) return;
+    syncPedido = true;
+    const hacer = () => {
+      syncPedido = false;
+      Reveal.sync();
+      pendientes.splice(0).forEach(r => { const s = r.closest('section'); if (s && s.classList.contains('present') && r._sync) r._sync(); });
+    };
+    if (Reveal.isReady && Reveal.isReady()) Promise.resolve().then(hacer); else Reveal.on('ready', hacer);
+  }
+  function pasos(root, tl, o = {}) {
+    tl.pause();
+    const N = o.n !== undefined ? o.n : Object.keys(tl.labels).filter(l => /^s\d+$/.test(l)).length - 1;
+    const P = { i: 0, t: 0, from: 0, to: 0, dur: 0, stops: [...Array(N + 1)].map((_, k) => k), nMax: N, tl };
+    const sec = root.closest('.reveal .slides section');
+    if (sec && !sec.querySelector('.fragment.paso')) {
+      const cont = document.createElement('div'); cont.className = 'pasos-frag'; cont.setAttribute('aria-hidden', 'true');
+      for (let k = 0; k < N; k++) { const f = document.createElement('span'); f.className = 'fragment paso'; cont.appendChild(f); }
+      sec.appendChild(cont); pedirSync(root);
+    }
+    const b = document.createElement('div'); b.className = 'ot-controls ot-pasos';
+    const ant = K.textButton(b, '← Anterior', () => { if (sec && window.Reveal) Reveal.prevFragment(); else va(P.i - 1); });
+    const sig = K.textButton(b, 'Siguiente →', () => { if (sec && window.Reveal && P.i < N) Reveal.nextFragment(); else va(P.i >= N ? 0 : P.i + 1); });
+    const puntos = document.createElement('span'); puntos.className = 'ot-puntos'; b.appendChild(puntos);
+    root.appendChild(b);
+    const S = root.querySelector('svg.anim-svg');
+    if (S && !sec) { S.style.cursor = 'pointer'; S.addEventListener('click', () => sig.click()); }
+    function pinta() {
+      puntos.innerHTML = [...Array(N + 1)].map((_, k) => `<i class="${k === P.i ? 'on' : k < P.i ? 'ya' : ''}"></i>`).join('');
+      ant.disabled = P.i === 0; sig.textContent = P.i >= N ? '↺ Desde el principio' : 'Siguiente →';
+    }
+    let tw = null;
+    function va(n, inmediato) {
+      n = clamp(n, 0, N);
+      const anima = !inmediato && n === P.i + 1 && !reducido();
+      if (tw) { tw.kill(); tw = null; }
+      if (anima) {
+        tl.seek('s' + P.i, true);           // si la parada anterior seguía animando, se completa de golpe
+        const desde = P.i;
+        P.i = n; P.from = desde; P.to = n; P.t = desde;
+        tw = tl.tweenTo('s' + n, {
+          onUpdate() { P.t = desde + (n - desde) * this.progress(); },
+          onComplete() { P.t = n; P.dur = 0; tw = null; }
+        });
+        P.dur = Math.max(1, tw.duration() * 1000);
+      } else {
+        P.i = n; P.from = P.to = P.t = n; P.dur = 0;
+        tl.seek('s' + n, true);
+      }
+      pinta();
+    }
+    P.va = va; root._pasos = P;
+    let dentro = false;
+    root._sync = () => {
+      if (!sec) return;
+      const n = Math.min(N, sec.querySelectorAll('.fragment.paso.visible').length);
+      const presente = sec.classList.contains('present');
+      if (!presente || !dentro) { dentro = presente; va(n, true); return; }
+      if (n !== P.i) va(n, n !== P.i + 1);
+    };
+    if (sec && window.Reveal && Reveal.on) Reveal.on('slidechanged', e => { if (e.currentSlide !== sec) dentro = false; });
+    va(0, true);
+    return P;
+  }
+
+  window.OTA = { C, el, tr, svg, medir, tex, texto, formula, rotulos, encabezado, op, vector, escenaURL, parcheURL, mapa, red, flecha, trazar,
+    G, reducido, cuandoFuentes, pasos, clamp };
+})();
+</script>
