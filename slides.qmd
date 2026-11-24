@@ -246,7 +246,7 @@ La energía $F(x, y)$ (en una JEPA, la distancia $D(\hat s_y, s_y)$) tiene que q
 <div class="ot-widget" data-widget="mapaJepa" data-paso="5" data-alt="Diagrama de I-JEPA con el paso 5 resaltado"><canvas width="300" height="500"></canvas></div>
 </div></div>
 
-<p class="leyenda">Angosto a propósito: con ancho 1024 en vez de 384, el ajuste fino con 1 % de etiquetas baja de 70,7 a 68,4.</p>
+<p class="leyenda">Angosto a propósito: con ancho 1024 en vez de 384, el fine-tuning con 1 % de etiquetas baja de 70,7 a 68,4.</p>
 ```
 
 ## Paso 6: La pérdida
@@ -313,7 +313,7 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 ::: {.columns}
 ::: {.column width="48%"}
 - Muy sensible a la máscara, que también es diseño a mano.
-- No gana en todo: iNaturalist (47,6 contra 57,3 de iBOT), conteo (86,7 contra 90,5 de MAE), ajuste fino.
+- No gana en todo: iNaturalist (47,6 contra 57,3 de iBOT), conteo (86,7 contra 90,5 de MAE), fine-tuning.
 - Nada garantiza que no colapse: EMA y stop-gradient funcionan en la práctica, sin una explicación completa.
 - Sin tiempo, sin acciones y sin variable latente para varios desenlaces: lejos del programa de 2022.
 
@@ -384,8 +384,6 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
   <canvas width="1100" height="430"></canvas>
 </div>
 ```
-
-[]{.fragment .paso}[]{.fragment .paso}[]{.fragment .paso}
 
 ## Qué pasó con el colapso
 

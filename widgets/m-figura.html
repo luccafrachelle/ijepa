@@ -1,1 +1,542 @@
-<script>/* m-figura: widgets migrados a SVG + GSAP (ver widgets/anim.html). Vacío hasta que se migren. */</script>
+<script>
+/* m-figura: la figura general de I-JEPA en SVG + GSAP (sobre widgets/anim.html).
+   Reemplaza a las versiones en canvas de widgets/ijepa.html (se registran con el mismo nombre):
+     arquitectura  slide "I-JEPA dibujito" y blog: el recorrido en siete paradas (s0..s6)
+                   s0 parches · s1 máscaras · s2 encoder de contexto · s3 encoder objetivo
+                   s4 predictor · s5 distancia · s6 gradiente y EMA
+                   El paso actual queda resaltado; lo de pasos anteriores, atenuado.
+     pasada        "Una pasada completa": el diagrama vertical a la izquierda y la lista de etapas
+                   a la derecha; ocho paradas (la etapa 7 tiene dos: gradiente, después EMA). Una señal
+                   recorre las flechas de la etapa activa.
+     mapaJepa      el diagrama vertical al costado de los pasos 1–5. No tiene paradas propias: se
+                   resalta cuando el widget principal de la slide llega a su última parada. */
+(function () {
+  const K = window.OTK, A = window.OTA, C = A.C, G = A.G;
+  const el = A.el, tr = A.tr;
+  const BLANCO = '#ffffff';
+
+  // ---------------------------------------------------------------- helpers locales
+  // color mezclado con blanco: a = 1 es el color, a = 0 es blanco
+  function mezcla(hex, a) {
+    const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(255 + (v - 255) * a));
+    return '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+  }
+  const largo = pts => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
+  // flecha que se dibuja con A.trazar; la punta aparece recién al final del trazo
+  function flecha(padre, pts, color, o = {}) {
+    const p = A.flecha(padre, pts, color, o);
+    p._punta = p.getAttribute('marker-end'); p.setAttribute('marker-end', 'none');
+    p.style.opacity = 0;
+    return p;
+  }
+  function traza(tl, p, at, dur = 0.7) {
+    tl.to(p, { opacity: 1, duration: 0.05 }, at);
+    A.trazar(tl, p, at, dur);
+    if (p._punta) tl.set(p, { attr: { 'marker-end': p._punta } }, at + dur * 0.8);
+  }
+  // flecha punteada: el trazo se revela con una máscara (las rayas no se pueden "dibujar" con dashoffset)
+  function flechaRayada(padre, pts, color, o, W, H) {
+    const S = padre.ownerSVGElement || padre, id = S.uid('msk');
+    const m = el('mask', { id, maskUnits: 'userSpaceOnUse', x: -50, y: -50, width: W + 100, height: H + 100 }, S.defs);
+    const rev = el('path', { d: 'M' + pts.map(p => p.join(',')).join(' L'), fill: 'none', stroke: '#fff', 'stroke-width': 18,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round', pathLength: 1, 'stroke-dasharray': '1 1', 'stroke-dashoffset': 1 }, m);
+    const p = A.flecha(padre, pts, color, o);
+    p.setAttribute('mask', `url(#${id})`);
+    p.style.opacity = 0; p._rev = rev;
+    return p;
+  }
+  function trazaRayada(tl, p, at, dur = 0.9) {
+    tl.to(p, { opacity: 1, duration: 0.05 }, at)
+      .fromTo(p._rev, { attr: { 'stroke-dashoffset': 1 } }, { attr: { 'stroke-dashoffset': 0 }, duration: dur, ease: 'power1.inOut', immediateRender: false }, at);
+  }
+  // señal: puntos que recorren una poligonal (todo en la timeline, así ida y vuelta funcionan)
+  function senal(tl, capa, pts, color, at, dur = 1, n = 2, r = 5) {
+    const L = largo(pts) || 1;
+    for (let j = 0; j < n; j++) {
+      const c = el('circle', { cx: pts[0][0], cy: pts[0][1], r, fill: color }, capa); c.style.opacity = 0;
+      let t = at + j * 0.28;
+      tl.set(c, { attr: { cx: pts[0][0], cy: pts[0][1] } }, t).to(c, { opacity: 1, duration: 0.12 }, t);
+      for (let i = 1; i < pts.length; i++) {
+        const d = dur * Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]) / L;
+        tl.to(c, { attr: { cx: pts[i][0], cy: pts[i][1] }, duration: d, ease: 'none' }, t); t += d;
+      }
+      tl.to(c, { opacity: 0, duration: 0.18 }, t - 0.08);
+    }
+  }
+  function aparece(tl, els, at, dur = 0.5) { tl.to(els, { opacity: 1, duration: dur }, at); }
+  // textos que deben estar ocultos al empezar
+  const oculto = g => { g.style.opacity = 0; return g; };
+
+  // ======================================================================== arquitectura
+  K.register('arquitectura', root => {
+    const S = A.svg(root, 1100, 450);
+    A.cuandoFuentes(() => arquitectura(root, S));
+  });
+
+  function arquitectura(root, S) {
+    const W = 1100, H = 450;
+    const PASOS = [
+      'Una imagen se parte en parches, igual que en cualquier Vision Transformer',
+      'Se sortean un bloque de contexto (punteado verde) y bloques objetivo (rojo); lo gris no es ninguno',
+      'El encoder de contexto recibe sólo lo verde: el bloque de contexto sin los parches objetivo',
+      'El encoder objetivo ve la imagen completa; los bloques objetivo se recortan recién a la salida',
+      'El predictor recibe el contexto y tokens de máscara que indican qué posición predecir',
+      'La pérdida compara predicción y objetivo en el espacio de representaciones',
+      'El gradiente actualiza contexto y predictor; el encoder objetivo sigue al de contexto por EMA'];
+    const N = G.N, IM = { x: 0, y: 160, s: 180 }, q = IM.s / N;
+    const CY = 140, OY = 380, MX = 226, MS = 60;
+    const CB = G.CBOX;
+    const enObj = k => G.bloqueDe(k) >= 0, enCtx = k => G.enCBox(k) && !enObj(k);
+    const ATEN = 0.42;
+
+    // ---- encabezado: número y texto del paso
+    const hg = el('g', {}, S);
+    el('rect', { x: 0, y: 4, width: 36, height: 32, rx: 8, fill: C.blue }, hg);
+    const NUM = A.rotulos(hg, PASOS.map((_, k) => String(k + 1)), { x: 18, y: 27, size: 20, weight: '600', color: BLANCO, anchor: 'middle' });
+    const tam = Math.min(21, ...PASOS.map(s => Math.floor(21 * 1040 / A.medir(s, 21, '600') * 10) / 10));
+    const HEAD = A.rotulos(hg, PASOS, { x: 50, y: 28, size: tam, weight: '600', color: C.navy });
+    NUM.set(0); HEAD.set(0);
+
+    // ---- grupos por paso (para atenuar lo anterior)
+    const capa = el('g', {}, S);
+    const grupo = PASOS.map(() => el('g', {}, capa));
+    const puntos = el('g', {}, S);
+
+    // ---- imagen en parches y máscaras
+    const g0 = grupo[0];
+    el('image', { href: A.escenaURL(), x: IM.x, y: IM.y, width: IM.s, height: IM.s, preserveAspectRatio: 'none' }, g0);
+    const gris = [], rojo = [];
+    for (let k = 0; k < G.NT; k++) {
+      const x = IM.x + (k % N) * q, y = IM.y + Math.floor(k / N) * q;
+      if (!enCtx(k) && !enObj(k)) gris.push(el('rect', { x, y, width: q, height: q, fill: 'rgb(150,155,170)', 'fill-opacity': 0.78 }, g0));
+      if (enObj(k)) rojo.push(el('rect', { x, y, width: q, height: q, fill: C.coral, 'fill-opacity': 0.55 }, g0));
+    }
+    el('path', { d: [...Array(N - 1)].map((_, i) => `M${IM.x + (i + 1) * q},${IM.y}v${IM.s}M${IM.x},${IM.y + (i + 1) * q}h${IM.s}`).join(''),
+      stroke: 'rgba(255,255,255,0.8)', 'stroke-width': 1.2, fill: 'none' }, g0);
+    el('rect', { x: IM.x, y: IM.y, width: IM.s, height: IM.s, rx: 3, fill: 'none', stroke: C.grid, 'stroke-width': 1.5 }, g0);
+    const cbox = el('rect', { x: IM.x + CB.left * q + 1.5, y: IM.y + CB.top * q + 1.5, width: CB.w * q - 3, height: CB.h * q - 3, rx: 2,
+      fill: 'none', stroke: C.teal, 'stroke-width': 2.8, 'stroke-dasharray': '6 4' }, g0);
+    const marcosObj = G.OBJ.map(b => el('rect', { x: IM.x + b.left * q, y: IM.y + b.top * q, width: b.w * q, height: b.h * q, rx: 2,
+      fill: 'none', stroke: C.coralD, 'stroke-width': 2.8 }, g0));
+    [...gris, ...rojo, cbox, ...marcosObj].forEach(oculto);
+    const cap0 = A.texto(g0, 'imagen en parches', IM.x + IM.s / 2, IM.y + IM.s + 26, { size: 17, color: C.grey2, anchor: 'middle' });
+    const cap1 = el('g', {}, g0);
+    A.texto(cap1, 'gris: ni contexto', IM.x + IM.s / 2, IM.y + IM.s + 26, { size: 17, color: C.grey2, anchor: 'middle' });
+    A.texto(cap1, 'ni objetivo', IM.x + IM.s / 2, IM.y + IM.s + 47, { size: 17, color: C.grey2, anchor: 'middle' });
+    oculto(cap1);
+
+    // ---- piezas comunes
+    function red(padre, x, y, w, h, titulo, sim, color) {
+      const g = el('g', {}, padre);
+      const halo = el('rect', { x: x - 7, y: y - 7, width: w + 14, height: h + 14, rx: 18, fill: color, 'fill-opacity': 0.1 }, g);
+      const rect = el('rect', { x, y, width: w, height: h, rx: 13, fill: BLANCO, stroke: color, 'stroke-width': 2.5 }, g);
+      A.texto(g, titulo, x + w / 2, y + 32, { size: 19, weight: '600', color, anchor: 'middle' });
+      A.texto(g, sim, x + w / 2, y + 62, { size: 22, color: C.navy, anchor: 'middle' });
+      halo.style.opacity = 0; g.style.opacity = 0;
+      return { g, halo, rect, color };
+    }
+    const prende = (tl, R, at) => tl.to(R.halo, { opacity: 1, duration: 0.6 }, at)
+      .to(R.rect, { attr: { 'stroke-width': 4, fill: mezcla(R.color, 0.1) }, duration: 0.6 }, at);
+    const apaga = (tl, R, at) => tl.to(R.halo, { opacity: 0, duration: 0.6 }, at)
+      .to(R.rect, { attr: { 'stroke-width': 2.5, fill: BLANCO }, duration: 0.6 }, at);
+    function tokens(padre, x, y, cols, rows, color, estilo) {
+      const g = el('g', {}, padre), cs = [];
+      for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++)
+        cs.push(el('rect', { x: j * 15, y: i * 15, width: 12, height: 12, rx: 2.5,
+          fill: estilo ? BLANCO : color, stroke: estilo ? color : 'none', 'stroke-width': 1.8, 'stroke-dasharray': estilo === 'punteado' ? '3 2' : null }, g));
+      g.setAttribute('transform', tr(x, y)); g.style.opacity = 0; g.cs = cs; g.x0 = x; g.y0 = y;
+      return g;
+    }
+    function mini(padre, soloCtx, borde) {
+      const g = el('g', {}, padre), qq = MS / N;
+      el('image', { href: A.escenaURL(), x: 0, y: 0, width: MS, height: MS, preserveAspectRatio: 'none' }, g);
+      if (soloCtx) for (let k = 0; k < G.NT; k++) if (!enCtx(k))
+        el('rect', { x: (k % N) * qq - 0.3, y: Math.floor(k / N) * qq - 0.3, width: qq + 0.6, height: qq + 0.6, fill: C.light }, g);
+      el('rect', { x: 0, y: 0, width: MS, height: MS, rx: 3, fill: 'none', stroke: borde, 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke' }, g);
+      g.setAttribute('transform', tr(IM.x, IM.y, IM.s / MS)); g.style.opacity = 0;
+      return g;
+    }
+
+    // ---- rama de contexto (paso 3)
+    const g2 = grupo[2];
+    const fCtx = flecha(g2, [[186, 205], [205, 205], [205, CY], [221, CY]], C.teal);
+    const mCtx = mini(g2, true, C.teal);
+    const lCtx = oculto(A.texto(g2, 'verde sin rojo', MX + MS / 2, CY - 42, { size: 16, weight: '600', color: C.teal, anchor: 'middle' }));
+    const fCtx2 = flecha(g2, [[MX + MS + 4, CY], [313, CY]], C.teal);
+    const RC = red(g2, 318, CY - 40, 200, 80, 'Encoder de contexto', '$f_\\theta$', C.teal);
+    const fSx = flecha(g2, [[522, CY], [550, CY]], C.teal);
+    const tSx = tokens(g2, 556, CY - 21, 7, 3, C.teal);
+    const lSx = oculto(A.texto(g2, '$s_x$', 607, CY + 50, { size: 21, color: C.teal, anchor: 'middle' }));
+
+    // ---- rama objetivo (paso 4)
+    const g3 = grupo[3];
+    const fObj = flecha(g3, [[186, 300], [205, 300], [205, OY], [221, OY]], C.navy);
+    const mObj = mini(g3, false, C.navy);
+    const lObj = oculto(A.texto(g3, 'imagen completa', MX + MS / 2, OY + 52, { size: 16, weight: '600', color: C.navy, anchor: 'middle' }));
+    const fObj2 = flecha(g3, [[MX + MS + 4, OY], [313, OY]], C.navy);
+    const RO = red(g3, 318, OY - 40, 200, 80, 'Encoder objetivo', '$f_{\\bar\\theta}$', C.navy);
+    const fSy = flecha(g3, [[522, OY], [926, OY]], C.coralD);
+    const lRec = oculto(A.texto(g3, 'se recortan los bloques objetivo', 724, OY - 13, { size: 17, color: C.grey2, anchor: 'middle' }));
+    const tSy = [tokens(g3, 936, OY - 14, 3, 2, C.coral), tokens(g3, 990, OY - 21, 2, 3, C.coral)];
+    const lSy = oculto(A.texto(g3, '$s_y$', 1068, OY + 7, { size: 21, color: C.coralD, anchor: 'middle' }));
+
+    // ---- predictor (paso 5)
+    const g4 = grupo[4];
+    const fPred = flecha(g4, [[668, CY], [699, CY]], C.blue);
+    const RP = red(g4, 704, CY - 40, 180, 80, 'Predictor', '$g_\\phi$', C.blue);
+    const tMask = tokens(g4, 731, 214, 4, 1, C.blue, 'punteado');
+    const fMask = flecha(g4, [[760, 209], [760, CY + 45]], C.blue, { lw: 2 });
+    const lMask = oculto(el('g', {}, g4));
+    A.texto(lMask, 'tokens de máscara', 760, 252, { size: 16, weight: '600', color: C.blue, anchor: 'middle' });
+    A.texto(lMask, '+ posición del objetivo', 760, 273, { size: 16, color: C.blue, anchor: 'middle' });
+    const fSh = flecha(g4, [[888, CY], [926, CY]], C.blue);
+    const tSh = [tokens(g4, 936, CY - 14, 3, 2, C.blue, 'lleno'), tokens(g4, 990, CY - 21, 2, 3, C.blue, 'lleno')];
+    const lSh = oculto(A.texto(g4, '$\\hat s_y$', 1068, CY + 7, { size: 21, color: C.blue, anchor: 'middle' }));
+
+    // ---- distancia (paso 6): las dos representaciones viajan hasta la pastilla
+    const g5 = grupo[5];
+    const PC = { x: 1000, y: 260, w: 196, h: 46 };
+    const fDa = flecha(g5, [[1003, 168], [1003, PC.y - PC.h / 2 - 4]], C.navy, { lw: 2 });
+    const fDb = flecha(g5, [[1003, OY - 26], [1003, PC.y + PC.h / 2 + 4]], C.navy, { lw: 2 });
+    const pill = el('g', {}, g5); pill.style.opacity = 0;
+    const pHalo = el('rect', { x: PC.x - PC.w / 2 - 7, y: PC.y - PC.h / 2 - 7, width: PC.w + 14, height: PC.h + 14, rx: 30, fill: C.navy, 'fill-opacity': 0.12 }, pill);
+    const pRect = el('rect', { x: PC.x - PC.w / 2, y: PC.y - PC.h / 2, width: PC.w, height: PC.h, rx: PC.h / 2, fill: BLANCO, stroke: C.navy, 'stroke-width': 2.5 }, pill);
+    pHalo.style.opacity = 0;
+    const FS = 19, BY = PC.y + 7;
+    const pz = {};
+    [['dist', 'texto', 'distancia'], ['D', 'tex', '$D($'], ['sh', 'tex', '$\\hat s_y$'], ['co', 'tex', '$,\\,$'], ['sy', 'tex', '$s_y$'], ['cp', 'tex', '$)$']].forEach(([k, t, s]) => {
+      if (t === 'tex') s = s.slice(1, -1);   // con signos de pesos para que scripts/compilar_tex.mjs las encuentre
+      const g = el('g', {}, g5);
+      const n = t === 'texto' ? A.texto(g, s, 0, 0, { size: 17, weight: '600', color: C.navy }) : A.tex(g, s, 0, 0, { size: FS, color: k === 'sh' ? C.blue : k === 'sy' ? C.coralD : C.navy });
+      g.ancho = n.ancho; g.style.opacity = 0; pz[k] = g;
+    });
+    { const orden = ['dist', 'D', 'sh', 'co', 'sy', 'cp'], gapD = 8;
+      let x = PC.x - (orden.reduce((s, k) => s + pz[k].ancho, 0) + gapD) / 2;
+      orden.forEach(k => { pz[k].x = x; x += pz[k].ancho + (k === 'dist' ? gapD : 0); pz[k].setAttribute('transform', tr(pz[k].x, BY)); }); }
+    pz.sh.setAttribute('transform', tr(1068 - pz.sh.ancho * 1.1 / 2, CY + 7, 1.1));
+    pz.sy.setAttribute('transform', tr(1068 - pz.sy.ancho * 1.1 / 2, OY + 7, 1.1));
+
+    // ---- gradiente y EMA (paso 7)
+    const g6 = grupo[6];
+    const fG1 = flechaRayada(g6, [[PC.x - PC.w / 2 - 3, PC.y], [866, PC.y], [866, CY + 45]], C.navy, { lw: 2.2, dash: '6 5' }, W, H);
+    const fG2 = flechaRayada(g6, [[794, CY - 44], [794, 74], [418, 74], [418, CY - 45]], C.navy, { lw: 2.2, dash: '6 5' }, W, H);
+    const lG1 = oculto(A.texto(g6, 'gradiente', 874, 216, { size: 16, weight: '600', color: C.navy }));
+    const lG2 = oculto(A.texto(g6, 'gradiente: se actualizan $\\theta$ y $\\phi$', 606, 64, { size: 17, weight: '600', color: C.navy, anchor: 'middle' }));
+    const lSin = oculto(A.texto(g6, 'sin gradiente por esta rama', 724, OY + 31, { size: 17, weight: '600', color: C.coralD, anchor: 'middle' }));
+    const fEma = flechaRayada(g6, [[418, CY + 44], [418, OY - 45]], C.teal, { lw: 3, dash: '2 6' }, W, H);
+    const lEma = oculto(el('g', {}, g6));
+    A.texto(lEma, 'promedio móvil (EMA)', 432, 252, { size: 17, weight: '600', color: C.teal });
+    A.texto(lEma, 'de los pesos del contexto', 432, 274, { size: 17, color: C.teal });
+
+    // ---------------------------------------------------------------- línea de tiempo
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    tl.addLabel('s0', 0);
+    let at = 0;
+    const cabeza = k => { NUM.a(tl, k, at); HEAD.a(tl, k, at); };
+    const atenua = k => tl.to(grupo[k], { opacity: ATEN, duration: 0.7 }, at + 0.2);
+    const viajaTok = (gs, dx, t0, dur = 1.0) => gs.forEach((g, i) =>
+      tl.fromTo(g, { opacity: 0, attr: { transform: tr(g.x0 - dx, g.y0) } }, { opacity: 1, attr: { transform: tr(g.x0, g.y0) }, duration: dur, ease: 'power2.out', immediateRender: false }, t0 + i * 0.12));
+
+    // s1: máscaras: primero el bloque de contexto, después los objetivos, al final lo gris (≈ 2,8 s)
+    cabeza(1);
+    tl.to(cbox, { opacity: 1, duration: 0.6 }, at + 0.5)
+      .to(rojo, { opacity: 1, duration: 0.6, stagger: 0.03 }, at + 1.1)
+      .to(marcosObj, { opacity: 1, duration: 0.5 }, at + 1.3)
+      .to(gris, { opacity: 1, duration: 0.6, stagger: 0.03 }, at + 1.9)
+      .to(cap0, { opacity: 0, duration: 0.4 }, at + 2.0)
+      .to(cap1, { opacity: 1, duration: 0.5 }, at + 2.3);
+    at = tl.duration(); tl.addLabel('s1', at);
+
+    // s2: lo verde viaja hasta el encoder de contexto; sale s_x (≈ 3,6 s)
+    cabeza(2);
+    tl.to(mCtx, { opacity: 1, duration: 0.35 }, at + 0.4)
+      .to(mCtx, { attr: { transform: tr(MX, CY - MS / 2) }, duration: 1.3 }, at + 0.6);
+    traza(tl, fCtx, at + 1.3, 0.6);
+    aparece(tl, lCtx, at + 1.8);
+    traza(tl, fCtx2, at + 2.0, 0.35);
+    aparece(tl, RC.g, at + 2.1, 0.6); prende(tl, RC, at + 2.3);
+    senal(tl, puntos, [[MX + MS + 4, CY], [330, CY]], C.teal, at + 2.0, 0.45, 1);
+    traza(tl, fSx, at + 2.8, 0.35);
+    viajaTok([tSx], 26, at + 2.9, 0.8);
+    aparece(tl, lSx, at + 3.3, 0.4);
+    at = tl.duration(); tl.addLabel('s2', at);
+
+    // s3: la imagen completa viaja al encoder objetivo; los bloques se recortan a la salida (≈ 4 s)
+    cabeza(3); atenua(2); apaga(tl, RC, at + 0.2);
+    tl.to(mObj, { opacity: 1, duration: 0.35 }, at + 0.5)
+      .to(mObj, { attr: { transform: tr(MX, OY - MS / 2) }, duration: 1.3 }, at + 0.7);
+    traza(tl, fObj, at + 1.4, 0.6);
+    aparece(tl, lObj, at + 1.9);
+    traza(tl, fObj2, at + 2.1, 0.35);
+    aparece(tl, RO.g, at + 2.2, 0.6); prende(tl, RO, at + 2.4);
+    senal(tl, puntos, [[MX + MS + 4, OY], [330, OY]], C.navy, at + 2.1, 0.45, 1);
+    traza(tl, fSy, at + 2.9, 1.0);
+    aparece(tl, lRec, at + 3.0);
+    senal(tl, puntos, [[522, OY], [926, OY]], C.coralD, at + 2.9, 1.0, 1);
+    viajaTok(tSy, 380, at + 2.9, 1.1);
+    aparece(tl, lSy, at + 3.9, 0.4);
+    at = tl.duration(); tl.addLabel('s3', at);
+
+    // s4: predictor: recibe s_x y los tokens de máscara con la posición; sale ŝ_y (≈ 3,6 s)
+    cabeza(4); atenua(3); apaga(tl, RO, at + 0.2);
+    traza(tl, fPred, at + 0.5, 0.4);
+    senal(tl, puntos, [[630, CY], [712, CY]], C.teal, at + 0.4, 0.55, 1);
+    aparece(tl, RP.g, at + 0.7, 0.6); prende(tl, RP, at + 0.9);
+    tl.fromTo(tMask, { opacity: 0, attr: { transform: tr(tMask.x0, tMask.y0 + 30) } }, { opacity: 1, attr: { transform: tr(tMask.x0, tMask.y0) }, duration: 0.8, ease: 'power2.out', immediateRender: false }, at + 1.4);
+    aparece(tl, lMask, at + 1.6);
+    traza(tl, fMask, at + 2.1, 0.4);
+    traza(tl, fSh, at + 2.7, 0.4);
+    viajaTok(tSh, 40, at + 2.8, 0.8);
+    aparece(tl, lSh, at + 3.3, 0.4);
+    at = tl.duration(); tl.addLabel('s4', at);
+
+    // s5: distancia: ŝ_y y s_y entran a la pastilla D(ŝ_y, s_y) (≈ 2,8 s)
+    cabeza(5); atenua(4); apaga(tl, RP, at + 0.2);
+    traza(tl, fDa, at + 0.5, 0.5); traza(tl, fDb, at + 0.5, 0.5);
+    aparece(tl, pill, at + 0.8, 0.5);
+    tl.to(pHalo, { opacity: 1, duration: 0.6 }, at + 1.0).to(pRect, { attr: { fill: mezcla(C.navy, 0.08) }, duration: 0.6 }, at + 1.0);
+    aparece(tl, [pz.dist, pz.D], at + 1.1, 0.5);
+    tl.to(pz.sh, { opacity: 1, duration: 0.3 }, at + 1.3).to(pz.sh, { attr: { transform: tr(pz.sh.x, BY) }, duration: 1.2 }, at + 1.4)
+      .to(pz.sy, { opacity: 1, duration: 0.3 }, at + 1.5).to(pz.sy, { attr: { transform: tr(pz.sy.x, BY) }, duration: 1.2 }, at + 1.6);
+    aparece(tl, [pz.co, pz.cp], at + 2.4, 0.4);
+    at = tl.duration(); tl.addLabel('s5', at);
+
+    // s6: el gradiente vuelve a θ y φ; la rama objetivo no recibe; después, EMA de los pesos (≈ 4,4 s)
+    cabeza(6); atenua(5);
+    tl.to(pHalo, { opacity: 0, duration: 0.6 }, at + 0.2).to(pRect, { attr: { fill: BLANCO }, duration: 0.6 }, at + 0.2);
+    trazaRayada(tl, fG1, at + 0.5, 0.8);
+    senal(tl, puntos, [[PC.x - PC.w / 2 - 3, PC.y], [866, PC.y], [866, CY + 45]], C.navy, at + 0.5, 0.8, 1, 4.5);
+    aparece(tl, lG1, at + 0.9, 0.4);
+    trazaRayada(tl, fG2, at + 1.2, 1.1);
+    senal(tl, puntos, [[794, CY - 44], [794, 74], [418, 74], [418, CY - 45]], C.navy, at + 1.2, 1.1, 1, 4.5);
+    aparece(tl, lG2, at + 1.5, 0.5);
+    prende(tl, RC, at + 2.0); prende(tl, RP, at + 2.0);
+    tl.to(grupo[2], { opacity: 1, duration: 0.5 }, at + 2.0).to(grupo[4], { opacity: 1, duration: 0.5 }, at + 2.0);
+    aparece(tl, lSin, at + 2.3, 0.5);
+    trazaRayada(tl, fEma, at + 3.0, 1.0);
+    senal(tl, puntos, [[418, CY + 44], [418, OY - 45]], C.teal, at + 3.0, 1.0, 1);
+    aparece(tl, lEma, at + 3.2, 0.5);
+    tl.to(grupo[3], { opacity: 1, duration: 0.5 }, at + 3.7); prende(tl, RO, at + 3.8);
+    at = tl.duration(); tl.addLabel('s6', at);
+
+    A.pasos(root, tl);
+  }
+
+  // ======================================================================== diagrama vertical
+  // El mismo de widgets/ijepa.html (MAPA): dos columnas que suben desde las miniaturas. Cada elemento
+  // tiene una versión apagada (opacidad 0,38) y una prendida; D.set(k, v) y D.a(tl, k, v, at) las cruzan.
+  // o: { fs: escala de letra, bw: ancho de las cajas, XL, XR }
+  const ACT = {
+    1: ['thumbC', 'thumbT'],
+    2: ['thumbC', 'thumbT'],
+    3: ['thumbC', 'aC', 'encC', 'aSx', 'sx'],
+    4: ['thumbT', 'aT', 'encT', 'aSy', 'sy'],
+    5: ['sx', 'aP', 'pred', 'pos', 'aH', 'sh'],
+    6: ['sh', 'sy', 'dL', 'D'],
+    7: ['D', 'grad', 'pred', 'encC'],
+    8: ['ema', 'encC', 'encT']
+  };
+  function diagrama(padre, o = {}) {
+    const fs = o.fs || 1, bw = o.bw || 120, bh = o.bh || 52, XL = o.XL || 72, XR = o.XR || 228, XM = (XL + XR) / 2;
+    const SZ = 92, TY = 500 - SZ - 34, yE = TY - 56, yS = yE - 64, yP = yS - 62, yH = yP - 62, yD = yH - 58;
+    const BASE = 0.38, qq = SZ / 6;
+    const RA = G.OBJ, CB = G.CBOX;
+    const D = { on: {}, off: {}, grilla: [], masc: [], XL, XR, XM, TY, yE, yS, yP, yH, yD, bw, bh, SZ };
+    const gBase = el('g', { opacity: BASE }, padre), gOn = el('g', {}, padre);
+    const capas = k => {
+      if (!D.off[k]) { D.off[k] = el('g', {}, gBase); D.on[k] = el('g', {}, gOn); D.on[k].style.opacity = 0; }
+      return [D.off[k], D.on[k]];
+    };
+    function miniatura(k, x, lado) {
+      capas(k).forEach((g, on) => {
+        el('image', { href: A.escenaURL(), x, y: TY, width: SZ, height: SZ, preserveAspectRatio: 'none' }, g);
+        const gm = el('g', {}, g), gg = el('g', {}, g);
+        if (lado === 'ctx') {
+          for (let c = 0; c < G.NT; c++) if (!G.enCBox(c) || G.bloqueDe(c) >= 0)
+            el('rect', { x: x + (c % 6) * qq, y: TY + Math.floor(c / 6) * qq, width: qq + 0.5, height: qq + 0.5, fill: '#eceef3' }, gm);
+          el('rect', { x: x + 1, y: TY + 1, width: CB.w * qq - 2, height: CB.h * qq - 2, fill: 'none', stroke: C.teal, 'stroke-width': 2, 'stroke-dasharray': '4 3' }, gm);
+        } else RA.forEach(b => el('rect', { x: x + b.left * qq, y: TY + b.top * qq, width: b.w * qq, height: b.h * qq,
+          fill: mezcla(C.coral, 1), 'fill-opacity': 0.35, stroke: C.coralD, 'stroke-width': 2 }, gm));
+        el('path', { d: [1, 2, 3, 4, 5].map(i => `M${x + i * qq},${TY}v${SZ}M${x},${TY + i * qq}h${SZ}`).join(''), stroke: 'rgba(255,255,255,0.9)', 'stroke-width': 1, fill: 'none' }, gg);
+        el('rect', { x, y: TY, width: SZ, height: SZ, fill: 'none', stroke: C.grid, 'stroke-width': 1 }, g);
+        const lm = A.texto(gm, lado === 'ctx' ? 'contexto' : 'imagen completa', x + SZ / 2, TY + SZ + 22 * fs, { size: 12.5 * fs, weight: '600', color: lado === 'ctx' ? C.teal : C.coralD, anchor: 'middle' });
+        const lg = A.texto(gg, 'parches + posición', x + SZ / 2, TY + SZ + 22 * fs, { size: 12.5 * fs, weight: '600', color: C.navy, anchor: 'middle' });
+        if (on) el('rect', { x: x - 4, y: TY - 4, width: SZ + 8, height: SZ + 8, rx: 6, fill: 'none', stroke: lado === 'ctx' ? C.teal : C.coralD, 'stroke-width': 2.5 }, g);
+        D.masc.push(gm); D.grilla.push(gg);
+      });
+    }
+    function bloque(k, x, y, titulo, sim, color) {
+      const ts = Math.min(12.5 * fs, 12.5 * fs * (bw - 12) / A.medir(titulo, 12.5 * fs, '600'));
+      capas(k).forEach((g, on) => {
+        el('rect', { x: x - bw / 2, y: y - bh / 2, width: bw, height: bh, rx: 9, fill: on ? mezcla(color, 0.13) : BLANCO, stroke: color, 'stroke-width': on ? 3.4 : 1.8 }, g);
+        A.texto(g, titulo, x, y - 4 * fs, { size: ts, weight: '600', color, anchor: 'middle' });
+        A.texto(g, sim, x, y + 17 * fs, { size: 15 * fs, color, anchor: 'middle' });
+      });
+    }
+    function lin(k, pts) {
+      const [off, on] = capas(k);
+      A.flecha(off, pts, C.grey, { lw: 1.8 });
+      A.flecha(on, pts, C.navy, { lw: 2.6 });
+      D.paths = D.paths || {}; D.paths[k] = (D.paths[k] || []).concat([pts]);
+    }
+    function simb(k, x, y, s, color) {
+      const [off, on] = capas(k);
+      A.texto(off, s, x, y + 6, { size: 18 * fs, color, anchor: 'middle' });
+      A.texto(on, s, x, y + 7, { size: 20 * fs, color, anchor: 'middle' });
+    }
+    const t2 = bh / 2 + 2;
+    // entradas
+    miniatura('thumbC', XL - SZ / 2, 'ctx'); miniatura('thumbT', XR - SZ / 2, 'obj');
+    // rama de contexto
+    lin('aC', [[XL, TY - 6], [XL, yE + t2]]); bloque('encC', XL, yE, 'encoder contexto', '$f_\\theta$', C.teal);
+    lin('aSx', [[XL, yE - t2], [XL, yS + 14]]); simb('sx', XL, yS, '$s_x$', C.teal);
+    lin('aP', [[XL, yS - 14], [XL, yP + t2]]); bloque('pred', XL, yP, 'predictor', '$g_\\phi$', C.blue);
+    lin('aH', [[XL, yP - t2], [XL, yH + 14]]); simb('sh', XL, yH, '$\\hat s_y$', C.blue);
+    // rama objetivo
+    lin('aT', [[XR, TY - 6], [XR, yE + t2]]); bloque('encT', XR, yE, 'encoder objetivo', '$f_{\\bar\\theta}$', C.navy);
+    lin('aSy', [[XR, yE - t2], [XR, yH + 14]]); simb('sy', XR, yH, '$s_y$', C.coralD);
+    // EMA
+    { const [off, on] = capas('ema'), pts = [[XL + bw / 2 + 2, yE], [XR - bw / 2 - 2, yE]];
+      A.flecha(off, pts, C.grey2, { lw: 1.6, dash: '5 4' }); A.flecha(on, pts, C.navy, { lw: 2.8, dash: '5 4' });
+      A.texto(off, 'EMA', XM, yE - 7, { size: 12 * fs, weight: '600', color: C.grey2, anchor: 'middle' });
+      A.texto(on, 'EMA', XM, yE - 7, { size: 12 * fs, weight: '600', color: C.navy, anchor: 'middle' });
+      D.paths.ema = [pts]; }
+    // posiciones de los objetivos
+    { const [off, on] = capas('pos'), pts = [[XR - 18, yP], [XL + bw / 2 + 2, yP]], xm = (pts[0][0] + pts[1][0]) / 2;
+      A.flecha(off, pts, C.coralD, { lw: 1.6 }); A.flecha(on, pts, C.coralD, { lw: 2.8 });
+      A.texto(off, 'posiciones', xm, yP - 8, { size: 12 * fs, color: C.coralD, anchor: 'middle' });
+      A.texto(on, 'posiciones', xm, yP - 8, { size: 12 * fs, color: C.coralD, anchor: 'middle' });
+      D.paths.pos = [pts]; }
+    // pérdida
+    lin('dL', [[XL, yH - 14], [XL, yD], [XM - 20, yD]]); lin('dL', [[XR, yH - 14], [XR, yD], [XM + 20, yD]]);
+    capas('D').forEach((g, on) => {
+      el('circle', { cx: XM, cy: yD, r: 18, fill: on ? mezcla(C.coral, 0.25) : BLANCO, stroke: C.coralD, 'stroke-width': on ? 3.5 : 2 }, g);
+      A.texto(g, 'D', XM, yD + 6, { size: 16, weight: '600', color: C.coralD, anchor: 'middle' });
+    });
+    // gradiente (sólo prendido, en la pasada completa)
+    { capas('grad'); const on = D.on.grad, xg = XL - bw / 2 - 16;
+      const p1 = [[XM - 18, yD - 6], [xg, yD - 6], [xg, yP], [XL - bw / 2 - 3, yP]], p2 = [[xg, yP], [xg, yE], [XL - bw / 2 - 3, yE]];
+      A.flecha(on, p1, C.coralD, { lw: 2.4, dash: '6 4' }); A.flecha(on, p2, C.coralD, { lw: 2.4, dash: '6 4' });
+      A.texto(on, 'gradiente', xg, yD - 14, { size: 13 * fs, weight: '600', color: C.coralD });
+      const xs = XR + 26 * fs, ys = yH;
+      el('path', { d: `M${xs - 7},${ys - 7}L${xs + 7},${ys + 7}M${xs + 7},${ys - 7}L${xs - 7},${ys + 7}`, stroke: C.coralD, 'stroke-width': 2.4, 'stroke-linecap': 'round' }, on);
+      D.paths.grad = [p1.slice(0, 3).concat([[XL - bw / 2 - 3, yP]]), [[xg, yD - 6], [xg, yE], [XL - bw / 2 - 3, yE]]]; }
+    D.set = (k, v) => { D.on[k].style.opacity = v; D.off[k].style.opacity = 1 - v; };
+    D.a = (tl, k, v, at, dur = 0.7) => tl.to(D.on[k], { opacity: v, duration: dur }, at).to(D.off[k], { opacity: 1 - v, duration: dur }, at);
+    D.variante = grilla => { D.grilla.forEach(g => { g.style.opacity = grilla ? 1 : 0; }); D.masc.forEach(g => { g.style.opacity = grilla ? 0 : 1; }); };
+    return D;
+  }
+
+  // ======================================================================== mapaJepa
+  K.register('mapaJepa', root => {
+    const S = A.svg(root, 300, 500);
+    A.cuandoFuentes(() => {
+      const paso = +root.dataset.paso || 0;
+      const D = diagrama(S, { fs: 1.04 });
+      D.variante(paso === 1);
+      A.texto(S, 'I-JEPA', 16, 22, { size: 13, weight: '600', color: C.grey2 });
+      const keys = ACT[paso] || [];
+      // la parte del paso queda prendida durante toda la slide (pedido del autor)
+      const terminado = () => true;
+      const H = { v: 0 }; let meta = null, tw = null;
+      const pinta = () => keys.forEach(k => D.set(k, H.v));
+      Object.defineProperty(root, '_hl', { get: () => H.v, configurable: true });
+      root._entrar = () => { if (tw) { tw.kill(); tw = null; } meta = terminado() ? 1 : 0; H.v = meta; pinta(); };
+      root._entrar();
+      K.frame(root, () => {
+        const t = terminado() ? 1 : 0;
+        if (t === meta) return;
+        meta = t; if (tw) tw.kill();
+        tw = gsap.to(H, { v: t, duration: 0.4, ease: 'power1.inOut', onUpdate: pinta, onComplete: () => { tw = null; } });
+      });
+    });
+  });
+
+  // ======================================================================== pasada
+  K.register('pasada', root => {
+    const S = A.svg(root, 1100, 500);
+    A.cuandoFuentes(() => pasada(root, S));
+  });
+
+  function pasada(root, S) {
+    const OX = 40;
+    const dg = el('g', { transform: tr(OX, 0) }, S);
+    const D = diagrama(dg, { fs: 1.3, bw: 150, bh: 60, XL: 95, XR: 295 });
+    const puntos = el('g', {}, dg);
+    const ITEMS = ['Tokens', 'Máscaras', 'Encoder de contexto', 'Encoder objetivo', 'Predictor', 'Pérdida', 'Gradiente y EMA'];
+    const DESC = [
+      ['La imagen se corta en parches y cada uno', 'lleva su posición.'],
+      ['Se sortean un bloque de contexto y varios', 'bloques objetivo.'],
+      ['Procesa sólo los tokens de contexto y da $s_x$.'],
+      ['Procesa la imagen entera; se recortan', 'los objetivos $s_y$.'],
+      ['Con $s_x$ y la posición de cada objetivo,', 'predice $\\hat s_y$.'],
+      ['Distancia entre $\\hat s_y$ y $s_y$, promediada', 'sobre los objetivos.'],
+      ['El gradiente actualiza el predictor y el encoder', 'de contexto; $s_y$ no recibe gradiente.'],
+      ['Después, el encoder objetivo se mueve hacia', 'el de contexto por EMA.']];
+    const NS = DESC.length, item = n => Math.min(n, ITEMS.length - 1);
+    const LX = 490, LY = 70, DY = 46, LH = 25;
+    const extra = n => DESC[n].length * LH + 10;
+    const yItem = (k, n) => LY + k * DY + (k > item(n) ? extra(n) : 0);
+    const EST = {
+      on: { f: C.blue, s: C.blue, n: BLANCO, t: C.navy },
+      ya: { f: mezcla(C.blue, 0.25), s: C.blue, n: C.blue, t: mezcla(C.navy, 0.6) },
+      no: { f: BLANCO, s: C.grid, n: C.grey2, t: C.grey2 } };
+    const est = (k, n) => EST[k === item(n) ? 'on' : k < item(n) ? 'ya' : 'no'];
+    const L = ITEMS.map((tit, k) => {
+      const g = el('g', { transform: tr(0, yItem(k, 0)) }, S), e = est(k, 0);
+      const r = el('rect', { x: LX, y: -21, width: 30, height: 30, rx: 8, fill: e.f, stroke: e.s, 'stroke-width': 1.5 }, g);
+      const nt = el('text', { x: LX + 15, y: 0, 'text-anchor': 'middle', 'font-size': 17, 'font-weight': 600, fill: e.n }, g); nt.textContent = k + 1;
+      const tt = el('text', { x: LX + 44, y: 0, 'font-size': 21, 'font-weight': 400, fill: e.t }, g); tt.textContent = tit;
+      return { g, r, nt, tt };
+    });
+    // descripción: debajo del título activo
+    const DS = DESC.map((ls, n) => {
+      const g = el('g', {}, S);
+      ls.forEach((s, j) => A.texto(g, s, LX + 44, yItem(item(n), n) + 28 + j * LH, { size: 18, color: C.navy }));
+      g.setAttribute('transform', tr(0, 0)); g.style.opacity = n === 0 ? 1 : 0;
+      return g;
+    });
+    A.texto(S, 'Se repite en cada lote, con máscaras nuevas.', LX, 486, { size: 17, color: C.grey2 });
+
+    // estado inicial: etapa 1 (grilla de parches)
+    D.variante(true);
+    ACT[1].forEach(k => D.set(k, 1));
+
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    tl.addLabel('s0', 0);
+    let at = 0;
+    const SEN = {
+      2: [[['aC', 'aSx'], C.teal]], 3: [[['aT', 'aSy'], C.navy]], 4: [[['pos'], C.coralD], [['aP', 'aH'], C.blue]],
+      5: [[['dL'], C.coralD]], 6: [[['grad'], C.coralD]], 7: [[['ema'], C.navy]] };
+    const D2 = D.paths;
+    for (let n = 1; n < NS; n++) {
+      // la lista: la descripción anterior se va, los ítems se reacomodan, el nuevo se marca
+      tl.to(DS[n - 1], { opacity: 0, attr: { transform: tr(0, -6) }, duration: 0.35 }, at);
+      L.forEach((it, k) => {
+        const e = est(k, n);
+        tl.to(it.g, { attr: { transform: tr(0, yItem(k, n)) }, duration: 0.8 }, at + 0.2)
+          .to(it.r, { attr: { fill: e.f, stroke: e.s }, duration: 0.6 }, at + 0.3)
+          .to(it.nt, { attr: { fill: e.n }, duration: 0.6 }, at + 0.3)
+          .to(it.tt, { attr: { fill: e.t }, duration: 0.6 }, at + 0.3);
+      });
+      tl.fromTo(DS[n], { opacity: 0, attr: { transform: tr(0, 10) } }, { opacity: 1, attr: { transform: tr(0, 0) }, duration: 0.6, immediateRender: false }, at + 0.7);
+      // el diagrama: se apaga la etapa anterior y se prende la nueva
+      const prev = ACT[n], next = ACT[n + 1];
+      prev.filter(k => !next.includes(k)).forEach(k => D.a(tl, k, 0, at + 0.4));
+      next.filter(k => !prev.includes(k)).forEach(k => D.a(tl, k, 1, at + 0.8));
+      if (n === 1) {
+        D.grilla.forEach(g => tl.to(g, { opacity: 0, duration: 0.8 }, at + 0.6));
+        D.masc.forEach(g => tl.to(g, { opacity: 1, duration: 0.8 }, at + 0.9));
+      }
+      // la señal recorre las flechas de la etapa
+      (SEN[n] || []).forEach(([ks, col], j) => {
+        const tramos = ks.flatMap(k => D2[k]);
+        if (ks.length > 1) senal(tl, puntos, tramos.reduce((a, p) => a.concat(a.length ? p.slice(1) : p), []), col, at + 1.0 + j * 0.9, 1.2, 2, 6);
+        else tramos.forEach(p => senal(tl, puntos, p, col, at + 1.0 + j * 0.9, 1.0, 2, 6));
+      });
+      at = tl.duration(); tl.addLabel('s' + n, at);
+    }
+    A.pasos(root, tl);
+  }
+})();
+</script>

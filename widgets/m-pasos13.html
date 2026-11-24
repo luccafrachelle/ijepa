@@ -1,1 +1,338 @@
-<script>/* m-pasos13: widgets migrados a SVG + GSAP (ver widgets/anim.html). Vacío hasta que se migren. */</script>
+<script>
+/* m-pasos13: Paso 1 (parches) y Paso 3 (contexto) migrados a SVG + GSAP, sobre widgets/anim.html.
+   Reemplazan a los registros del mismo nombre en widgets/pasos.html (se registran después).
+
+   parches — de la imagen a los tokens. Paradas:
+     s0 imagen · s1 se corta en parches · s2 los parches viajan a una fila, por filas
+     s3 cada parche se aplana (x_k) · s4 la misma proyección lineal E → tokens
+     s5 embedding posicional p_k (sin-cos 2D, fijo), sale de cada celda de la grilla
+     s6 se suma: token de entrada E x_k + p_k
+   contexto — el encoder de contexto. Paradas:
+     s0 los 36 tokens · s1 contexto / objetivo / ninguno · s2 se descarta lo que no es contexto
+     s3 quedan 17 · s4 entran al encoder f_θ · s5 atención sólo entre ellos
+     s6 salen las representaciones s_x · s7 ninguno vio los parches objetivo */
+(function () {
+  const K = window.OTK, A = window.OTA, C = A.C, G = A.G;
+  const { N, NT, OBJ, ROL, CTX, NADA, OBJK, colRol, bloqueDe, VAL, mezcla } = G;
+  const VIO = '#7b5ea7';
+  // las claves con signos de pesos se escriben así para que scripts/compilar_tex.mjs las encuentre
+  const limpiar = o => { const r = {}; for (const k in o) r[k] = o[k].slice(1, -1); return r; };
+
+  // ============================================================ Paso 1: de la imagen a los tokens
+  K.register('parches', root => {
+    const S = A.svg(root, 1100, 560);
+    A.cuandoFuentes(() => parches(root, S));
+  });
+
+  function parches(root, S) {
+    const el = A.el, tr = A.tr;
+    // ---------------------------------------------------------------- geometría
+    const IM = { x: 0, y: 78, s: 228 }, q = IM.s / N;
+    const X0 = 270, DX = 22.6, TS = 18, TW = 15, TH = 64, PH = 46;
+    const RY = 84, BAND = { y: 168, h: 44 }, VY = 236, PY = 372;
+    const fx = k => X0 + k * DX, tx = k => fx(k) + (TS - TW) / 2;
+    const cx = k => IM.x + (k % N) * q, cy = k => IM.y + Math.floor(k / N) * q;
+    const XC = X0 + (35 * DX + TS) / 2;
+    // embedding posicional 2D sin-cos (fijo): la mitad de las coordenadas codifica la fila, la otra mitad la columna
+    const PE = [...Array(NT)].map((_, k) => { const i = Math.floor(k / N), j = k % N, w = [1.1, 0.4];
+      return [Math.sin(i * w[0]), Math.cos(i * w[0]), Math.sin(i * w[1]), Math.cos(i * w[1]), Math.sin(j * w[0]), Math.cos(j * w[0]), Math.sin(j * w[1]), Math.cos(j * w[1])].map(v => (v + 1) / 2); });
+    const SUMA = PE.map((p, k) => p.map((v, c) => A.clamp(0.55 * VAL[k][c] + 0.45 * v, 0, 1)));
+
+    // ---------------------------------------------------------------- dibujo (estado inicial)
+    const head = A.encabezado(S, 1, [
+      'Una imagen de entrada: 224 × 224 píxeles',
+      'La imagen se corta en parches cuadrados que no se superponen',
+      'Los parches se ordenan en una secuencia, por filas',
+      'Cada parche se aplana: sus píxeles quedan en una columna $x_k$',
+      'Una misma proyección lineal $E$ convierte cada parche en un vector: un token',
+      'Cada posición tiene su vector: el embedding posicional (sin-cos 2D, fijo)',
+      'Se suma a cada token: el token lleva consigo de dónde salió'
+    ]);
+    head.set(0);
+
+    // imagen: las celdas se aclaran cuando su parche se va
+    const M = A.mapa(S, IM.x, IM.y, IM.s, { grilla: false });
+    M.celdas.forEach(c => c.setAttribute('fill', C.light));
+    const lineas = [];
+    for (let i = 1; i < N; i++) {
+      lineas.push(A.flecha(S, [[IM.x + i * q, IM.y], [IM.x + i * q, IM.y + IM.s]], '#ffffff', { punta: false, lw: 2 }));
+      lineas.push(A.flecha(S, [[IM.x, IM.y + i * q], [IM.x + IM.s, IM.y + i * q]], '#ffffff', { punta: false, lw: 2 }));
+    }
+    lineas.forEach(l => { l.setAttribute('stroke-dasharray', '1 1'); l.setAttribute('stroke-dashoffset', 1); });
+    const capImg = A.texto(S, '224 × 224 píxeles', IM.x + IM.s / 2, IM.y + IM.s + 30, { size: 19, color: C.grey2, anchor: 'middle' });
+    const capPos = A.texto(S, '(fila, columna)', IM.x + IM.s / 2, IM.y + IM.s + 30, { size: 19, weight: '600', color: VIO, anchor: 'middle' });
+    capPos.style.opacity = 0;
+    const coords = el('g', {}, S); coords.style.opacity = 0;
+    for (let k = 0; k < NT; k++) {
+      const t = el('text', { x: cx(k) + q / 2, y: cy(k) + q / 2 + 6, 'text-anchor': 'middle', 'font-size': 19, 'font-weight': 600, fill: VIO }, coords);
+      t.textContent = Math.floor(k / N) + ',' + (k % N);
+    }
+
+    // proyección lineal: una banda que cruza toda la fila
+    const band = el('g', {}, S); band.style.opacity = 0;
+    el('rect', { x: X0 - 8, y: BAND.y, width: 35 * DX + TS + 16, height: BAND.h, rx: 9, fill: C.light, stroke: C.blue, 'stroke-width': 1.5 }, band);
+    A.texto(band, 'proyección lineal $E$, la misma para todos los parches', XC, BAND.y + 29, { size: 19, weight: '600', color: C.blue, anchor: 'middle' });
+
+    // rótulos debajo de la fila
+    const labAplana = A.texto(S, 'cada parche aplanado: 16 × 16 × 3 = 768 valores', X0, BAND.y + 10, { size: 19, color: C.grey2 });
+    labAplana.style.opacity = 0;
+    const labTok = A.texto(S, 'un vector por parche: un token (768 números en un ViT-B)', X0, VY + TH + 30, { size: 19, weight: '600', color: C.blue });
+    labTok.style.opacity = 0;
+    const mas = A.texto(S, '+', X0 - 22, (VY + TH + PY) / 2 + 12, { size: 34, weight: '600', color: VIO, anchor: 'middle' });
+    mas.style.opacity = 0;
+    const labPos = A.texto(S, 'embedding posicional $p_k$: senos y cosenos de la fila y la columna; no se entrena', X0, PY + PH + 34, { size: 19, weight: '600', color: VIO });
+    labPos.style.opacity = 0;
+    const labFin = el('g', {}, S); labFin.style.opacity = 0;
+    A.texto(labFin, 'Como cada token lleva su posición, después se pueden quitar', X0, VY + TH + 34, { size: 19, color: C.grey2 });
+    A.texto(labFin, 'tokens sin perder dónde estaba cada uno.', X0, VY + TH + 60, { size: 19, color: C.grey2 });
+
+    // tokens, embeddings posicionales y parches en vuelo (encima de todo)
+    const tokG = el('g', {}, S), posG = el('g', {}, S), imgG = el('g', {}, S);
+    const T = [...Array(NT)].map((_, k) => {
+      const v = A.vector(tokG, VAL[k], { w: TW, h: TH, color: C.blue });
+      v.g.setAttribute('transform', tr(tx(k), BAND.y - 20)); v.g.style.opacity = 0;
+      v.borde = el('rect', { x: -2, y: -2, width: TW + 4, height: TH + 3, rx: 2.5, fill: 'none', stroke: VIO, 'stroke-width': 1.8 }, v.g);
+      v.borde.style.opacity = 0;
+      const p = A.vector(posG, PE[k], { w: TW, h: PH, color: VIO });
+      p.g.setAttribute('transform', tr(cx(k) + (q - TW) / 2, cy(k) + (q - PH * 0.6) / 2, 1, 0.6)); p.g.style.opacity = 0;
+      const img = el('image', { href: A.parcheURL(k, N), x: cx(k), y: cy(k), width: q, height: q, preserveAspectRatio: 'none' }, imgG);
+      img.style.opacity = 0;
+      return { ...v, p, img };
+    });
+    const nums = [0, 6, 12, 18, 24, 30, 35].map(k => {
+      const t = el('text', { x: fx(k) + TS / 2, y: RY + TS + 22, 'text-anchor': 'middle', 'font-size': 19, fill: C.grey }, S);
+      t.textContent = k + 1; t.style.opacity = 0; return { k, t };
+    });
+
+    // fórmula por piezas: lo que es cada token en cada momento
+    const F = A.formula(S, limpiar({ E: '$E$', x: '$x_k$', mas: '$+$', p: '$p_k$' }),
+      [[], [], [], ['x'], ['E', 'x'], ['E', 'x'], ['E', 'x', 'mas', 'p']],
+      { cx: XC, y: 506, size: 30, gap: { E: 2, mas: 8 }, color: { E: C.blue, p: VIO } });
+    F.set(0);
+    const nota = A.texto(S, 'Simplificado a 6 × 6 parches. Un ViT-B/16 a 224 px corta 14 × 14 = 196 parches de 16 × 16 píxeles.',
+      0, 552, { size: 19, color: C.grey2 });
+
+    // ---------------------------------------------------------------- línea de tiempo
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    tl.addLabel('s0', 0);
+    let at = 0;
+
+    // s1: la grilla se dibuja sobre la imagen (≈ 1,6 s)
+    head.a(tl, 1, at);
+    lineas.forEach((l, i) => tl.to(l, { attr: { 'stroke-dashoffset': 0 }, duration: 0.7, ease: 'power1.out' }, at + 0.5 + 0.07 * i));
+    at = tl.duration(); tl.addLabel('s1', at);
+
+    // s2: cada parche sale de su lugar y viaja a la fila, en orden de lectura (≈ 3,3 s)
+    head.a(tl, 2, at);
+    T.forEach((t, k) => {
+      const t0 = at + 0.5 + 0.05 * k, x0 = cx(k), y0 = cy(k);
+      const xm = (x0 + fx(k)) / 2, ym = Math.min(y0, RY) - 30, sm = (q + TS) / 2;
+      tl.set(t.img, { opacity: 1 }, t0)
+        .to(M.celdas[k], { attr: { 'fill-opacity': 0.82 }, duration: 0.4 }, t0 + 0.1)
+        .to(t.img, { attr: { x: xm, y: ym, width: sm, height: sm }, duration: 0.55, ease: 'sine.in' }, t0)
+        .to(t.img, { attr: { x: fx(k), y: RY, width: TS, height: TS }, duration: 0.55, ease: 'sine.out' }, t0 + 0.55);
+    });
+    nums.forEach(({ k, t }) => tl.to(t, { opacity: 1, duration: 0.4 }, at + 0.5 + 0.05 * k + 1.0));
+    at = tl.duration(); tl.addLabel('s2', at);
+
+    // s3: cada parche se aplana en una columna (≈ 1,6 s)
+    head.a(tl, 3, at);
+    tl.to(nums.map(n => n.t), { opacity: 0, duration: 0.35 }, at);
+    T.forEach((t, k) => tl.to(t.img, { attr: { x: tx(k), width: TW, height: TH }, duration: 1.0 }, at + 0.4 + 0.006 * k));
+    tl.to(labAplana, { opacity: 1, duration: 0.5 }, at + 1.0);
+    F.a(tl, 3, at + 0.5);
+    at = tl.duration(); tl.addLabel('s3', at);
+
+    // s4: la misma proyección lineal: cada columna cruza la banda y sale convertida en token (≈ 2,4 s)
+    head.a(tl, 4, at);
+    tl.to(labAplana, { opacity: 0, duration: 0.35 }, at)
+      .to(band, { opacity: 1, duration: 0.5 }, at + 0.35);
+    T.forEach((t, k) => {
+      const t0 = at + 0.8 + 0.012 * k;
+      tl.to(t.img, { attr: { y: BAND.y + BAND.h / 2 - TH / 2 }, duration: 0.6, ease: 'power2.in' }, t0)
+        .to(t.img, { opacity: 0, duration: 0.25 }, t0 + 0.45)
+        .to(t.g, { opacity: 1, duration: 0.25 }, t0 + 0.45)
+        .to(t.g, { attr: { transform: tr(tx(k), VY) }, duration: 0.7, ease: 'power2.out' }, t0 + 0.45);
+    });
+    tl.to(labTok, { opacity: 1, duration: 0.5 }, at + 1.9);
+    F.a(tl, 4, at + 0.9);
+    at = tl.duration(); tl.addLabel('s4', at);
+
+    // s5: cada celda de la grilla da su vector de posición, que viaja debajo de su token (≈ 3 s)
+    head.a(tl, 5, at);
+    tl.to(labTok, { opacity: 0, duration: 0.35 }, at)
+      .to(capImg, { opacity: 0, duration: 0.35 }, at + 0.3)
+      .to(capPos, { opacity: 1, duration: 0.5 }, at + 0.5)
+      .to(coords, { opacity: 1, duration: 0.6 }, at + 0.5);
+    T.forEach((t, k) => {
+      const t0 = at + 1.1 + 0.03 * k;
+      tl.to(t.p.g, { opacity: 1, duration: 0.25 }, t0)
+        .to(t.p.g, { attr: { transform: tr(tx(k), PY) }, duration: 0.9 }, t0 + 0.1);
+    });
+    tl.to(mas, { opacity: 1, duration: 0.4 }, at + 2.4)
+      .to(labPos, { opacity: 1, duration: 0.5 }, at + 2.4);
+    at = tl.duration(); tl.addLabel('s5', at);
+
+    // s6: los vectores de posición suben y se suman a cada token (≈ 2,2 s)
+    head.a(tl, 6, at);
+    tl.to([mas, labPos], { opacity: 0, duration: 0.35 }, at);
+    T.forEach((t, k) => {
+      const t0 = at + 0.4 + 0.012 * k;
+      tl.to(t.p.g, { attr: { transform: tr(tx(k), VY + (TH - PH) / 2) }, duration: 0.8 }, t0)
+        .to(t.p.g, { opacity: 0, duration: 0.3 }, t0 + 0.6)
+        .to(t.cells, { attr: { 'fill-opacity': i => A.op(SUMA[k][i]) }, duration: 0.4 }, t0 + 0.6)
+        .to(t.borde, { opacity: 1, duration: 0.4 }, t0 + 0.7);
+    });
+    tl.to(labFin, { opacity: 1, duration: 0.5 }, at + 1.5);
+    F.a(tl, 6, at + 0.9);
+    at = tl.duration(); tl.addLabel('s6', at);
+
+    A.pasos(root, tl);
+  }
+
+  // ============================================================ Paso 3: el encoder de contexto
+  K.register('contexto', root => {
+    const S = A.svg(root, 1100, 560);
+    A.cuandoFuentes(() => contexto(root, S));
+  });
+
+  function contexto(root, S) {
+    const el = A.el, tr = A.tr;
+    // ---------------------------------------------------------------- geometría
+    const MAP = { x: 0, y: 78, s: 190 }, q = MAP.s / N;
+    const X0 = 234, DX = 23.4, TW = 15, TH = 64, RY = 86;
+    const BOX = { x: 220, y: 196, w: 868, h: 164 }, EY = 280, OY = 386;
+    const xFila = k => X0 + k * DX;
+    const NC = CTX.length, CDX = 30, xComp = n => BOX.x + BOX.w / 2 - ((NC - 1) * CDX + TW) / 2 + n * CDX;
+    const desdeCentro = n => Math.abs(n - (NC - 1) / 2);
+
+    // ---------------------------------------------------------------- dibujo (estado inicial)
+    const head = A.encabezado(S, 3, [
+      'Llegan los 36 tokens del paso 1, cada uno con su posición ya sumada',
+      'Cada token es contexto (verde), objetivo (rojo) o ninguno (gris)',
+      'Lo que no es contexto se descarta antes de entrar a la red',
+      `Quedan ${NC} de los 36 tokens`,
+      'El encoder de contexto, un ViT, recibe sólo esos tokens',
+      'Atención entre los tokens de contexto, y sólo entre ellos',
+      'Sale un vector por token visible: las representaciones de contexto $s_x$',
+      'Ninguno de estos vectores vio los parches objetivo'
+    ]);
+    head.set(0);
+
+    const M = A.mapa(S, MAP.x, MAP.y, MAP.s, { cbox: true });
+    const FONDO = k => (ROL[k].r === 'obj' ? [C.coral, 0.6] : ROL[k].r === 'nada' ? ['#969baa', 0.78] : null);
+    M.celdas.forEach((c, k) => { const f = FONDO(k); if (f) c.setAttribute('fill', f[0]); });
+    M.cbox.style.opacity = 0;
+    const marcoMapa = OBJ.map(o => el('rect', { x: MAP.x + o.left * q, y: MAP.y + o.top * q, width: o.w * q, height: o.h * q,
+      fill: 'none', stroke: C.coralD, 'stroke-width': 3.5, opacity: 0 }, S));
+    // leyenda de los tres grupos
+    const ley = el('g', {}, S); ley.style.opacity = 0;
+    [[C.teal, `contexto (${NC})`, '#ffffff', 1, '4 3'], [C.coralD, `objetivo (${OBJK[0].length + OBJK[1].length})`, C.coral, 0.6, null],
+     [C.grey2, `ninguno (${NADA})`, '#969baa', 0.78, null]].forEach(([col, s, fill, fo, dash], i) => {
+      const y = MAP.y + MAP.s + 36 + i * 30;
+      el('rect', { x: MAP.x + 4, y: y - 14, width: 16, height: 16, rx: 3, fill, 'fill-opacity': fo, stroke: col, 'stroke-width': 1.8, 'stroke-dasharray': dash }, ley);
+      A.texto(ley, s, MAP.x + 30, y, { size: 19, weight: '600', color: col });
+    });
+
+    const R = A.red(S, BOX.x, BOX.y, BOX.w, BOX.h, 'Encoder de contexto $f_\\theta$', 'ViT · se entrena por gradiente', C.teal);
+    R.g.style.opacity = 0;
+    const arcsG = el('g', {}, S);
+    const hl = el('rect', { x: xComp(0) - 4, y: EY - 4, width: TW + 8, height: TH + 8, rx: 5, fill: 'none', stroke: C.teal, 'stroke-width': 2.6 }, S);
+    hl.style.opacity = 0;
+
+    // tokens
+    const toksG = el('g', {}, S);
+    const T = [...Array(NT)].map((_, k) => {
+      const v = A.vector(toksG, VAL[k], { w: TW, h: TH, color: C.blue });
+      v.g.setAttribute('transform', tr(xFila(k), RY));
+      v.borde = el('rect', { x: -2, y: -2, width: TW + 4, height: TH + 3, rx: 2.5, fill: 'none', stroke: C.teal, 'stroke-width': 1.8 }, v.g);
+      v.borde.style.opacity = 0;
+      return v;
+    });
+    const labSx = A.texto(S, '$s_x$: cada vector ya mezcló información de los demás tokens de contexto', BOX.x, OY + TH + 36,
+      { size: 19, weight: '600', color: C.teal });
+    labSx.style.opacity = 0;
+    const labObj = A.texto(S, 'los parches objetivo sólo entran por el encoder objetivo (paso 4)', BOX.x, OY + TH + 66,
+      { size: 19, color: C.coralD });
+    labObj.style.opacity = 0;
+
+    // atención: arcos desde un token de contexto hacia los otros
+    const AY = EY - 4;
+    function arcosDe(h) {
+      const g = el('g', {}, arcsG), xh = xComp(h) + TW / 2;
+      g.style.opacity = 0;
+      const paths = [];
+      for (let j = 0; j < NC; j++) {
+        if (j === h) continue;
+        const xj = xComp(j) + TW / 2, dy = 10 + Math.min(22, 0.06 * Math.abs(xj - xh));
+        paths.push(A.flecha(g, `M${xh},${AY} Q${(xh + xj) / 2},${AY - 2 * dy} ${xj},${AY}`, C.teal, { lw: 1.6 }));
+      }
+      paths.forEach(p => { p.setAttribute('stroke-opacity', 0.75); p.setAttribute('stroke-dasharray', '1 1'); p.setAttribute('stroke-dashoffset', 1); });
+      return { g, paths };
+    }
+
+    // ---------------------------------------------------------------- línea de tiempo
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    tl.addLabel('s0', 0);
+    let at = 0;
+
+    // s1: los roles se marcan en el mapa y cada token toma el color de su rol (≈ 2 s)
+    head.a(tl, 1, at);
+    M.celdas.forEach((c, k) => { const f = FONDO(k); if (f) tl.to(c, { attr: { 'fill-opacity': f[1] }, duration: 0.6 }, at + 0.4); });
+    tl.to(M.cbox, { opacity: 1, duration: 0.6 }, at + 0.4)
+      .to(ley, { opacity: 1, duration: 0.6 }, at + 0.7);
+    T.forEach((t, k) => tl.to(t.cells, { attr: { fill: colRol(k) }, duration: 0.5 }, at + 0.8 + 0.02 * k));
+    at = tl.duration(); tl.addLabel('s1', at);
+
+    // s2: los que no son contexto caen y se descartan (≈ 1,8 s)
+    head.a(tl, 2, at);
+    T.forEach((t, k) => { if (ROL[k].r !== 'ctx')
+      tl.to(t.g, { opacity: 0, attr: { transform: tr(xFila(k), RY + 70) }, duration: 1.0, ease: 'power2.in' }, at + 0.5 + 0.015 * k); });
+    at = tl.duration(); tl.addLabel('s2', at);
+
+    // s3: los de contexto se juntan, sin perder su orden (≈ 1,6 s)
+    head.a(tl, 3, at);
+    CTX.forEach((k, n) => tl.to(T[k].g, { attr: { transform: tr(xComp(n), RY) }, duration: 1.1 }, at + 0.45));
+    at = tl.duration(); tl.addLabel('s3', at);
+
+    // s4: aparece el encoder y entran los 17 (≈ 2 s)
+    head.a(tl, 4, at);
+    tl.to(R.g, { opacity: 1, duration: 0.6 }, at + 0.35);
+    CTX.forEach((k, n) => tl.to(T[k].g, { attr: { transform: tr(xComp(n), EY) }, duration: 1.0 }, at + 0.9 + 0.012 * desdeCentro(n)));
+    at = tl.duration(); tl.addLabel('s4', at);
+
+    // s5: atención sólo entre los tokens de contexto; los vectores se van mezclando (≈ 4 s)
+    head.a(tl, 5, at);
+    const ejemplos = [8, 1, 14];
+    ejemplos.forEach((h, n) => {
+      const t0 = at + 0.6 + n * 1.1, Ar = arcosDe(h);
+      if (n === 0) tl.fromTo(hl, { attr: { x: xComp(h) - 4 }, opacity: 0 }, { opacity: 1, duration: 0.3, immediateRender: false }, t0 - 0.3);
+      else tl.to(hl, { attr: { x: xComp(h) - 4 }, duration: 0.4 }, t0 - 0.4);
+      tl.to(Ar.g, { opacity: 1, duration: 0.15 }, t0)
+        .to(Ar.paths, { attr: { 'stroke-dashoffset': 0 }, duration: 0.65, ease: 'power1.out', stagger: 0.01 }, t0)
+        .to(Ar.g, { opacity: n < ejemplos.length - 1 ? 0 : 0.35, duration: 0.35 }, t0 + 0.9);
+      const u = (n + 1) / ejemplos.length;
+      CTX.forEach(k => tl.to(T[k].cells, { attr: { 'fill-opacity': i => A.op(mezcla(k, u)[i]) }, duration: 0.7 }, t0 + 0.2));
+    });
+    at = tl.duration(); tl.addLabel('s5', at);
+
+    // s6: salen las representaciones de contexto s_x (≈ 2 s)
+    head.a(tl, 6, at);
+    tl.to([hl, arcsG], { opacity: 0, duration: 0.4 }, at);
+    CTX.forEach((k, n) => tl.to(T[k].g, { attr: { transform: tr(xComp(n), OY) }, duration: 1.0 }, at + 0.4 + 0.012 * desdeCentro(n)));
+    tl.to(CTX.map(k => T[k].borde), { opacity: 1, duration: 0.5 }, at + 1.3)
+      .to([R.rect, R.titulo, R.sub], { opacity: 0.35, duration: 0.6 }, at + 1.0)
+      .to(labSx, { opacity: 1, duration: 0.5 }, at + 1.5);
+    at = tl.duration(); tl.addLabel('s6', at);
+
+    // s7: ninguno vio los parches objetivo: se marcan en el mapa (≈ 1,5 s)
+    head.a(tl, 7, at);
+    tl.to(marcoMapa, { opacity: 1, duration: 0.6 }, at + 0.4)
+      .to(M.celdas.filter((_, k) => bloqueDe(k) >= 0), { attr: { 'fill-opacity': 0.85 }, duration: 0.6 }, at + 0.4)
+      .to(labObj, { opacity: 1, duration: 0.5 }, at + 0.8);
+    at = tl.duration(); tl.addLabel('s7', at);
+
+    A.pasos(root, tl);
+  }
+})();
+</script>

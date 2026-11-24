@@ -1,1 +1,428 @@
-<script>/* m-predeval: widgets migrados a SVG + GSAP (ver widgets/anim.html). Vacío hasta que se migren. */</script>
+<script>
+/* m-predeval: Paso 5 (predictor) y la evaluación, en SVG + GSAP (sobre widgets/anim.html).
+   Reemplazan a los widgets en canvas de widgets/pasos.html registrándose con el mismo nombre.
+
+   predictor (sigue el código oficial: proyección a 384 dimensiones, un único token de máscara
+   aprendido más la posición de cada parche objetivo):
+     s0 entra s_x · s1 proyección a 384 · s2 se vuelve a sumar la posición · s3 token de máscara y copias
+     s4 posición de cada parche objetivo · s5 el predictor procesa todo junto · s6 las salidas del contexto
+     se descartan · s7 las de las máscaras son ŝ_y, de vuelta a la dimensión del encoder
+     s8 se repite para el bloque 2 (una sola parada corta)
+   evaluacion:
+     s0 tres redes · s1 se descartan contexto y predictor · s2 el encoder objetivo, congelado, baja
+     s3 imagen nueva → un vector por parche · s4 average pooling · s5 clasificador lineal
+     s6 probabilidades · s7 nota final */
+(function () {
+  const K = window.OTK, A = window.OTA, C = A.C, G = A.G;
+  const { N, NT, OBJ, OBJK, CTX, ROL, VAL2 } = G;
+  const el = A.el, tr = A.tr;
+  // las claves con signos de pesos se escriben así para que scripts/compilar_tex.mjs las encuentre
+  const limpiar = o => { const r = {}; for (const k in o) r[k] = o[k].slice(1, -1); return r; };
+  const clamp01 = v => Math.min(1, Math.max(0, v));
+
+  // ================================================================ Paso 5: el predictor
+  K.register('predictor', root => {
+    const W = 1100, H = 560;
+    const S = A.svg(root, W, H);
+    A.cuandoFuentes(() => predictor(root, S, W, H));
+  });
+
+  function predictor(root, S, W, H) {
+    // ---------------------------------------------------------------- geometría
+    const MAP = { x: 0, y: 96, s: 170 }, q = MAP.s / N;
+    const TW = 15, TH0 = 64, TH1 = 34, SY = TH1 / TH0;           // alto: dimensión del encoder → 384
+    const X0 = 226, DX = 24, MX0 = 700, MDX = 26, RX0 = 430, RDX = 26;
+    const RY = 110, BOX = { x: 210, y: 196, w: 880, h: 150 }, EY = 262, OY = 374;
+    const TPL = { x: 960, y: RY };
+    const xc = n => X0 + n * DX, xm = n => MX0 + n * MDX, xr = n => RX0 + n * RDX;
+    const centro = k => [MAP.x + (k % N + 0.5) * q, MAP.y + (Math.floor(k / N) + 0.5) * q];
+    const R = K.mulberry(55), rnd = () => R();
+    const PJ = CTX.map(() => [...Array(8)].map(rnd));                       // contexto proyectado
+    const PJ2 = PJ.map(v => v.map(x => clamp01(x + (rnd() - 0.5) * 0.45)));  // + posición
+    const MV = [...Array(8)].map(() => 0.5);                                 // el token de máscara
+    const MVP = [0, 1].map(() => OBJK[0].map(() => MV.map(x => clamp01(x + (rnd() - 0.5) * 0.5))));
+    const PRED = [0, 1].map(b => OBJK[b].map(k => VAL2[k].map(x => clamp01(x + (rnd() - 0.5) * 0.35))));
+
+    // ---------------------------------------------------------------- dibujo (estado inicial)
+    const head = A.encabezado(S, 5, [
+      'El predictor recibe $s_x$, la salida del encoder de contexto',
+      'El contexto se proyecta a 384 dimensiones',
+      'Y se le vuelve a sumar su posición',
+      'Un único token de máscara, aprendido, se copia una vez por parche a predecir',
+      'A cada copia se le suma la posición de su parche objetivo: «¿qué hay acá?»',
+      'El predictor, un ViT angosto, procesa contexto y máscaras juntos',
+      'Las salidas del contexto se descartan',
+      'Las salidas en las posiciones de máscara son la predicción $\\hat s_y$ del bloque 1',
+      'Se repite una vez por bloque objetivo: 4 en el paper, 2 en este dibujo'
+    ]);
+    head.set(0);
+
+    const GRIS = 'rgba(150,155,170,1)';
+    const colIni = k => (ROL[k].r === 'ctx' ? null : ROL[k].r === 'obj' && ROL[k].b === 0 ? C.coral : GRIS);
+    const M = A.mapa(S, MAP.x, MAP.y, MAP.s, { color: colIni });
+    M.celdas.forEach((c, k) => { const col = colIni(k); if (col) c.setAttribute('fill-opacity', col === C.coral ? 0.65 : 0.78); });
+    const rotMapa = A.rotulos(S, ['bloque 1 de 2', 'bloque 2 de 2'], { x: MAP.x + MAP.s / 2, y: MAP.y + MAP.s + 30, size: 19, weight: '600', color: C.coralD, anchor: 'middle' });
+    rotMapa.set(0);
+
+    const Rd = A.red(S, BOX.x, BOX.y, BOX.w, BOX.h, 'Predictor $g_\\phi$', 'ViT angosto · 384 dimensiones', C.blue);
+    Rd.g.style.opacity = 0;
+    const arcsG = el('g', {}, S);
+
+    // token: pila de celdas con borde opcional; se achica en alto con la escala vertical
+    function tok(padre, vals, color, x, y, sy, borde) {
+      const g = el('g', { transform: tr(x, y, 1, sy) }, padre);
+      const b = el('rect', { x: -2.5, y: -2.5, width: TW + 5, height: TH0 + 5, rx: 2, fill: 'none', stroke: borde || C.grey,
+        'stroke-width': 1.8, 'stroke-dasharray': '3 2', 'vector-effect': 'non-scaling-stroke' }, g);
+      if (!borde) b.style.opacity = 0;
+      const v = A.vector(g, vals, { w: TW, h: TH0, color });
+      return { g, cells: v.cells, borde: b };
+    }
+    const ctxG = el('g', {}, S), mskG = el('g', {}, S), dotsG = el('g', {}, S);
+    const CT = CTX.map((k, n) => tok(ctxG, VAL2[k], C.teal, xc(n), RY, 1));
+    const plantilla = tok(S, MV, C.grey, TPL.x, TPL.y, SY, C.grey);
+    plantilla.g.style.opacity = 0;
+    const rotPl = el('g', {}, S); rotPl.style.opacity = 0;
+    A.texto(rotPl, 'token de máscara', TPL.x + TW / 2, TPL.y + TH1 + 30, { size: 19, color: C.grey2, anchor: 'middle' });
+    A.texto(rotPl, '(uno, aprendido)', TPL.x + TW / 2, TPL.y + TH1 + 54, { size: 19, color: C.grey2, anchor: 'middle' });
+    const MK = [0, 1].map(b => OBJK[b].map(() => { const t = tok(mskG, MV, C.grey, TPL.x, TPL.y, SY, C.grey); t.g.style.opacity = 0; return t; }));
+
+    // rótulos bajo las filas
+    const rotCtx = A.rotulos(S, ['$s_x$: 17 tokens de contexto', 'proyección lineal a 384 dimensiones', '+ posición de cada parche de contexto'],
+      { x: X0, y: RY + TH0 + 30, size: 19, weight: '600', color: C.teal });
+    rotCtx.set(0);
+    const posMsk = A.texto(S, '+ posición', xm(0), RY + TH1 + 30, { size: 19, weight: '600', color: C.coralD });
+    posMsk.style.opacity = 0;
+    const descarte = A.texto(S, 'las salidas del contexto se descartan', X0, OY + TH0 + 30, { size: 19, color: C.grey2 });
+    descarte.style.opacity = 0;
+    const sy1 = A.texto(S, '$\\hat s_y$ bloque 1', xm(0), OY + TH0 + 30, { size: 19, weight: '600', color: C.blue });
+    sy1.setAttribute('transform', tr(0, 0)); sy1.style.opacity = 0;
+    const dimTxt = A.texto(S, '(de vuelta a la dimensión del encoder)', xm(0), OY + TH0 + 56, { size: 19, color: C.grey2 });
+    dimTxt.style.opacity = 0;
+    const sy2 = A.texto(S, '$\\hat s_y$ bloque 2', xm(0), OY + TH0 + 30, { size: 19, weight: '600', color: C.blue });
+    sy2.style.opacity = 0;
+
+    // puntitos de posición: viajan desde la celda del mapa hasta el token, con un arco por debajo
+    function viajes(ks, destinos, color, at, fondo) {
+      ks.forEach((k, n) => {
+        const [x0, y0] = centro(k), [x1, y1] = destinos[n], t0 = at + n * 0.05;
+        const d = el('circle', { cx: x0, cy: y0, r: 5, fill: color, stroke: '#fff', 'stroke-width': 1.5 }, dotsG); d.style.opacity = 0;
+        tl.to(d, { opacity: 1, duration: 0.2 }, t0)
+          .to(d, { attr: { cx: x1 }, duration: 1.1, ease: 'power1.inOut' }, t0)
+          .to(d, { attr: { cy: fondo }, duration: 0.55, ease: 'power2.out' }, t0)
+          .to(d, { attr: { cy: y1 }, duration: 0.55, ease: 'power2.in' }, t0 + 0.55)
+          .to(d, { opacity: 0, duration: 0.2 }, t0 + 1.05);
+      });
+    }
+
+    // fórmula por piezas
+    const F = A.formula(S, limpiar({
+      sy: '$\\hat s_y$', eq: '$=$', g: '$g_\\phi$', lp: '$($', sx: '$s_x$', co: '$,$', m: '$\\{m_j\\}_{j \\in B_i}$', rp: '$)$'
+    }), [
+      ['sx'], ['sx'], ['sx'], ['sx'], ['sx', 'co', 'm'], ['g', 'lp', 'sx', 'co', 'm', 'rp'], ['g', 'lp', 'sx', 'co', 'm', 'rp'],
+      ['sy', 'eq', 'g', 'lp', 'sx', 'co', 'm', 'rp'], ['sy', 'eq', 'g', 'lp', 'sx', 'co', 'm', 'rp']
+    ], { cx: BOX.x + BOX.w / 2, y: 546, size: 26, gap: { eq: 10 },
+      color: { sy: C.blue, g: C.blue, lp: C.blue, rp: C.blue, sx: C.teal, m: C.coralD, co: C.text, eq: C.text } });
+    F.set(0);
+
+    // ---------------------------------------------------------------- línea de tiempo
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    const valsTo = (t, vals, at, dur, extra = {}) => tl.to(t.cells, { attr: { 'fill-opacity': i => A.op(vals[i]), ...extra }, duration: dur }, at);
+    tl.addLabel('s0', 0);
+
+    // s1: proyección a 384 dimensiones: cada token se angosta y cambia de valores (≈ 2 s)
+    let at = 0;
+    head.a(tl, 1, at); rotCtx.a(tl, 1, at + 0.2);
+    CT.forEach((t, n) => {
+      tl.to(t.g, { attr: { transform: tr(xc(n), RY, 1, SY) }, duration: 1.2 }, at + 0.5 + n * 0.02);
+      valsTo(t, PJ[n], at + 0.6 + n * 0.02, 1.0);
+    });
+    at = tl.duration(); tl.addLabel('s1', at);
+
+    // s2: la posición de cada parche de contexto viaja desde el mapa y se suma (≈ 2,4 s)
+    head.a(tl, 2, at); rotCtx.a(tl, 2, at + 0.2);
+    viajes(CTX, CTX.map((_, n) => [xc(n) + TW / 2, RY + TH1 + 6]), C.teal, at + 0.4, 200);
+    CT.forEach((t, n) => valsTo(t, PJ2[n], at + 1.45 + n * 0.05, 0.5));
+    at = tl.duration(); tl.addLabel('s2', at);
+
+    // s3: un único token de máscara, aprendido, se copia una vez por parche objetivo (≈ 2,4 s)
+    head.a(tl, 3, at);
+    tl.to(rotCtx.items, { opacity: 0, duration: 0.4 }, at);
+    tl.to([plantilla.g, rotPl], { opacity: 1, duration: 0.6 }, at + 0.35);
+    MK[0].forEach((t, n) => {
+      const t0 = at + 1.0 + n * 0.12;
+      tl.to(t.g, { opacity: 1, duration: 0.2 }, t0)
+        .to(t.g, { attr: { transform: tr(xm(n), RY, 1, SY) }, duration: 1.0 }, t0);
+    });
+    at = tl.duration(); tl.addLabel('s3', at);
+
+    // s4: a cada copia le llega la posición de su parche objetivo (≈ 2,2 s)
+    head.a(tl, 4, at);
+    tl.to(M.celdas.filter((_, k) => OBJK[0].includes(k)), { attr: { 'fill-opacity': 0.85 }, duration: 0.5 }, at + 0.3);
+    viajes(OBJK[0], OBJK[0].map((_, n) => [xm(n) + TW / 2, RY + TH1 + 6]), C.coralD, at + 0.4, 190);
+    MK[0].forEach((t, n) => {
+      tl.to(t.borde, { attr: { stroke: C.coralD }, duration: 0.35 }, at + 1.4 + n * 0.05);
+      valsTo(t, MVP[0][n], at + 1.4 + n * 0.05, 0.45);
+    });
+    tl.to(posMsk, { opacity: 1, duration: 0.5 }, at + 1.5);
+    F.a(tl, 4, at + 1.2);
+    at = tl.duration(); tl.addLabel('s4', at);
+
+    // s5: el predictor procesa contexto y máscaras juntos; las máscaras se van llenando (≈ 3,4 s)
+    head.a(tl, 5, at);
+    tl.to([plantilla.g, rotPl, posMsk], { opacity: 0, duration: 0.4 }, at)
+      .to(M.celdas.filter((_, k) => OBJK[0].includes(k)), { attr: { 'fill-opacity': 0.65 }, duration: 0.5 }, at)
+      .to(Rd.g, { opacity: 1, duration: 0.6 }, at + 0.3);
+    CT.forEach((t, n) => tl.to(t.g, { attr: { transform: tr(xc(n), EY, 1, SY) }, duration: 1.0 }, at + 0.6 + n * 0.01));
+    MK[0].forEach((t, n) => tl.to(t.g, { attr: { transform: tr(xm(n), EY, 1, SY) }, duration: 1.0 }, at + 0.6 + n * 0.02));
+    F.a(tl, 5, at + 0.6);
+    const AY = EY - 5;
+    [0, 1].forEach(ola => {
+      const g = el('g', {}, arcsG), paths = [];
+      g.style.opacity = 0;
+      for (let n = ola; n < CTX.length; n += 2) {
+        const m = (n * 5 + ola) % 6, x1 = xc(n) + TW / 2, x2 = xm(m) + TW / 2, dy = 12 + Math.min(18, 0.04 * Math.abs(x2 - x1));
+        const p = A.flecha(g, `M${x1},${AY} Q${(x1 + x2) / 2},${AY - 2 * dy} ${x2},${AY}`, C.blue, { lw: 1.5 });
+        p.setAttribute('stroke-opacity', 0.6); p.setAttribute('stroke-dasharray', '1 1'); p.setAttribute('stroke-dashoffset', 1);
+        paths.push(p);
+      }
+      const t0 = at + 1.7 + ola * 0.9;
+      tl.to(g, { opacity: 1, duration: 0.15 }, t0)
+        .to(paths, { attr: { 'stroke-dashoffset': 0 }, duration: 0.6, ease: 'power1.out', stagger: 0.02 }, t0)
+        .to(g, { opacity: 0, duration: 0.4 }, t0 + 0.8);
+    });
+    MK[0].forEach((t, n) => valsTo(t, PRED[0][n], at + 1.9 + n * 0.08, 1.1, { fill: C.blue }));
+    at = tl.duration(); tl.addLabel('s5', at);
+
+    // s6: las salidas del contexto salen del predictor y se descartan (≈ 1,8 s)
+    head.a(tl, 6, at);
+    CT.forEach((t, n) => {
+      tl.to(t.g, { attr: { transform: tr(xc(n), OY, 1, SY) }, duration: 1.0 }, at + 0.4 + n * 0.015)
+        .to(t.cells, { attr: { fill: C.grey }, duration: 0.6 }, at + 0.9)
+        .to(t.g, { opacity: 0.25, duration: 0.6 }, at + 1.1);
+    });
+    tl.to(descarte, { opacity: 1, duration: 0.5 }, at + 1.2);
+    at = tl.duration(); tl.addLabel('s6', at);
+
+    // s7: las salidas de las máscaras son ŝ_y y vuelven a la dimensión del encoder (≈ 2 s)
+    head.a(tl, 7, at);
+    MK[0].forEach((t, n) => {
+      tl.to(t.g, { attr: { transform: tr(xm(n), OY, 1, 1) }, duration: 1.2 }, at + 0.4 + n * 0.03)
+        .to(t.borde, { opacity: 0, duration: 0.5 }, at + 0.6);
+    });
+    tl.to(sy1, { opacity: 1, duration: 0.5 }, at + 1.3).to(dimTxt, { opacity: 1, duration: 0.5 }, at + 1.5);
+    F.a(tl, 7, at + 0.8);
+    at = tl.duration(); tl.addLabel('s7', at);
+
+    // s8: lo mismo para el bloque 2, de corrido (≈ 4 s)
+    head.a(tl, 8, at);
+    tl.to([descarte, dimTxt, ctxG], { opacity: 0, duration: 0.4 }, at);
+    MK[0].forEach((t, n) => tl.to(t.g, { attr: { transform: tr(xr(n), OY, 1, 1) }, duration: 0.9 }, at + 0.3 + n * 0.03));
+    tl.to(sy1, { attr: { transform: tr(RX0 - MX0, 0) }, duration: 0.9 }, at + 0.35);
+    rotMapa.a(tl, 1, at + 0.3);
+    OBJK[0].forEach(k => tl.to(M.celdas[k], { attr: { fill: GRIS, 'fill-opacity': 0.78 }, duration: 0.6 }, at + 0.4));
+    OBJK[1].forEach(k => tl.to(M.celdas[k], { attr: { fill: C.coral, 'fill-opacity': 0.65 }, duration: 0.6 }, at + 0.4));
+    tl.to(plantilla.g, { opacity: 1, duration: 0.4 }, at + 0.5);
+    MK[1].forEach((t, n) => {
+      const t0 = at + 0.8 + n * 0.06;
+      tl.to(t.g, { opacity: 1, duration: 0.2 }, t0)
+        .to(t.g, { attr: { transform: tr(xm(n), RY, 1, SY) }, duration: 0.7 }, t0);
+      tl.to(t.borde, { attr: { stroke: C.coralD }, duration: 0.3 }, at + 1.5);
+      valsTo(t, MVP[1][n], at + 1.5, 0.3);
+    });
+    // el contexto vuelve a entrar al predictor junto con las máscaras del bloque 2
+    CT.forEach((t, n) => { tl.set(t.g, { opacity: 1, attr: { transform: tr(xc(n), EY, 1, SY) } }, at + 1.0); tl.set(t.cells, { attr: { fill: C.teal } }, at + 1.0); });
+    tl.to(plantilla.g, { opacity: 0, duration: 0.4 }, at + 1.8)
+      .to(ctxG, { opacity: 1, duration: 0.5 }, at + 1.8);
+    MK[1].forEach((t, n) => {
+      tl.to(t.g, { attr: { transform: tr(xm(n), EY, 1, SY) }, duration: 0.6 }, at + 1.9);
+      valsTo(t, PRED[1][n], at + 2.4 + n * 0.04, 0.5, { fill: C.blue });
+      tl.to(t.g, { attr: { transform: tr(xm(n), OY, 1, 1) }, duration: 0.8 }, at + 3.0 + n * 0.03)
+        .to(t.borde, { opacity: 0, duration: 0.4 }, at + 3.1);
+    });
+    tl.to(ctxG, { opacity: 0, duration: 0.5 }, at + 3.0)
+      .to(sy2, { opacity: 1, duration: 0.5 }, at + 3.6);
+    at = tl.duration(); tl.addLabel('s8', at);
+
+    A.pasos(root, tl);
+  }
+
+  // ================================================================ después de entrenar: la evaluación
+  K.register('evaluacion', root => {
+    const W = 1100, H = 450;
+    const S = A.svg(root, W, H);
+    A.cuandoFuentes(() => evaluacion(root, S, W, H));
+  });
+
+  function evaluacion(root, S, W, H) {
+    const IM = { x: 16, y: 200, s: 150 }, ENC = { x: 220, y: 205, w: 210, h: 140 }, CY = ENC.y + ENC.h / 2;
+    const GR = { x: 482, y: 196, dx: 24, dy: 28, w: 14, h: 22 };
+    const POOL = { x: 680, w: 22, h: 72 }, LIN = { x: 774, y: CY - 48, w: 150, h: 96 };
+    const CL = { x: 958, xb: 1046, esc: 80 };
+    const CLASES = [['casa', 0.62], ['granja', 0.21], ['lago', 0.1], ['montaña', 0.07]];
+    const q = IM.s / N;
+    const gx = k => GR.x + (k % N) * GR.dx, gy = k => GR.y + Math.floor(k / N) * GR.dy;
+    const PROM = [...Array(8)].map((_, c) => clamp01((VAL2.reduce((s, v) => s + v[c], 0) / NT - 0.35) * 2.5));
+
+    const head = A.encabezado(S, '✓', [
+      'Al terminar el preentrenamiento quedan tres redes',
+      'El encoder de contexto y el predictor se descartan',
+      'Se usa el encoder objetivo, congelado',
+      'Una imagen nueva da un vector por parche',
+      'Average pooling: los vectores de todos los parches se promedian en uno solo',
+      'Encima se entrena sólo un clasificador lineal: la evaluación lineal',
+      'El clasificador da la probabilidad de cada clase',
+      'Lo que mide la evaluación lineal'
+    ]);
+    head.set(0);
+
+    // las tres redes entrenadas
+    const TOP = [['Encoder de contexto', C.teal], ['Predictor', C.blue], ['Encoder objetivo', C.navy]].map(([n, col], i) => {
+      const x = 230 + i * 250, y = 56, g = el('g', {}, S);
+      const rect = el('rect', { x, y, width: 220, height: 50, rx: 12, fill: '#fff', stroke: col, 'stroke-width': 2.4 }, g);
+      const t = A.texto(g, n, x + 110, y + 32, { size: 20, weight: '600', color: col, anchor: 'middle' });
+      t.setAttribute('transform', tr(0, 0));
+      return { g, rect, t, x, y };
+    });
+    const tachas = TOP.slice(0, 2).map(T => {
+      const g = el('g', {}, S);
+      const l = el('path', { d: `M${T.x + 12},${T.y + 8} L${T.x + 208},${T.y + 42}`, stroke: C.coralD, 'stroke-width': 3, 'stroke-linecap': 'round', fill: 'none', pathLength: 1, 'stroke-dasharray': '1 1', 'stroke-dashoffset': 1 }, g);
+      const s = A.texto(g, 'se descarta', T.x + 110, T.y + 78, { size: 19, color: C.coralD, anchor: 'middle' }); s.style.opacity = 0;
+      return { l, s };
+    });
+
+    // el encoder objetivo, abajo
+    const encDet = el('g', {}, S); encDet.style.opacity = 0;
+    A.texto(encDet, 'imagen completa,', ENC.x + 16, ENC.y + 66, { size: 19, color: C.grey2 });
+    A.texto(encDet, 'sin máscaras', ENC.x + 16, ENC.y + 90, { size: 19, color: C.grey2 });
+    A.texto(encDet, '❄ congelado', ENC.x + 16, ENC.y + 124, { size: 19, weight: '600', color: C.blue });
+
+    // imagen nueva
+    const imG = el('g', {}, S); imG.style.opacity = 0;
+    el('image', { href: A.escenaURL(), x: IM.x, y: IM.y, width: IM.s, height: IM.s, preserveAspectRatio: 'none' }, imG);
+    el('rect', { x: IM.x, y: IM.y, width: IM.s, height: IM.s, rx: 3, fill: 'none', stroke: C.grid, 'stroke-width': 1.5 }, imG);
+    A.texto(imG, 'imagen nueva', IM.x + IM.s / 2, IM.y + IM.s + 28, { size: 19, color: C.grey2, anchor: 'middle' });
+    const fl1 = A.flecha(S, [[IM.x + IM.s + 6, CY], [ENC.x - 6, CY]], C.navy); fl1.style.opacity = 0;
+    const fl2 = A.flecha(S, [[ENC.x + ENC.w + 6, CY], [GR.x - 12, CY]], C.navy); fl2.style.opacity = 0;
+    const fl3 = A.flecha(S, [[GR.x + 5 * GR.dx + GR.w + 10, CY], [POOL.x - 10, CY]], C.navy); fl3.style.opacity = 0;
+    const fl4 = A.flecha(S, [[POOL.x + POOL.w + 10, CY], [LIN.x - 6, CY]], C.navy); fl4.style.opacity = 0;
+    const fl5 = A.flecha(S, [[LIN.x + LIN.w + 6, CY], [CL.x - 10, CY]], C.navy); fl5.style.opacity = 0;
+
+    // parches que viajan al encoder y vectores que salen
+    const parG = el('g', {}, S), vecG = el('g', {}, S);
+    const PAR = [...Array(NT)].map((_, k) => {
+      const im = el('image', { href: A.parcheURL(k, N), x: IM.x + (k % N) * q, y: IM.y + Math.floor(k / N) * q, width: q, height: q, preserveAspectRatio: 'none' }, parG);
+      im.style.opacity = 0; return im;
+    });
+    const VEC = [...Array(NT)].map((_, k) => {
+      const v = A.vector(vecG, VAL2[k], { w: GR.w, h: GR.h, color: C.navy });
+      v.g.setAttribute('transform', tr(ENC.x + ENC.w - GR.w, CY - GR.h / 2, 0.6)); v.g.style.opacity = 0; return v;
+    });
+    // copias que viajan al promedio (los 36 vectores originales quedan en su lugar)
+    const GHO = [...Array(NT)].map((_, k) => {
+      const v = A.vector(vecG, VAL2[k], { w: GR.w, h: GR.h, color: C.navy });
+      v.g.setAttribute('transform', tr(gx(k), gy(k))); v.g.style.opacity = 0; return v;
+    });
+    const n36 = A.texto(S, '36 vectores', GR.x + (5 * GR.dx + GR.w) / 2, GR.y + 5 * GR.dy + GR.h + 30, { size: 19, color: C.grey2, anchor: 'middle' });
+    n36.style.opacity = 0;
+
+    // average pooling
+    const pool = A.vector(S, PROM, { w: POOL.w, h: POOL.h, color: C.navy });
+    pool.g.setAttribute('transform', tr(POOL.x, CY - 4, 1, 0.1)); pool.g.style.opacity = 0;
+    const poolTxt = A.texto(S, 'average pooling', POOL.x + POOL.w / 2, CY + POOL.h / 2 + 30, { size: 19, weight: '600', color: C.navy, anchor: 'middle' });
+    poolTxt.style.opacity = 0;
+
+    // clasificador lineal
+    const linG = el('g', {}, S); linG.style.opacity = 0;
+    el('rect', { x: LIN.x, y: LIN.y, width: LIN.w, height: LIN.h, rx: 12, fill: C.light, stroke: C.blue, 'stroke-width': 2.2 }, linG);
+    A.texto(linG, 'clasificador', LIN.x + LIN.w / 2, LIN.y + 42, { size: 20, weight: '600', color: C.blue, anchor: 'middle' });
+    A.texto(linG, 'lineal', LIN.x + LIN.w / 2, LIN.y + 66, { size: 20, weight: '600', color: C.blue, anchor: 'middle' });
+    const linTxt = A.texto(S, 'lo único que se entrena', LIN.x + LIN.w / 2, LIN.y - 16, { size: 19, color: C.grey2, anchor: 'middle' });
+    linTxt.style.opacity = 0;
+
+    // probabilidades
+    const clG = el('g', {}, S); clG.style.opacity = 0;
+    const barras = CLASES.map(([n, p], i) => {
+      const y = CY - 52 + i * 30;
+      A.texto(clG, n, CL.x, y + 15, { size: 19, color: C.navy });
+      return { r: el('rect', { x: CL.xb, y: y, width: 0, height: 18, rx: 4, fill: i ? C.grey : C.teal, 'fill-opacity': i ? 0.7 : 1 }, clG), w: CL.esc * p };
+    });
+
+    // nota final
+    const nota = el('g', {}, S); nota.style.opacity = 0;
+    A.texto(nota, 'Si una capa lineal alcanza para clasificar bien,', W / 2, 408, { size: 20, color: C.navy, anchor: 'middle' });
+    A.texto(nota, 'la representación ya tenía la información ordenada.', W / 2, 436, { size: 20, color: C.navy, anchor: 'middle' });
+
+    // ---------------------------------------------------------------- línea de tiempo
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    const aparece = (x, at, d = 0.5) => tl.to(x, { opacity: 1, duration: d }, at);
+    const traza = (f, at, d = 0.6) => { tl.set(f, { opacity: 1 }, at); A.trazar(tl, f, at, d); };
+    tl.addLabel('s0', 0);
+
+    // s1: se descartan el encoder de contexto y el predictor (≈ 1,6 s)
+    let at = 0;
+    head.a(tl, 1, at);
+    tachas.forEach((T, i) => {
+      tl.to(T.l, { attr: { 'stroke-dashoffset': 0 }, duration: 0.6, ease: 'power1.out' }, at + 0.5 + i * 0.25);
+      aparece(T.s, at + 0.8 + i * 0.25);
+      tl.to(TOP[i].g, { opacity: 0.35, duration: 0.6 }, at + 1.0 + i * 0.25);
+    });
+    at = tl.duration(); tl.addLabel('s1', at);
+
+    // s2: el encoder objetivo baja a su lugar y queda congelado (≈ 1,9 s)
+    head.a(tl, 2, at);
+    const E = TOP[2];
+    tl.to(E.rect, { attr: { x: ENC.x, y: ENC.y, width: ENC.w, height: ENC.h, rx: 14, 'stroke-width': 2.5 }, duration: 1.3 }, at + 0.4);
+    tl.to(E.t, { attr: { transform: tr(ENC.x + ENC.w / 2 - (E.x + 110), ENC.y - E.y) }, duration: 1.3 }, at + 0.4);
+    aparece(encDet, at + 1.5);
+    at = tl.duration(); tl.addLabel('s2', at);
+
+    // s3: imagen nueva → cada parche entra al encoder y sale como vector (≈ 2,8 s)
+    head.a(tl, 3, at);
+    aparece(imG, at + 0.3);
+    traza(fl1, at + 0.7, 0.5);
+    PAR.forEach((im, k) => {
+      const t0 = at + 1.0 + 0.025 * k;
+      tl.to(im, { opacity: 1, duration: 0.1 }, t0)
+        .to(im, { attr: { x: ENC.x + 20, y: CY - q / 4, width: q / 2, height: q / 2 }, opacity: 0, duration: 0.7, ease: 'power2.in' }, t0 + 0.05);
+      tl.to(VEC[k].g, { opacity: 1, duration: 0.2 }, t0 + 0.6)
+        .to(VEC[k].g, { attr: { transform: tr(gx(k), gy(k)) }, duration: 0.8 }, t0 + 0.6);
+    });
+    traza(fl2, at + 1.4, 0.5);
+    aparece(n36, at + 2.5);
+    at = tl.duration(); tl.addLabel('s3', at);
+
+    // s4: average pooling: los 36 vectores viajan al mismo lugar y se funden en uno (≈ 2,2 s)
+    head.a(tl, 4, at);
+    traza(fl3, at + 0.4, 0.5);
+    GHO.forEach((v, k) => {
+      tl.set(v.g, { opacity: 0.85 }, at + 0.7 + 0.012 * k);
+      tl.to(v.g, { attr: { transform: tr(POOL.x + 4, CY - GR.h / 2, 1, 1) }, opacity: 0, duration: 1.0, ease: 'power2.in' }, at + 0.7 + 0.012 * k);
+    });
+    tl.to(pool.g, { opacity: 1, duration: 0.3 }, at + 1.3)
+      .to(pool.g, { attr: { transform: tr(POOL.x, CY - POOL.h / 2, 1, 1) }, duration: 0.8 }, at + 1.3);
+    aparece(poolTxt, at + 1.6);
+    at = tl.duration(); tl.addLabel('s4', at);
+
+    // s5: encima, un clasificador lineal: lo único que se entrena (≈ 1,8 s)
+    head.a(tl, 5, at);
+    traza(fl4, at + 0.4, 0.5);
+    aparece(linG, at + 0.8, 0.6);
+    aparece(linTxt, at + 1.3);
+    at = tl.duration(); tl.addLabel('s5', at);
+
+    // s6: probabilidades de cada clase (≈ 1,9 s)
+    head.a(tl, 6, at);
+    traza(fl5, at + 0.4, 0.5);
+    aparece(clG, at + 0.8, 0.4);
+    barras.forEach((b, i) => tl.to(b.r, { attr: { width: b.w }, duration: 0.9, ease: 'power2.out' }, at + 1.0 + i * 0.1));
+    at = tl.duration(); tl.addLabel('s6', at);
+
+    // s7: la nota final (≈ 1,4 s)
+    head.a(tl, 7, at);
+    aparece(nota, at + 0.5, 0.8);
+    at = tl.duration(); tl.addLabel('s7', at);
+
+    A.pasos(root, tl);
+  }
+})();
+</script>

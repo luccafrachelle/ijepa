@@ -267,7 +267,7 @@ Cada bloque objetivo se predice en una secuencia aparte, así que los tokens de 
 ```
 :::
 
-El ancho interno del predictor es 384 aunque el encoder sea mucho más ancho (1024 en un ViT-L), y tiene 12 capas para los encoders grandes (6 para el ViT-B). El paper mide las dos cosas. Ensanchar el predictor a 1024 baja el resultado con ajuste fino sobre el 1 % de las etiquetas de 70,7 a 68,4 (ViT-L/16, 600 épocas; tabla 14), así que el cuello de botella en el ancho ayuda. Con la profundidad pasa lo contrario: con evaluación lineal, 12 capas dan 66,9 y 6 capas, 64,0 (ViT-L/16, 500 épocas; tabla 12) [@assran2023ijepa].
+El ancho interno del predictor es 384 aunque el encoder sea mucho más ancho (1024 en un ViT-L), y tiene 12 capas para los encoders grandes (6 para el ViT-B). El paper mide las dos cosas. Ensanchar el predictor a 1024 baja el resultado con fine-tuning sobre el 1 % de las etiquetas de 70,7 a 68,4 (ViT-L/16, 600 épocas; tabla 14), así que el cuello de botella en el ancho ayuda. Con la profundidad pasa lo contrario: con evaluación lineal, 12 capas dan 66,9 y 6 capas, 64,0 (ViT-L/16, 500 épocas; tabla 12) [@assran2023ijepa].
 
 ### Pasos 6 y 7: la pérdida y la actualización
 
@@ -395,7 +395,7 @@ En un método de este tipo, que la pérdida baje no quiere decir que el entrenam
 
 ## Qué muestran los resultados {#sec-resultados}
 
-El protocolo principal es la evaluación lineal. Después del preentrenamiento sin etiquetas en ImageNet-1k se descartan el encoder de contexto y el predictor, se congela el encoder objetivo, se promedian (average pooling) las salidas de los parches de cada imagen y encima se entrena sólo un clasificador lineal. Así salen la tabla 1 y las de transferencia (el paper reporta lo mejor entre la última capa y la concatenación de las cuatro últimas), y también las ablaciones con el 1 % de las etiquetas. Los resultados con el 1 % de la tabla 2, en cambio, son con ajuste fino del encoder (protocolo de MAE, 50 épocas).
+El protocolo principal es la evaluación lineal. Después del preentrenamiento sin etiquetas en ImageNet-1k se descartan el encoder de contexto y el predictor, se congela el encoder objetivo, se promedian (average pooling) las salidas de los parches de cada imagen y encima se entrena sólo un clasificador lineal. Así salen la tabla 1 y las de transferencia (el paper reporta lo mejor entre la última capa y la concatenación de las cuatro últimas), y también las ablaciones con el 1 % de las etiquetas. Los resultados con el 1 % de la tabla 2, en cambio, son con fine-tuning del encoder (protocolo de MAE, 50 épocas).
 
 ::: {.column-page-right}
 ```{=html}
@@ -411,13 +411,13 @@ El protocolo principal es la evaluación lineal. Después del preentrenamiento s
 <div class="ot-widget" data-widget="resultados" data-alt="Gráfico de puntos con los resultados reportados de I-JEPA y otros métodos en evaluación lineal, con 1 por ciento de etiquetas y en tareas de bajo nivel">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Números de las tablas 1, 2 y 4 de Assran et al. (2023). En la tabla 2 (1 % de etiquetas), I-JEPA usa ajuste fino, y cada uno de los demás métodos, lo mejor entre ajuste fino y evaluación lineal. En rojo, I-JEPA; en azul, otros métodos sin aumentos de vista diseñados a mano; en gris, los que sí los usan. Las arquitecturas y cantidades de épocas difieren, como en el paper.</p>
+<p class="leyenda">Números de las tablas 1, 2 y 4 de Assran et al. (2023). En la tabla 2 (1 % de etiquetas), I-JEPA usa fine-tuning, y cada uno de los demás métodos, lo mejor entre fine-tuning y evaluación lineal. En rojo, I-JEPA; en azul, otros métodos sin aumentos de vista diseñados a mano; en gris, los que sí los usan. Las arquitecturas y cantidades de épocas difieren, como en el paper.</p>
 ```
 :::
 
 En evaluación lineal, entre los métodos sin aumentos de vista diseñados a mano (I-JEPA sí aplica un recorte aleatorio a su única vista), I-JEPA con ViT-H/14 llega a 79,3 en 300 épocas, por encima de MAE (77,2) y data2vec (77,3), que entrenan 1600. Un ViT-H/16 preentrenado a 448 px llega a 81,1, a la par de iBOT (81,0), que sí usa aumentos.
 
-Con el 1 % de las etiquetas (12 o 13 imágenes por clase) y ajuste fino, I-JEPA con ViT-H/14 empata con data2vec con ViT-L/16 (73,3) y supera a MAE (71,5). El ViT-H/16 a 448 px llega a 77,3, por encima de MSN (75,7), el mejor de los métodos con aumentos en esa tabla.
+Con el 1 % de las etiquetas (12 o 13 imágenes por clase) y fine-tuning, I-JEPA con ViT-H/14 empata con data2vec con ViT-L/16 (73,3) y supera a MAE (71,5). El ViT-H/16 a 448 px llega a 77,3, por encima de MSN (75,7), el mejor de los métodos con aumentos en esa tabla.
 
 En transferencia y tareas de bajo nivel la comparación es más pareja. Los métodos basados en invariancia tienden a perder información local, porque se entrenan justamente para ignorar ese tipo de diferencias. En predicción de profundidad sobre Clevr, I-JEPA (72,4) iguala a MAE y supera de lejos a DINO (53,4) e iBOT (62,8). En conteo de objetos queda por debajo de MAE (86,7 contra 90,5), y en transferencia a iNaturalist 2018, por debajo de DINO e iBOT (47,6 contra 55,9 y 57,3).
 
@@ -447,7 +447,7 @@ Lo que se repite entre muestras es lo que la predicción contiene; lo que varía
 Separo lo que sale de los números del propio paper de lo que es lectura mía. Primero, lo que muestran los datos:
 
 - *Sensibilidad a la máscara.* Las ablaciones de la sección 6 muestran saltos de decenas de puntos por cambios chicos en la escala o en la cantidad de bloques: el método depende de una configuración bien afinada.
-- *No gana en todo.* En iNaturalist queda detrás de DINO e iBOT; en conteo, detrás de MAE; con ajuste fino completo en ImageNet saca 87,1 contra 87,8 de MAE, aunque con 5,3 veces menos épocas.
+- *No gana en todo.* En iNaturalist queda detrás de DINO e iBOT; en conteo, detrás de MAE; con fine-tuning completo en ImageNet saca 87,1 contra 87,8 de MAE, aunque con 5,3 veces menos épocas.
 - *Comparaciones no controladas.* Las tablas enfrentan arquitecturas, resoluciones y cantidades de épocas distintas. Es lo habitual en el área, pero así no se aísla el efecto del método.
 - *Sin garantía contra el colapso.* Se evita con un diseño que funciona en la práctica; el paper remite a análisis en escenarios simplificados.
 

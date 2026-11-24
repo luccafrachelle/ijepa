@@ -1,1 +1,538 @@
-<script>/* m-datos: widgets migrados a SVG + GSAP (ver widgets/anim.html). Vacío hasta que se migren. */</script>
+<script>
+/* m-datos: widgets de datos migrados a SVG + GSAP (sobre widgets/anim.html).
+   Reemplazan (mismo nombre, incluidos después) a:
+     resultados  (widgets/ijepa.html)       slide «Resultados» y sección 8 del blog
+     regs, grilla, rango (widgets/experimento.html)   apéndice de la charla y sección 11 del blog
+   Los números son los mismos de los widgets viejos (tablas 1, 2 y 4 del paper; tabla_grilla.csv
+   y collapse.csv del experimento). */
+(function () {
+  const K = window.OTK, A = window.OTA, C = A.C;
+  const el = (t, a, p) => A.el(t, a, p), tr = A.tr;
+  const coma = (v, d = 1) => v.toFixed(d).replace('.', ',');
+  const fmt = v => Math.round(v * 100) / 100;
+  const ocultar = (...xs) => xs.flat().forEach(x => { x.style.opacity = 0; });
+
+  // dos líneas que se reemplazan en el mismo lugar (A.rotulos para textos de dos renglones)
+  function rotulos2(padre, pares, o) {
+    const R = { items: pares.map(([a, b]) => {
+      const g = el('g', { transform: tr(0, 0) }, padre);
+      A.texto(g, a, o.x, o.y, { size: o.size, weight: o.w1 || '600', color: o.color });
+      if (b) A.texto(g, b, o.x, o.y + o.dy, { size: o.size, weight: o.w2 || '400', color: o.color });
+      g.style.opacity = 0; return g;
+    }) };
+    R.set = i => R.items.forEach((g, j) => { g.style.opacity = j === i ? 1 : 0; });
+    R.a = (tl, i, at) => {
+      tl.to(R.items.filter((_, j) => j !== i), { opacity: 0, attr: { transform: tr(0, -8) }, duration: 0.35 }, at);
+      if (i >= 0) tl.fromTo(R.items[i], { opacity: 0, attr: { transform: tr(0, 10) } }, { opacity: 1, attr: { transform: tr(0, 0) }, duration: 0.55, immediateRender: false }, at + 0.25);
+    };
+    return R;
+  }
+
+  // ============================================================ resultados reportados (tablas 1, 2 y 4)
+  // Paradas: s0 lineal (ejes) · s1 lineal sin aumentos · s2 lineal con aumentos · s3 1 % de etiquetas · s4 bajo nivel
+  const VR = {
+    lineal: { titulo: 'Evaluación lineal en ImageNet-1k (top-1, %)', min: 74, max: 83, filas: [
+      ['MAE', 'ViT-H/14', 77.2, 0, '1600 épocas'], ['data2vec', 'ViT-L/16', 77.3, 0, '1600 épocas'], ['CAE', 'ViT-L/16', 78.1, 0, '1600 épocas'],
+      ['I-JEPA', 'ViT-H/14', 79.3, 0, '300 épocas'], ['I-JEPA', 'ViT-H/16 a 448 px', 81.1, 0, '300 épocas'],
+      ['SimCLR v2', 'RN152 (2×)', 79.1, 1, '800 épocas'], ['DINO', 'ViT-B/8', 80.1, 1, '300 épocas'], ['iBOT', 'ViT-L/16', 81.0, 1, '250 épocas']] },
+    uno: { titulo: 'ImageNet con el 1 % de las etiquetas: lo mejor entre fine-tuning y lineal (I-JEPA: fine-tuning)', min: 66, max: 79, filas: [
+      ['MAE', 'ViT-H/14', 71.5, 0, ''], ['data2vec', 'ViT-L/16', 73.3, 0, ''],
+      ['I-JEPA', 'ViT-H/14', 73.3, 0, ''], ['I-JEPA', 'ViT-H/16 a 448 px', 77.3, 0, ''],
+      ['iBOT', 'ViT-B/16', 69.7, 1, ''], ['DINO', 'ViT-B/8', 70.0, 1, ''], ['MSN', 'ViT-B/4', 75.7, 1, '']] },
+    bajo: { titulo: 'Tarea de bajo nivel: profundidad en Clevr/Dist (lineal, %)', min: 50, max: 76, filas: [
+      ['data2vec', 'ViT-L/16', 71.3, 0, 'conteo 85,3'], ['MAE', 'ViT-H/14', 72.4, 0, 'conteo 90,5'], ['I-JEPA', 'ViT-H/14', 72.4, 0, 'conteo 86,7'],
+      ['DINO', 'ViT-B/8', 53.4, 1, 'conteo 86,6'], ['iBOT', 'ViT-L/16', 62.8, 1, 'conteo 85,7']] } };
+
+  K.register('resultados', root => {
+    const S = A.svg(root, 1100, 440);
+    A.cuandoFuentes(() => resultados(root, S));
+  });
+
+  function resultados(root, S) {
+    const X0 = 300, X1 = 880, Y0 = 58, HG = 30;
+    const titulo = A.rotulos(S, ['lineal', 'uno', 'bajo'].map(k => VR[k].titulo), { x: 20, y: 30, size: 20, weight: '600', color: C.navy });
+    titulo.set(0);
+
+    function vista(D) {
+      const g = el('g', {}, S);
+      const X = v => X0 + (v - D.min) / (D.max - D.min) * (X1 - X0);
+      const paso = D.filas.length > 7 ? 35 : D.filas.length > 5 ? 40 : 48;
+      const yEje = Y0 + D.filas.length * paso + 2 * HG;
+      const step = D.max - D.min > 15 ? 4 : 2;
+      for (let v = Math.ceil(D.min / 2) * 2; v <= D.max; v += step) {
+        el('line', { x1: fmt(X(v)), x2: fmt(X(v)), y1: Y0 - 2, y2: yEje - 8, stroke: C.grid, 'stroke-width': 1 }, g);
+        A.texto(g, String(v), X(v), yEje + 12, { size: 16, color: C.grey, anchor: 'middle' });
+      }
+      A.texto(g, 'números de las tablas 1, 2 y 4 del paper', 20, yEje + 12, { size: 16, color: C.grey });
+      A.texto(g, 'el eje no empieza en cero', 1100, yEje + 12, { size: 16, color: C.grey, anchor: 'end' });
+      const grupos = [{ cab: null, etq: [], filas: [] }, { cab: null, etq: [], filas: [] }];
+      let y = Y0, grupo = -1;
+      for (const f of D.filas) {
+        if (f[3] !== grupo) {
+          grupo = f[3];
+          grupos[grupo].cab = A.texto(g, grupo ? 'Con aumentos de vista diseñados a mano' : 'Sin aumentos de vista diseñados a mano', 20, y + 20, { size: 16, weight: '600', color: C.grey2 });
+          y += HG;
+        }
+        const yo = y + paso / 2, ij = f[0] === 'I-JEPA', col = ij ? C.coralD : grupo ? C.grey : C.blue, xv = X(f[2]);
+        const G = grupos[grupo];
+        G.etq.push(A.texto(g, f[0], 20, yo + 6, { size: 18, weight: ij ? '600' : '500', color: ij ? C.coralD : C.navy }));
+        G.etq.push(A.texto(g, f[1], 128, yo + 6, { size: 16, color: C.grey2 }));
+        const linea = el('line', { x1: X0, y1: yo, x2: X0, y2: yo, stroke: col, 'stroke-opacity': 0.45, 'stroke-width': ij ? 4 : 2.5, 'stroke-linecap': 'round' }, g);
+        const punto = el('circle', { cx: X0, cy: yo, r: ij ? 9 : 7, fill: col }, g);
+        const val = A.texto(g, coma(f[2]), xv + 16, yo + 6, { size: 18, weight: ij ? '600' : '500', color: ij ? C.coralD : C.navy });
+        const nota = f[4] ? A.texto(g, f[4], xv + 64, yo + 6, { size: 16, color: C.grey2 }) : null;
+        ocultar(punto, val); if (nota) ocultar(nota);
+        G.filas.push({ linea, punto, val, nota, xv });
+        y += paso;
+      }
+      return { g, grupos };
+    }
+    const VL = vista(VR.lineal), VU = vista(VR.uno), VB = vista(VR.bajo);
+    ocultar(VU.g, VB.g, VL.grupos[1].cab, VL.grupos[1].etq);
+
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    // barras que crecen: el punto viaja desde el borde izquierdo hasta su valor
+    const crecer = (filas, at, sep) => filas.forEach((r, i) => {
+      const t0 = at + i * sep;
+      tl.to(r.punto, { opacity: 1, duration: 0.2 }, t0)
+        .to(r.linea, { attr: { x2: r.xv }, duration: 1.1, ease: 'power2.out' }, t0)
+        .to(r.punto, { attr: { cx: r.xv }, duration: 1.1, ease: 'power2.out' }, t0)
+        .to([r.val, r.nota].filter(Boolean), { opacity: 1, duration: 0.4 }, t0 + 0.9);
+    });
+    tl.addLabel('s0', 0);
+    // s1: lineal, métodos sin aumentos (I-JEPA al final)
+    let at = 0.2;
+    crecer(VL.grupos[0].filas, at, 0.28);
+    at = tl.duration(); tl.addLabel('s1', at);
+    // s2: lineal, métodos con aumentos
+    tl.to([VL.grupos[1].cab, ...VL.grupos[1].etq], { opacity: 1, duration: 0.6 }, at + 0.1);
+    crecer(VL.grupos[1].filas, at + 0.6, 0.28);
+    at = tl.duration(); tl.addLabel('s2', at);
+    // s3 y s4: cambio de vista
+    [[VL, VU, 1], [VU, VB, 2]].forEach(([vieja, nueva, k]) => {
+      titulo.a(tl, k, at);
+      tl.to(vieja.g, { opacity: 0, duration: 0.5 }, at)
+        .to(nueva.g, { opacity: 1, duration: 0.6 }, at + 0.45);
+      crecer(nueva.grupos[0].filas, at + 0.8, 0.22);
+      crecer(nueva.grupos[1].filas, at + 0.8 + 0.22 * nueva.grupos[0].filas.length + 0.25, 0.22);
+      at = tl.duration(); tl.addLabel('s' + (k + 2), at);
+    });
+    A.pasos(root, tl);
+  }
+
+  // ============================================================ regularizadores, por arriba
+  // Paradas (las cuatro del texto del blog): s0 el lote · s1 qué hace cada término ·
+  // s2 sombra sobre una dirección e histograma · s3 muchas direcciones
+  K.register('regs', root => {
+    const S = A.svg(root, 1100, 440);
+    A.cuandoFuentes(() => regs(root, S));
+  });
+
+  function regs(root, S) {
+    const NP = 220, r = K.mulberry(11), g = () => K.gauss(r);
+    const ang0 = 0.55, P0 = [...Array(NP)].map(() => {
+      const a = 1.35 * g(), b = 0.32 * g();
+      return [0.35 + a * Math.cos(ang0) - b * Math.sin(ang0), 0.2 + a * Math.sin(ang0) + b * Math.cos(ang0)];
+    });
+    const PG = [...Array(NP)].map(() => [g(), g()]);
+    const RAD = 1.45;
+    const ANG = P0.map(p => Math.atan2(p[1], p[0]));
+    const orden = ANG.map((a, i) => [a, i]).sort((x, y) => x[0] - y[0]);
+    const TH = Array(NP); orden.forEach(([a, i], k) => { TH[i] = -Math.PI + 2 * Math.PI * (k + 0.5) / NP; });
+    const ux = [Math.cos(ang0), Math.sin(ang0)];
+    const P1 = P0.map(p => { const c = (p[0] - 0.35) * ux[0] + (p[1] - 0.2) * ux[1]; return [0.35 + c * ux[0], 0.2 + c * ux[1]]; });
+    const P2 = TH.map(a => [RAD * Math.cos(a), RAD * Math.sin(a)]);
+    const FIN = [P1, PG, P2];
+    const PAN = [
+      { titulo: 'Sin regularizador', sub: 'nada impide achicarse a pocas dimensiones', col: C.blue },
+      { titulo: 'SIGReg (LeJEPA)', sub: 'empuja hacia una gaussiana isótropa', col: C.teal },
+      { titulo: 'SUSReg (SPHERE-JEPA)', sub: 'normaliza y reparte parejo en la esfera', col: C.coralD }
+    ];
+    const SC = 42, CY = 158, HB = { y: 278, w: 300, h: 64 }, NB = 20, LIM = 3;
+    const PHI = [0.55, 0.99, 1.43, 1.87, 2.31, 2.75];
+    const deg = a => fmt(-a * 180 / Math.PI);
+    const rot = (cx, a) => `translate(${cx},${CY}) rotate(${deg(a)})`;
+    const polar = (cx, rr, a) => `translate(${cx},${CY}) rotate(${deg(a)}) translate(${fmt(rr * SC)},0)`;
+    const proy = (p, a) => p[0] * Math.cos(a) + p[1] * Math.sin(a);
+    const esc = HB.h / (NP * (2 * LIM / NB) * 0.62), bw = HB.w / NB;
+    const hist = (pts, a) => { const h = Array(NB).fill(0); pts.forEach(p => { const b = Math.floor((proy(p, a) + LIM) / (2 * LIM) * NB); if (b >= 0 && b < NB) h[b]++; }); return h.map(c => Math.min(HB.h, c * esc)); };
+
+    const P = PAN.map((pan, j) => {
+      const x0 = 8 + j * 366, cx = x0 + 172, hx = x0 + 22;
+      const G = el('g', {}, S);
+      A.texto(G, pan.titulo, x0 + 8, 26, { size: 19, weight: '600', color: pan.col });
+      const sub = A.rotulos(G, ['el mismo lote de embeddings', pan.sub], { x: x0 + 8, y: 50, size: 16, color: C.grey2 }); sub.set(0);
+      const clip = S.uid('clip');
+      el('rect', { x: x0 + 6, y: 60, width: 340, height: 200 }, el('clipPath', { id: clip }, S.defs));
+      const Z = el('g', { 'clip-path': `url(#${clip})` }, G);
+      el('path', { d: `M${cx - 150},${CY}h300M${cx},${CY - 100}v200`, stroke: C.grid, 'stroke-width': 1, fill: 'none' }, Z);
+      const forma = el('g', { fill: 'none', stroke: pan.col, 'stroke-width': 1.5, 'stroke-dasharray': '4 4', 'stroke-opacity': 0.55 }, Z);
+      if (j === 1) [1, 2].forEach(k => el('circle', { cx, cy: CY, r: k * SC }, forma));
+      if (j === 2) el('circle', { cx, cy: CY, r: RAD * SC }, forma);
+      forma.style.opacity = 0;
+      // direcciones ya usadas (rastro), dirección actual y sombras (en coordenadas de la recta)
+      const rastro = PHI.slice(0, -1).map(a => el('line', { x1: -140, x2: 140, y1: 0, y2: 0, transform: rot(cx, a), stroke: C.navy, 'stroke-opacity': 0.16, 'stroke-width': 1 }, Z));
+      ocultar(rastro);
+      const conect = el('g', { stroke: C.navy, 'stroke-opacity': 0.2, 'stroke-width': 0.8 }, Z); conect.style.opacity = 0;
+      const pts = el('g', {}, Z);
+      const dots = P0.map((p, i) => j === 2
+        ? el('circle', { cx: 0, cy: 0, r: 2.5, transform: polar(cx, Math.hypot(p[0], p[1]), ANG[i]), fill: pan.col, 'fill-opacity': 0.55 }, pts)
+        : el('circle', { cx: fmt(cx + p[0] * SC), cy: fmt(CY - p[1] * SC), r: 2.5, fill: pan.col, 'fill-opacity': 0.55 }, pts));
+      FIN[j].forEach((p, i) => { if (i % 9) return; const u = proy(p, PHI[0]);
+        el('line', { x1: fmt(cx + p[0] * SC), y1: fmt(CY - p[1] * SC), x2: fmt(cx + u * Math.cos(PHI[0]) * SC), y2: fmt(CY - u * Math.sin(PHI[0]) * SC) }, conect); });
+      const dir = el('g', { transform: rot(cx, PHI[0]) }, Z);
+      const recta = el('line', { x1: -140, x2: 140, y1: 0, y2: 0, stroke: C.navy, 'stroke-opacity': 0.75, 'stroke-width': 1.6, 'stroke-dasharray': '6 4' }, dir);
+      recta.style.opacity = 0;
+      // cada sombra arranca sobre su punto (coordenadas locales de la recta) y viaja hasta la recta
+      const vloc = p => fmt(-SC * (-p[0] * Math.sin(PHI[0]) + p[1] * Math.cos(PHI[0])));
+      const sombras = FIN[j].map(p => el('rect', { x: fmt(proy(p, PHI[0]) * SC - 1.2), y: fmt(vloc(p) - 1.2), width: 2.4, height: 2.4, fill: C.navy, 'fill-opacity': 0.55 }, dir));
+      ocultar(sombras);
+      // histograma
+      const H = el('g', {}, G); H.style.opacity = 0;
+      el('rect', { x: hx - 6, y: HB.y - 6, width: HB.w + 12, height: HB.h + 12, rx: 8, fill: '#fafafc' }, H);
+      const barras = [...Array(NB)].map((_, b) => el('rect', { x: fmt(hx + b * bw + 1), y: HB.y + HB.h, width: fmt(bw - 2), height: 0, fill: pan.col, 'fill-opacity': 0.5 }, H));
+      let curva = null;
+      if (j > 0) {
+        let d = '', nuevo = true;
+        for (let k = 0; k <= 120; k++) {
+          const x = -LIM + 2 * LIM * k / 120;
+          const f = j === 1 ? Math.exp(-x * x / 2) / Math.sqrt(2 * Math.PI) : (Math.abs(x) < RAD * 0.995 ? 1 / (Math.PI * Math.sqrt(RAD * RAD - x * x)) : NaN);
+          if (isNaN(f)) { nuevo = true; continue; }
+          const yy = HB.y + HB.h - Math.min(HB.h, f * NP * esc * (2 * LIM / NB)), X = hx + (x + LIM) / (2 * LIM) * HB.w;
+          d += (nuevo ? 'M' : 'L') + fmt(X) + ',' + fmt(yy); nuevo = false;
+        }
+        curva = el('path', { d, fill: 'none', stroke: C.navy, 'stroke-width': 2 }, H);
+        curva.style.opacity = 0;
+      }
+      A.texto(H, j === 0 ? 'sombra del lote sobre la dirección' : 'sombra del lote (barras) y la buscada (línea)', hx - 4, HB.y + HB.h + 26, { size: 15, color: C.grey2 });
+      const alturas = PHI.map(a => hist(FIN[j], a));
+      return { j, cx, sub, forma, rastro, conect, dots, dir, recta, sombras, H, barras, curva, alturas };
+    });
+
+    // pie: número del paso (1–4, como en el texto del blog) y nota
+    el('rect', { x: 0, y: 384, width: 34, height: 32, rx: 8, fill: C.blue }, S);
+    const num = A.rotulos(S, ['1', '2', '3', '4'], { x: 17, y: 407, size: 20, weight: '600', color: '#fff', anchor: 'middle' }); num.set(0);
+    const nota = rotulos2(S, [
+      ['Cada punto es el embedding de una imagen del lote', 'Esquema en 2D; en el experimento, 256 dimensiones.'],
+      ['Sin regularizador nada impide el colapso dimensional;', 'cada regularizador empuja el lote hacia una forma fija.'],
+      ['Para medir la forma, el lote se proyecta sobre una dirección al azar', 'y esa sombra se compara con la de la forma buscada.'],
+      ['Se repite con muchas direcciones (1024 por paso):', 'si todas las sombras coinciden, la distribución coincide.']
+    ], { x: 48, y: 398, dy: 24, size: 17, color: C.navy });
+    nota.set(0);
+
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    tl.addLabel('s0', 0);
+    // s1: cada regularizador lleva el lote a su forma
+    let at = 0;
+    num.a(tl, 1, at); nota.a(tl, 1, at);
+    P.forEach(p => {
+      p.sub.a(tl, 1, at);
+      tl.to(p.forma, { opacity: 1, duration: 0.6 }, at + 0.3);
+      if (p.j < 2) tl.to(p.dots, { attr: { cx: i => fmt(p.cx + FIN[p.j][i][0] * SC), cy: i => fmt(CY - FIN[p.j][i][1] * SC) }, duration: 1.8 }, at + 0.5);
+      else tl.to(p.dots, { attr: { transform: i => polar(p.cx, RAD, ANG[i]) }, duration: 0.9 }, at + 0.5)
+        .to(p.dots, { attr: { transform: i => polar(p.cx, RAD, TH[i]) }, duration: 1.1 }, at + 1.45);
+    });
+    at = tl.duration(); tl.addLabel('s1', at);
+    // s2: una dirección; cada punto deja su sombra sobre la recta y se arma el histograma
+    num.a(tl, 2, at); nota.a(tl, 2, at);
+    P.forEach(p => {
+      tl.to(p.dots, { attr: { 'fill-opacity': 0.3 }, duration: 0.6 }, at + 0.3)
+        .to(p.recta, { opacity: 1, duration: 0.5 }, at + 0.3)
+        .to(p.conect, { opacity: 1, duration: 0.5 }, at + 0.6)
+        .to(p.sombras, { opacity: 1, duration: 0.3 }, at + 0.6)
+        .to(p.sombras, { attr: { y: -1.2 }, duration: 1.2, stagger: { each: 0.002, from: 'random' } }, at + 0.7)
+        .to(p.H, { opacity: 1, duration: 0.4 }, at + 1.5)
+        .to(p.barras, { attr: { y: b => fmt(HB.y + HB.h - p.alturas[0][b]), height: b => fmt(p.alturas[0][b]) }, duration: 0.9, ease: 'power2.out' }, at + 1.7);
+      if (p.curva) tl.to(p.curva, { opacity: 1, duration: 0.5 }, at + 2.4);
+    });
+    at = tl.duration(); tl.addLabel('s2', at);
+    // s3: la dirección gira; queda el rastro de las ya usadas y las sombras cambian
+    num.a(tl, 3, at); nota.a(tl, 3, at);
+    P.forEach(p => tl.to(p.conect, { opacity: 0, duration: 0.4 }, at));
+    PHI.slice(1).forEach((a, k) => {
+      const t0 = at + 0.5 + k * 0.6;
+      P.forEach(p => {
+        tl.to(p.rastro[k], { opacity: 1, duration: 0.3 }, t0)
+          .to(p.dir, { attr: { transform: rot(p.cx, a) }, duration: 0.5 }, t0)
+          .to(p.sombras, { attr: { x: i => fmt(proy(FIN[p.j][i], a) * SC - 1.2) }, duration: 0.5 }, t0)
+          .to(p.barras, { attr: { y: b => fmt(HB.y + HB.h - p.alturas[k + 1][b]), height: b => fmt(p.alturas[k + 1][b]) }, duration: 0.5 }, t0);
+      });
+    });
+    at = tl.duration(); tl.addLabel('s3', at);
+    A.pasos(root, tl);
+  }
+
+  // ============================================================ resultados de la grilla 2 × 3
+  const CEL = {
+    C1: { ema: true, reg: '—', lin: [43.40, 0.22], knn: [38.05, 0.87] },
+    C2: { ema: false, reg: '—', lin: [19.44, null], knn: [14.70, null] },
+    C3: { ema: true, reg: 'SIGReg', lin: [28.37, 0.70], knn: [23.18, 1.00] },
+    C4: { ema: false, reg: 'SIGReg', lin: [25.03, 0.33], knn: [21.81, 0.24] },
+    C5: { ema: true, reg: 'SUSReg', lin: [26.45, 1.48], knn: [21.26, 1.00] },
+    C6: { ema: false, reg: 'SUSReg', lin: [21.57, 0.66], knn: [19.28, 0.58] }
+  };
+  const colReg = reg => (reg === 'SIGReg' ? C.teal : reg === 'SUSReg' ? C.coralD : C.blue);
+
+  // Paradas: s0 la tabla · s1 las seis celdas (barras) · s2 P1 · s3 P2 · s4 P3
+  K.register('grilla', root => {
+    const S = A.svg(root, 1100, 440);
+    A.cuandoFuentes(() => grilla(root, S));
+  });
+
+  function grilla(root, S) {
+    const ORD = ['C1', 'C3', 'C5', 'C2', 'C4', 'C6'];
+    const PREG = [
+      { tit: 'Las seis celdas', on: ORD, comp: [],
+        txt: ['I-JEPA tal cual (C1) queda arriba de todo. Las cuatro celdas con regularizador', 'se agrupan entre 19 y 28 puntos; el control sin EMA ni regularizador (C2) queda último.'] },
+      { tit: 'P1 · ¿El regularizador reemplaza al EMA?', on: ['C1', 'C4', 'C6'], comp: [['C1', 'C4'], ['C1', 'C6']],
+        txt: ['No. Sin EMA quedan 16 a 22 puntos debajo de I-JEPA. Pero con regularizador el EMA', 'sólo suma 1,4 a 4,9 puntos: lo que más resta es el propio regularizador (ver P3).'] },
+      { tit: 'P2 · ¿Esfera o gaussiana?', on: ['C3', 'C5', 'C4', 'C6'], comp: [['C3', 'C5'], ['C4', 'C6']],
+        txt: ['La esfera no ayuda acá: sin EMA gana la gaussiana (3,5 puntos, distinguible);', 'con EMA la diferencia (1,9) no llega al umbral. Al revés de lo esperado.'] },
+      { tit: 'P3 · ¿EMA y regularizador se suman?', on: ['C1', 'C3', 'C5'], comp: [['C1', 'C3'], ['C1', 'C5']],
+        txt: ['No: se restan. Agregarle el regularizador a I-JEPA le quita 15 a 17 puntos,', 'con el λ elegido en las celdas sin EMA (con EMA podría convenir uno menor).'] }
+    ];
+    const G = { x: 20, y: 82, cw: 118, ch: 66, gap: 8, lx: 92 };
+    const B = { x: 470, y: 64, w: 620, h: 236, max: 60 };
+    const xb = k => B.x + 26 + k * 92 + (k >= 3 ? 26 : 0);
+    const yv = v => B.y + B.h - B.h * v / B.max;
+    const LW = 32, KX = 40, KW = 24;
+
+    // ---- tabla
+    A.texto(S, 'La grilla', G.x, 30, { size: 20, weight: '600', color: C.navy });
+    A.texto(S, 'con EMA', G.x + G.lx + G.cw / 2, G.y - 14, { size: 16, weight: '600', color: C.navy, anchor: 'middle' });
+    A.texto(S, 'sin EMA', G.x + G.lx + G.cw * 1.5 + G.gap, G.y - 14, { size: 16, weight: '600', color: C.navy, anchor: 'middle' });
+    const celda = {};
+    ['—', 'SIGReg', 'SUSReg'].forEach((reg, i) => {
+      const y = G.y + i * (G.ch + G.gap), col = colReg(reg);
+      A.texto(S, reg === '—' ? 'sin reg.' : reg, G.x + G.lx - 8, y + G.ch / 2 + 6, { size: 16, weight: '600', color: col, anchor: 'end' });
+      [true, false].forEach((ema, jj) => {
+        const id = Object.keys(CEL).find(k => CEL[k].ema === ema && CEL[k].reg === reg), c = CEL[id];
+        const x = G.x + G.lx + jj * (G.cw + G.gap), g = el('g', {}, S);
+        el('rect', { x, y, width: G.cw, height: G.ch, rx: 10, fill: col, 'fill-opacity': 0.12, stroke: col, 'stroke-width': id === 'C1' ? 2.6 : 1.4 }, g);
+        A.texto(g, id, x + 10, y + 22, { size: 16, weight: '600', color: C.navy });
+        A.texto(g, coma(c.lin[0]), x + G.cw - 10, y + 42, { size: 22, weight: '600', color: col, anchor: 'end' });
+        A.texto(g, 'k-NN ' + coma(c.knn[0]), x + G.cw - 10, y + 60, { size: 15, color: C.grey2, anchor: 'end' });
+        celda[id] = g;
+      });
+    });
+    const yNotas = G.y + 3 * (G.ch + G.gap) + 18;
+    ['C1 = I-JEPA tal cual · C2 = control', 'ViT-Tiny/16 · ImageNet-100 · 100 épocas', '3 semillas por celda (C2: 1) · RTX 5090 Laptop']
+      .forEach((s, i) => A.texto(S, s, G.x, yNotas + i * 21, { size: 15, color: C.grey2 }));
+
+    // ---- barras
+    const tit = A.rotulos(S, PREG.map(p => p.tit), { x: B.x - 30, y: 30, size: 20, weight: '600', color: C.navy });
+    for (let v = 0; v <= B.max; v += 10) {
+      el('line', { x1: B.x, x2: B.x + B.w, y1: fmt(yv(v)), y2: fmt(yv(v)), stroke: C.grid, 'stroke-width': 1 }, S);
+      A.texto(S, String(v), B.x - 8, yv(v) + 5, { size: 15, color: C.grey2, anchor: 'end' });
+    }
+    el('rect', { x: B.x + B.w - 170, y: 18, width: 13, height: 13, rx: 2, fill: C.blue }, S);
+    A.texto(S, 'lineal', B.x + B.w - 151, 30, { size: 15, color: C.grey2 });
+    el('rect', { x: B.x + B.w - 92, y: 18, width: 13, height: 13, rx: 2, fill: C.blue, 'fill-opacity': 0.3 }, S);
+    A.texto(S, 'k-NN (%)', B.x + B.w, 30, { size: 15, color: C.grey2, anchor: 'end' });
+    const barra = {};
+    ORD.forEach((id, k) => {
+      const c = CEL[id], x = xb(k), col = colReg(c.reg), g = el('g', {}, S);
+      const partes = [['lin', x, LW, 0.85, 16, C.navy, '600'], ['knn', x + KX, KW, 0.32, 15, C.grey2, '500']].map(([m, x0, w, fa, fs, fc, fw]) => {
+        const v = c[m][0], sd = c[m][1];
+        const rect = el('rect', { x: x0, y: B.y + B.h, width: w, height: 0, rx: 3, fill: col, 'fill-opacity': fa }, g);
+        let bigote = null;
+        if (sd) {
+          const xm = x0 + w / 2, ya = fmt(yv(v + sd)), yb = fmt(yv(v - sd));
+          bigote = el('path', { d: `M${xm},${ya}V${yb}M${xm - 4},${ya}h8M${xm - 4},${yb}h8`, stroke: C.navy, 'stroke-opacity': 0.8, 'stroke-width': 1.3, fill: 'none' }, g);
+          bigote.style.opacity = 0;
+        }
+        const etq = A.texto(g, coma(v), x0 + w / 2, yv(v + (sd || 0)) - 7, { size: fs, weight: fw, color: fc, anchor: 'middle' });
+        etq.style.opacity = 0;
+        return { rect, bigote, etq, y: fmt(yv(v)), h: fmt(B.y + B.h - yv(v)) };
+      });
+      A.texto(g, id, x + 32, B.y + B.h + 21, { size: 16, weight: '600', color: C.navy, anchor: 'middle' });
+      A.texto(g, c.reg === '—' ? 'sin reg.' : c.reg, x + 32, B.y + B.h + 39, { size: 15, color: col, anchor: 'middle' });
+      barra[id] = { g, partes };
+    });
+    A.texto(S, 'con EMA', (xb(0) + xb(2) + 64) / 2, B.y + B.h + 61, { size: 16, weight: '600', color: C.navy, anchor: 'middle' });
+    A.texto(S, 'sin EMA', (xb(3) + xb(5) + 64) / 2, B.y + B.h + 61, { size: 16, weight: '600', color: C.navy, anchor: 'middle' });
+
+    // ---- comparaciones: flecha de A a B con la diferencia (en lineal)
+    const comps = PREG.map(P => P.comp.map(([a, b], n) => {
+      const ka = ORD.indexOf(a), kb = ORD.indexOf(b), va = CEL[a].lin[0], vb = CEL[b].lin[0];
+      const xa = xb(ka) + LW / 2, xB = xb(kb) + LW / 2, yl = yv(Math.max(va, vb)) - 44 - n * 28;
+      const g = el('g', {}, S);
+      const yf = yv(vb) - 30;
+      const fl = A.flecha(g, [[xa, yv(va) - 30], [xa, yl], [xB, yl], [xB, yf - 2]], C.navy, { lw: 1.8, punta: false });
+      fl.setAttribute('stroke-dasharray', '1 1'); fl.setAttribute('stroke-dashoffset', 1);
+      const punta = el('path', { d: `M${fmt(xB - 5)},${fmt(yf - 8)}L${fmt(xB)},${fmt(yf)}L${fmt(xB + 5)},${fmt(yf - 8)}z`, fill: C.navy }, g);
+      punta.style.opacity = 0;
+      const dlt = vb - va, caja = el('g', {}, g);
+      el('rect', { x: (xa + xB) / 2 - 33, y: yl - 12, width: 66, height: 24, rx: 6, fill: '#fff', stroke: C.navy, 'stroke-width': 1.2 }, caja);
+      A.texto(caja, (dlt > 0 ? '+' : '−') + coma(Math.abs(dlt)), (xa + xB) / 2, yl + 6, { size: 16, weight: '600', color: C.navy, anchor: 'middle' });
+      caja.style.opacity = 0;
+      return { fl, punta, caja };
+    }));
+
+    // ---- lectura
+    const caja = el('rect', { x: 0, y: 382, width: 1100, height: 56, rx: 10, fill: C.light }, S);
+    caja.style.opacity = 0;
+    const lect = rotulos2(S, PREG.map(p => p.txt), { x: 16, y: 404, dy: 23, size: 16, color: C.navy });
+
+    // ---- línea de tiempo
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    tl.addLabel('s0', 0);
+    // s1: las seis celdas: crecen las barras (lineal y k-NN) y aparecen los desvíos
+    let at = 0;
+    tit.a(tl, 0, at);
+    ORD.forEach((id, k) => {
+      const t0 = at + 0.4 + k * 0.18;
+      barra[id].partes.forEach((p, m) => {
+        tl.to(p.rect, { attr: { y: p.y, height: p.h }, duration: 1.1, ease: 'power2.out' }, t0 + m * 0.1)
+          .to([p.bigote, p.etq].filter(Boolean), { opacity: 1, duration: 0.4 }, t0 + m * 0.1 + 1.0);
+      });
+    });
+    tl.to(caja, { opacity: 1, duration: 0.5 }, at + 1.6);
+    lect.a(tl, 0, at + 1.7);
+    at = tl.duration(); tl.addLabel('s1', at);
+    // s2–s4: cada pregunta resalta sus celdas y dibuja sus comparaciones
+    for (let q = 1; q < PREG.length; q++) {
+      const P = PREG[q];
+      tit.a(tl, q, at);
+      if (comps[q - 1].length) tl.to(comps[q - 1].flatMap(c => [c.fl, c.punta, c.caja]), { opacity: 0, duration: 0.4 }, at);
+      ORD.forEach(id => tl.to([barra[id].g, celda[id]], { opacity: P.on.includes(id) ? 1 : 0.28, duration: 0.6 }, at + 0.3));
+      comps[q].forEach((c, n) => {
+        const t0 = at + 0.9 + n * 0.6;
+        A.trazar(tl, c.fl, t0, 1.0);
+        tl.to(c.punta, { opacity: 1, duration: 0.2 }, t0 + 0.85)
+          .to(c.caja, { opacity: 1, duration: 0.4 }, t0 + 0.8);
+      });
+      lect.a(tl, q, at + 0.4);
+      at = tl.duration(); tl.addLabel('s' + (q + 1), at);
+    }
+    A.pasos(root, tl);
+  }
+
+  // ============================================================ rango efectivo durante el entrenamiento
+  // erank del avg-pool del encoder objetivo, cada 5 épocas (épocas 5…100), tres semillas por celda
+  const ER = {
+    C1: [[22.5,50.5,64.4,73.1,79.7,85.0,89.7,93.9,97.4,100.3,102.7,104.6,106.0,106.7,106.9,106.8,106.2,105.7,105.2,105.0],
+         [22.6,46.4,59.8,67.6,73.2,78.7,83.5,87.2,90.6,93.5,95.7,97.0,97.8,98.4,98.4,97.9,97.2,96.2,95.6,95.3],
+         [23.7,49.1,63.1,71.8,78.6,84.6,89.3,93.6,97.4,100.4,103.0,104.9,106.2,106.8,106.9,106.6,105.8,105.1,104.5,104.4]],
+    C2: [[9.0,17.2,22.5,26.7,29.2,27.5,24.8,26.7,29.7,30.5,27.4,26.8,28.6,28.1,27.9,27.5,27.3,28.5,27.7,27.7]],
+    C3: [[37.7,50.9,57.8,60.2,62.1,63.2,63.8,63.5,63.8,64.0,64.2,64.0,63.8,63.6,63.6,63.6,63.4,63.2,63.1,63.0],
+         [38.1,51.9,58.6,61.8,63.5,65.0,65.4,65.9,66.1,65.4,65.4,65.2,64.8,64.9,65.0,64.8,64.6,64.5,64.4,64.3],
+         [38.4,51.4,56.2,59.4,60.2,61.0,61.2,61.1,61.0,60.7,61.1,61.0,60.7,60.7,60.7,60.8,60.8,60.6,60.5,60.5]],
+    C4: [[32.8,41.3,45.5,45.3,46.7,50.4,50.0,48.0,53.9,51.2,54.1,54.7,55.3,56.9,57.2,57.3,57.2,57.2,57.1,57.2],
+         [36.6,46.2,46.9,48.0,49.8,49.8,52.2,50.4,51.9,50.0,52.9,54.1,55.8,55.7,54.5,56.4,55.4,56.4,56.3,56.4],
+         [38.1,39.3,41.1,49.0,46.9,51.8,50.5,49.5,53.7,55.8,55.0,55.6,56.4,57.9,57.8,58.5,57.7,57.8,57.7,57.5]],
+    C5: [[64.4,74.2,73.5,73.3,72.9,72.4,72.2,71.8,71.7,71.6,71.4,71.5,70.8,70.2,69.6,68.7,67.9,67.2,66.8,66.6],
+         [64.1,70.1,70.0,70.1,70.3,69.7,69.3,68.9,68.9,68.5,68.6,68.1,67.7,67.4,66.9,66.1,65.4,64.9,64.6,64.6],
+         [70.7,79.8,81.1,81.7,81.0,80.7,79.7,80.1,79.8,79.3,79.0,78.9,78.5,78.2,77.9,77.3,76.5,75.8,75.3,75.1]],
+    C6: [[67.4,57.4,51.7,54.1,59.4,59.4,55.1,55.0,52.6,54.4,54.7,51.3,54.8,55.1,55.0,55.5,55.4,54.7,54.4,54.2],
+         [70.0,61.4,60.9,60.4,58.8,58.3,58.7,57.6,57.1,54.9,57.7,57.6,60.8,59.8,60.0,60.8,60.7,59.9,59.4,59.5],
+         [68.4,69.5,67.0,61.8,60.4,58.9,58.6,58.7,57.0,56.0,57.0,55.3,57.4,58.1,57.4,58.9,58.2,57.2,57.1,57.2]]
+  };
+  const MEDIA = {}; Object.keys(ER).forEach(c => { MEDIA[c] = ER[c][0].map((_, e) => ER[c].reduce((s, a) => s + a[e], 0) / ER[c].length); });
+
+  // Paradas: s0 ejes · s1 C1 y C2 · s2 las cuatro con regularizador · s3 se estancan en 57–69 · s4 más uniforme no es mejor
+  K.register('rango', root => {
+    const S = A.svg(root, 1100, 430);
+    A.cuandoFuentes(() => rango(root, S));
+  });
+
+  function rango(root, S) {
+    const AX = { x: 66, y: 74, w: 610, h: 282, max: 120 };
+    const ex = ep => AX.x + AX.w * ep / 100, ey = v => AX.y + AX.h - AX.h * v / AX.max;
+    const ETQ = { C1: 'C1 · EMA (I-JEPA)', C2: 'C2 · sin EMA ni reg.', C3: 'C3 · EMA + SIGReg', C4: 'C4 · SIGReg sin EMA', C5: 'C5 · EMA + SUSReg', C6: 'C6 · SUSReg sin EMA' };
+    const ACC = { C1: 43.4, C2: 19.4, C3: 28.4, C4: 25.0, C5: 26.4, C6: 21.6 };
+    const ORDEN = ['C1', 'C5', 'C3', 'C6', 'C4', 'C2'];
+    const estilo = c => ({ col: colReg(CEL[c].reg), dash: CEL[c].ema ? null : '7 5' });
+
+    A.texto(S, 'Rango efectivo de las representaciones durante el entrenamiento', 20, 26, { size: 20, weight: '600', color: C.navy });
+    A.texto(S, 'cuántas de las 192 dimensiones del ViT-Tiny se usan en la práctica', 20, 52, { size: 16, color: C.grey2 });
+    for (let v = 0; v <= AX.max; v += 20) {
+      el('line', { x1: AX.x, x2: AX.x + AX.w, y1: fmt(ey(v)), y2: fmt(ey(v)), stroke: C.grid, 'stroke-width': 1 }, S);
+      A.texto(S, String(v), AX.x - 10, ey(v) + 5, { size: 15, color: C.grey2, anchor: 'end' });
+    }
+    for (let e = 0; e <= 100; e += 20) A.texto(S, String(e), ex(e), AX.y + AX.h + 22, { size: 15, color: C.grey2, anchor: 'middle' });
+    A.texto(S, 'época', AX.x + AX.w, AX.y + AX.h + 42, { size: 15, color: C.grey2, anchor: 'end' });
+    A.texto(S, 'Media de 3 semillas (C2: 1), medida sobre 10 000 imágenes de entrenamiento. Línea llena: con EMA; punteada: sin EMA.', 20, 424, { size: 15, color: C.grey2 });
+
+    // franja 57–69 (se muestra al final)
+    const franja = el('rect', { x: ex(5), y: fmt(ey(69)), width: fmt(ex(100) - ex(5)), height: fmt(ey(57) - ey(69)), fill: C.teal, 'fill-opacity': 0.13 }, S);
+    franja.style.opacity = 0;
+
+    // curvas: cada una se revela con un recorte que crece y un punto que viaja por la curva
+    const clips = [0, 1].map(() => {
+      const id = S.uid('clip'), rect = el('rect', { x: fmt(ex(5) - 8), y: 0, width: 0, height: 430 }, el('clipPath', { id }, S.defs));
+      return { id, rect };
+    });
+    const grupoDe = c => (c === 'C1' || c === 'C2' ? 0 : 1);
+    const curvas = {};
+    ['C2', 'C4', 'C6', 'C3', 'C5', 'C1'].forEach(c => {
+      const { col, dash } = estilo(c), pts = MEDIA[c].map((v, k) => [fmt(ex(5 * (k + 1))), fmt(ey(v))]);
+      const g = el('g', { 'clip-path': `url(#${clips[grupoDe(c)].id})` }, S);
+      el('path', { d: 'M' + pts.map(p => p.join(',')).join(' L'), fill: 'none', stroke: col, 'stroke-width': c === 'C1' ? 3.4 : 2.4,
+        'stroke-dasharray': dash, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, g);
+      const dot = el('circle', { cx: pts[0][0], cy: pts[0][1], r: c === 'C1' ? 5.5 : 4.5, fill: col }, S);
+      dot.style.opacity = 0;
+      curvas[c] = { pts, dot };
+    });
+
+    // leyenda con el valor final y la precisión lineal
+    const LX = 728;
+    A.texto(S, 'al final', 990, 84, { size: 15, color: C.grey2, anchor: 'end' });
+    A.texto(S, 'lineal', 1090, 84, { size: 15, color: C.grey2, anchor: 'end' });
+    const ley = {};
+    ORDEN.forEach((c, i) => {
+      const { col, dash } = estilo(c), y = 116 + i * 31;
+      el('line', { x1: LX, x2: LX + 26, y1: y - 6, y2: y - 6, stroke: col, 'stroke-width': 3, 'stroke-dasharray': dash }, S);
+      A.texto(S, ETQ[c], LX + 34, y, { size: 16, weight: c === 'C1' ? '600' : '400', color: C.navy });
+      const pend = [A.texto(S, '·', 990, y, { size: 16, weight: '600', color: col, anchor: 'end' }), A.texto(S, '·', 1090, y, { size: 16, color: C.navy, anchor: 'end' })];
+      const vals = [A.texto(S, coma(MEDIA[c][19], 0), 990, y, { size: 16, weight: '600', color: col, anchor: 'end' }), A.texto(S, coma(ACC[c]) + ' %', 1090, y, { size: 16, color: C.navy, anchor: 'end' })];
+      ocultar(vals);
+      ley[c] = { pend, vals };
+    });
+    const cajaF = el('g', {}, S); cajaF.style.opacity = 0;
+    el('rect', { x: LX, y: 310, width: 1090 - LX, height: 62, rx: 10, fill: C.light }, cajaF);
+    A.texto(cajaF, 'Más uniforme no es mejor: SIGReg', LX + 14, 335, { size: 16, weight: '600', color: C.navy });
+    A.texto(cajaF, 'es lo más uniforme y rinde 15–18 menos', LX + 14, 359, { size: 16, color: C.navy });
+
+    // notas
+    const n1 = el('g', {}, S);
+    A.texto(n1, 'los regularizadores', ex(4), ey(97), { size: 16, weight: '600', color: C.teal });
+    A.texto(n1, 'arrancan altos…', ex(4), ey(89), { size: 16, weight: '600', color: C.teal });
+    const n2 = A.texto(S, '…pero se estancan en 57–69; I-JEPA sigue subiendo', ex(27), ey(113), { size: 16, weight: '600', color: C.blue });
+    const n3 = A.texto(S, 'sin EMA ni regularizador: colapso parcial', ex(46), ey(15), { size: 16, weight: '600', color: C.blue });
+    ocultar(n1, n2, n3);
+
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    const D = 2.2, span = ex(100) - ex(5) + 16;
+    const dibujar = (cs, k, at) => {
+      tl.to(clips[k].rect, { attr: { width: fmt(span) }, duration: D, ease: 'none' }, at);
+      cs.forEach(c => {
+        const { pts, dot } = curvas[c];
+        tl.to(dot, { opacity: 1, duration: 0.2 }, at)
+          .to(dot, { keyframes: pts.slice(1).map(p => ({ attr: { cx: p[0], cy: p[1] }, duration: D / 19, ease: 'none' })) }, at)
+          .to(ley[c].pend, { opacity: 0, duration: 0.3 }, at + D)
+          .to(ley[c].vals, { opacity: 1, duration: 0.4 }, at + D + 0.1);
+      });
+    };
+    tl.addLabel('s0', 0);
+    // s1: I-JEPA (C1) y el control sin EMA ni regularizador (C2)
+    let at = 0.2;
+    dibujar(['C1', 'C2'], 0, at);
+    tl.to(n3, { opacity: 1, duration: 0.5 }, at + D + 0.2);
+    at = tl.duration(); tl.addLabel('s1', at);
+    // s2: las cuatro celdas con regularizador
+    tl.to(n1, { opacity: 1, duration: 0.5 }, at + 0.1);
+    dibujar(['C3', 'C4', 'C5', 'C6'], 1, at + 0.5);
+    at = tl.duration(); tl.addLabel('s2', at);
+    // s3: se estancan en 57–69
+    tl.to(n1, { opacity: 0.35, duration: 0.5 }, at)
+      .to(franja, { opacity: 1, duration: 0.8 }, at + 0.2)
+      .fromTo(n2, { opacity: 0, attr: { transform: tr(0, 10) } }, { opacity: 1, attr: { transform: tr(0, 0) }, duration: 0.7, immediateRender: false }, at + 0.5);
+    at = tl.duration(); tl.addLabel('s3', at);
+    // s4: más uniforme no es mejor
+    tl.to(cajaF, { opacity: 1, duration: 0.7 }, at + 0.2);
+    at = tl.duration(); tl.addLabel('s4', at);
+    A.pasos(root, tl);
+  }
+})();
+</script>

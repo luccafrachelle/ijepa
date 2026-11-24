@@ -1,1 +1,492 @@
-<script>/* m-intro: widgets migrados a SVG + GSAP (ver widgets/anim.html). Vacío hasta que se migren. */</script>
+<script>
+/* m-intro: pixlat, mascaras y mundo migrados a SVG + GSAP (sobre widgets/anim.html).
+   Reemplazan a los widgets en canvas del mismo nombre de widgets/ijepa.html (se registran después).
+   Todo cambio va en una timeline pausada con rótulos s0…sN y A.pasos la recorre (fragments en las
+   slides, botones en el blog). Lo que antes era interactivo (sliders, remuestreo, ciclos) quedó
+   como paradas fijas con semilla fija.
+
+   pixlat (1180×540, ancho completo):
+     s0 contexto: la pelota en su punto de partida · s1 un futuro posible
+     s2 varios futuros se superponen en el panel de píxeles · s3 el promedio de 240 futuros y su error
+     s4 la representación (tabla s_y / ŝ_y) · s5 la textura se descarta · s6 la dirección es incierta: falta z
+   mascaras (1100×560, 75 % del ancho en las slides):
+     s0 grilla 14×14 · s1 los cuatro bloques objetivo · s2 el bloque de contexto sin los objetivos
+     s3 lo gris y los conteos · s4 la ablación de estrategias (tabla 6 del paper)
+   mundo (1100×470, sólo en el blog):
+     s0 sensores · s1…s6 percepción, modelo del mundo, costo, actor, memoria, configurador
+     s7 se resalta el modelo del mundo: acá entra JEPA */
+(function () {
+  const K = window.OTK, A = window.OTA, C = A.C;
+  const num = (v, d = 1) => v.toFixed(d).replace('.', ',');
+
+  // grupos que se reemplazan uno a otro en el mismo lugar (como A.rotulos, pero con cualquier contenido)
+  function relevos(items) {
+    items.forEach(g => { g.setAttribute('transform', A.tr(0, 0)); g.style.opacity = 0; });
+    return {
+      items,
+      a(tl, i, at) {
+        tl.to(items.filter((_, j) => j !== i), { opacity: 0, attr: { transform: A.tr(0, -8) }, duration: 0.35 }, at)
+          .fromTo(items[i], { opacity: 0, attr: { transform: A.tr(0, 10) } }, { opacity: 1, attr: { transform: A.tr(0, 0) }, duration: 0.55, immediateRender: false }, at + 0.25);
+      }
+    };
+  }
+  const aparece = (tl, els, at, dur = 0.6, dy = 10) => {
+    (Array.isArray(els) ? els : [els]).forEach(e =>
+      tl.fromTo(e, { opacity: 0, attr: { transform: A.tr(0, dy) } }, { opacity: 1, attr: { transform: A.tr(0, 0) }, duration: dur, immediateRender: false }, at));
+  };
+  const oculto = (...els) => els.forEach(e => { e.style.opacity = 0; e.setAttribute('transform', A.tr(0, 0)); });
+
+  // ============================================================ píxeles vs. representación
+  K.register('pixlat', root => {
+    const S = A.svg(root, 1180, 540);
+    A.cuandoFuentes(() => pixlat(root, S));
+  });
+
+  function pixlat(root, S) {
+    const el = A.el, tr = A.tr;
+    const G = 48, KS = 240, U = 0.7, D = 0.46, RB = 0.105;
+    const PX = [0, 405, 820], PY = 144, PS = 300;
+    const r = K.mulberry(11);
+
+    // -------------------------------------------------- datos: futuros, promedio y error
+    // un futuro: la pelota sale del mismo punto con una dirección incierta; el fondo tiene textura
+    const centro = th => ({ x: 0.5 + D * Math.sin(th), y: 0.82 - D * Math.cos(th) });
+    function textura() { const T = new Float32Array(G * G); for (let i = 0; i < G * G; i++) T[i] = A.clamp(0.82 + 0.28 * U * K.gauss(r), 0, 1); return T; }
+    function conPelota(T, th) {
+      const c = centro(th), I = new Float32Array(G * G);
+      for (let i = 0; i < G; i++) for (let j = 0; j < G; j++) {
+        const dd = Math.hypot((j + 0.5) / G - c.x, (i + 0.5) / G - c.y), b = A.clamp((RB - dd) / 0.03, 0, 1);
+        I[i * G + j] = (1 - b) * T[i * G + j] + b * 0.08;
+      }
+      return I;
+    }
+    // la predicción que minimiza el error cuadrático esperado: el promedio de 240 futuros
+    const media = new Float32Array(G * G), todos = [];
+    for (let k = 0; k < KS; k++) { const th = (r() * 2 - 1) * U * 1.15, I = conPelota(textura(), th); todos.push(I); for (let i = 0; i < G * G; i++) media[i] += I[i] / KS; }
+    let mse = 0; for (const I of todos) for (let i = 0; i < G * G; i++) mse += (I[i] - media[i]) ** 2 / (KS * G * G);
+    // futuros que se muestran: direcciones fijas (grados) y texturas sorteadas
+    const ANG = [-24, 40, -42, 8, 30, -36, 18, -6];
+    const NF = 5;   // los que se superponen en la parada 2 (el último queda en el panel)
+    const TEX = ANG.slice(0, NF).map(() => textura());
+
+    const lienzo = document.createElement('canvas'), Z = 8; lienzo.width = lienzo.height = G * Z;
+    const lc = lienzo.getContext('2d'), chico = document.createElement('canvas'); chico.width = chico.height = G;
+    const cc = chico.getContext('2d'), img = cc.createImageData(G, G);
+    function url(I) {   // de claro (fondo) a azul marino (pelota), como el canvas viejo
+      for (let i = 0; i < G * G; i++) {
+        const k = A.clamp((I[i] - 0.08) / 0.74, 0, 1.25);
+        img.data[4 * i] = A.clamp(22 + 214 * k, 0, 255); img.data[4 * i + 1] = A.clamp(33 + 205 * k, 0, 255);
+        img.data[4 * i + 2] = A.clamp(62 + 182 * k, 0, 255); img.data[4 * i + 3] = 255;
+      }
+      cc.putImageData(img, 0, 0); lc.imageSmoothingEnabled = false; lc.drawImage(chico, 0, 0, G * Z, G * Z);
+      return lienzo.toDataURL();
+    }
+    const imagen = (padre, href, x) => el('image', { href, x, y: PY, width: PS, height: PS, preserveAspectRatio: 'none', style: 'image-rendering: pixelated' }, padre);
+    const SX = PS * 0.5, SY = PS * 0.82;                       // punto de partida (coordenadas del panel)
+    const bola = th => { const c = centro(th * Math.PI / 180); return { cx: c.x * PS, cy: PY + c.y * PS }; };
+    const dFlecha = th => { const a = th * Math.PI / 180, L = 0.3 * PS;
+      return `M${SX.toFixed(1)},${(PY + SY).toFixed(1)} L${(SX + L * Math.sin(a)).toFixed(1)},${(PY + SY - L * Math.cos(a)).toFixed(1)}`; };
+
+    // -------------------------------------------------- dibujo
+    const head = A.rotulos(S, [
+      'El contexto: una pelota en su punto de partida',
+      'Un futuro posible: sale en una dirección al azar, sobre un fondo con textura',
+      'Muchos futuros son igual de probables: en píxeles se superponen',
+      'Lo que minimiza el error cuadrático es el promedio: una mancha',
+      'En representación se predice qué hay en la escena, no cada píxel',
+      'Lo irrelevante no entra en la representación',
+      'Lo que importa y no se puede saber queda abierto'
+    ], { x: 0, y: 30, size: 23, weight: '600', color: C.navy });
+    head.set(0);
+
+    // panel 1: un futuro posible
+    const P1 = el('g', {}, S);
+    A.texto(P1, 'Un futuro posible', PX[0], 80, { size: 21, weight: '600', color: C.navy });
+    A.texto(P1, 'sale siempre del mismo punto,', PX[0], 106, { size: 19, color: C.grey2 });
+    A.texto(P1, 'en una dirección al azar', PX[0], 130, { size: 19, color: C.grey2 });
+    el('rect', { x: PX[0], y: PY, width: PS, height: PS, fill: '#eceef4' }, P1);
+    const texG = el('g', {}, P1);
+    const tex1 = TEX.map(T => { const im = imagen(texG, url(T), PX[0]); im.style.opacity = 0; return im; });
+    el('circle', { cx: SX, cy: PY + SY, r: RB * PS, fill: 'none', stroke: C.coralD, 'stroke-width': 2.5, 'stroke-dasharray': '6 5' }, P1);
+    const flechaP = A.flecha(P1, dFlecha(ANG[0]), C.coralD, { lw: 2.5, dash: '6 5' }); flechaP.style.opacity = 0;
+    const pelota = el('circle', { cx: SX, cy: PY + SY, r: RB * PS, fill: C.navy }, P1);
+    el('rect', { x: PX[0], y: PY, width: PS, height: PS, rx: 2, fill: 'none', stroke: C.grid, 'stroke-width': 1.5 }, P1);
+    const nota1 = [A.texto(S, 'punto de partida', PX[0], PY + PS + 32, { size: 19, color: C.coralD }),
+                   A.texto(S, 'y dirección de este futuro', PX[0], PY + PS + 58, { size: 19, color: C.coralD })];
+    oculto(...nota1);
+
+    // panel 2: predicción en píxeles
+    const P2t = el('g', {}, S);
+    A.texto(P2t, 'Predicción en píxeles', PX[1], 80, { size: 21, weight: '600', color: C.coralD });
+    A.texto(P2t, 'la que minimiza el error cuadrático:', PX[1], 106, { size: 19, color: C.grey2 });
+    A.texto(P2t, 'el promedio de los futuros', PX[1], 130, { size: 19, color: C.grey2 });
+    const marco2 = el('rect', { x: PX[1], y: PY, width: PS, height: PS, rx: 2, fill: '#f4f4f8', stroke: C.grid, 'stroke-width': 1.5 }, S);
+    oculto(P2t); marco2.style.opacity = 0;
+    // copias de cada futuro que viajan del panel 1 al 2 (capa k con opacidad 1/(k+1): el promedio exacto de las k+1)
+    const vuelanG = el('g', {}, S);
+    const vuelan = TEX.map((T, k) => {
+      const g = el('g', { transform: tr(0, 0) }, vuelanG);
+      imagen(g, tex1[k].getAttribute('href'), PX[0]);
+      el('circle', { ...bola(ANG[k]), r: RB * PS, fill: C.navy }, g);
+      g.style.opacity = 0; return g;
+    });
+    const promedio = imagen(S, url(media), PX[1]); promedio.style.opacity = 0;
+    const borde2 = el('rect', { x: PX[1], y: PY, width: PS, height: PS, rx: 2, fill: 'none', stroke: C.grid, 'stroke-width': 1.5 }, S);
+    borde2.style.opacity = 0;
+    const cuenta = relevos([...TEX.map((_, k) => A.texto(S, (k + 1) + (k ? ' futuros superpuestos' : ' futuro'), PX[1], PY + PS + 32, { size: 19, color: C.grey2 })),
+      A.texto(S, 'promedio de ' + KS + ' futuros', PX[1], PY + PS + 32, { size: 19, color: C.grey2 })]);
+    const nota2 = [A.texto(S, 'error medio por píxel: ' + num(mse, 3), PX[1], PY + PS + 58, { size: 19, weight: '600', color: C.coralD }),
+                   A.texto(S, 'no se parece a ningún futuro real', PX[1], PY + PS + 84, { size: 19, color: C.grey2 })];
+    oculto(...nota2);
+
+    // panel 3: predicción en representación (tabla elegida a mano, no un modelo entrenado)
+    const X3 = PX[2], cO = X3 + 262, cP = X3 + 350, y0 = PY + 22, DY = 50;
+    const P3t = el('g', {}, S);
+    A.texto(P3t, 'Predicción en representación', X3, 80, { size: 21, weight: '600', color: C.teal });
+    A.texto(P3t, 'objetivo $s_y$ y predicción $\\hat s_y$', X3, 106, { size: 19, color: C.grey2 });
+    A.texto(P3t, '$s_y$', cO, y0, { size: 22, color: C.teal, anchor: 'end' });
+    A.texto(P3t, '$\\hat s_y$', cP, y0, { size: 22, color: C.blue, anchor: 'end' });
+    oculto(P3t);
+    const resalta = el('rect', { x: X3 - 8, y: y0 + 14 + 3 * DY, width: 368, height: DY, rx: 8, fill: '#fff6f5', stroke: C.coral, 'stroke-width': 1.5 }, S);
+    resalta.style.opacity = 0;
+    const FILAS = [['hay una pelota', 'sí', 'sí'], ['tamaño', '0,21', '0,21'], ['distancia recorrida', '0,46', '0,46'], ['dirección', null, '?']];
+    const filas = FILAS.map(([n, o, p], k) => {
+      const y = y0 + 14 + k * DY, g = el('g', {}, S);
+      el('line', { x1: X3, y1: y, x2: X3 + 360, y2: y, stroke: C.grid, 'stroke-width': 1.2 }, g);
+      A.texto(g, n, X3, y + 33, { size: 19, weight: '600', color: C.navy });
+      const vo = o ? A.texto(g, o, cO, y + 33, { size: 19, weight: '600', color: C.teal, anchor: 'end' }) : null;
+      const vp = A.texto(S, p, cP, y + 33, { size: 19, weight: '600', color: p === '?' ? C.coralD : C.blue, anchor: 'end' });
+      oculto(g, vp); return { g, vp, y };
+    });
+    // la dirección de cada futuro (la de s_y); la primera viaja desde la flecha del panel 1
+    const yDir = filas[3].y + 33;
+    const angs = relevos(ANG.slice(NF - 1).map(a => A.texto(S, a + '°', cO, yDir, { size: 19, weight: '600', color: C.teal, anchor: 'end' })));
+    const filaTex = el('g', {}, S);
+    el('line', { x1: X3, y1: y0 + 14 + 4 * DY, x2: X3 + 360, y2: y0 + 14 + 4 * DY, stroke: C.grid, 'stroke-width': 1.2 }, filaTex);
+    A.texto(filaTex, 'textura del fondo', X3, y0 + 14 + 4 * DY + 33, { size: 19, color: C.grey });
+    A.texto(filaTex, 'no se representa', cP, y0 + 14 + 4 * DY + 33, { size: 19, color: C.grey, anchor: 'end' });
+    el('line', { x1: X3, y1: y0 + 14 + 5 * DY, x2: X3 + 360, y2: y0 + 14 + 5 * DY, stroke: C.grid, 'stroke-width': 1.2 }, filaTex);
+    oculto(filaTex);
+    const nota3 = [A.texto(S, 'la textura, irrelevante, se descarta', X3, PY + PS + 32, { size: 19, weight: '600', color: C.teal }),
+                   A.texto(S, 'la dirección importa y es incierta: falta $z$', X3, PY + PS + 58, { size: 19, color: C.coralD })];
+    oculto(...nota3);
+
+    // -------------------------------------------------- línea de tiempo
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    const aFuturo = (k, at, dur = 0.7) => {   // la pelota y la flecha del panel 1 pasan a la dirección ANG[k]
+      tl.to(pelota, { attr: bola(ANG[k]), duration: dur }, at).to(flechaP, { attr: { d: dFlecha(ANG[k]) }, duration: dur }, at);
+    };
+    tl.addLabel('s0', 0);
+
+    // s1: un futuro: aparece la textura, se traza la dirección y la pelota sale (≈ 2,4 s)
+    let at = 0;
+    head.a(tl, 1, at);
+    tl.to(tex1[0], { opacity: 1, duration: 0.8 }, at + 0.4)
+      .to(flechaP, { opacity: 1, duration: 0.2 }, at + 0.9);
+    A.trazar(tl, flechaP, at + 0.9, 0.6);
+    tl.to(pelota, { attr: bola(ANG[0]), duration: 1.2, ease: 'power2.out' }, at + 1.2);
+    aparece(tl, nota1, at + 1.6, 0.5);
+    at = tl.duration(); tl.addLabel('s1', at);
+
+    // s2: varios futuros: cada uno viaja al panel de píxeles y se superpone a los anteriores (≈ 5,6 s)
+    head.a(tl, 2, at);
+    aparece(tl, P2t, at + 0.3);
+    tl.to([marco2, borde2], { opacity: 1, duration: 0.5 }, at + 0.3);
+    const PASO = [1.3, 1.15, 1.0, 0.9];
+    let t = at + 1.0;
+    for (let k = 0; k < NF; k++) {
+      if (k > 0) {   // el panel 1 muestra otro futuro posible
+        tl.to(tex1[k - 1], { opacity: 0, duration: 0.4 }, t).to(tex1[k], { opacity: 1, duration: 0.4 }, t);
+        aFuturo(k, t, 0.55);
+      }
+      const v = t + (k ? 0.55 : 0);
+      tl.fromTo(vuelan[k], { opacity: 0, attr: { transform: tr(0, 0) } }, { opacity: 1, duration: 0.15, immediateRender: false }, v)
+        .to(vuelan[k], { attr: { transform: tr(PX[1] - PX[0], 0) }, duration: 0.85 }, v + 0.1)
+        .to(vuelan[k], { opacity: 1 / (k + 1), duration: 0.35 }, v + 0.75);
+      cuenta.a(tl, k, v + 0.7);
+      t += PASO[k] || 0;
+    }
+    at = tl.duration(); tl.addLabel('s2', at);
+
+    // s3: el promedio de los 240 futuros reemplaza a la pila y aparece su error (≈ 2,2 s)
+    head.a(tl, 3, at);
+    tl.to(promedio, { opacity: 1, duration: 1.2 }, at + 0.4)
+      .to(vuelanG, { opacity: 0, duration: 0.6 }, at + 1.2);
+    cuenta.a(tl, NF, at + 0.5);
+    aparece(tl, nota2[0], at + 1.3, 0.5);
+    aparece(tl, nota2[1], at + 1.7, 0.5);
+    at = tl.duration(); tl.addLabel('s3', at);
+
+    // s4: la representación: filas de la tabla; la dirección viaja desde la flecha (≈ 3,4 s)
+    head.a(tl, 4, at);
+    aparece(tl, P3t, at + 0.3);
+    filas.forEach((f, k) => aparece(tl, f.g, at + 0.8 + 0.3 * k, 0.5));
+    const punta = { x: SX + 0.3 * PS * Math.sin(ANG[NF - 1] * Math.PI / 180), y: PY + SY - 0.3 * PS * Math.cos(ANG[NF - 1] * Math.PI / 180) };
+    tl.fromTo(angs.items[0], { opacity: 0, attr: { transform: tr(punta.x + 40 - cO, punta.y - yDir) } },
+      { opacity: 1, attr: { transform: tr(0, 0) }, duration: 1.3, immediateRender: false }, at + 1.5);
+    filas.forEach((f, k) => aparece(tl, f.vp, at + 2.5 + 0.2 * k, 0.45));
+    at = tl.duration(); tl.addLabel('s4', at);
+
+    // s5: la textura no se representa: en el panel se apaga (≈ 2 s)
+    head.a(tl, 5, at);
+    aparece(tl, filaTex, at + 0.4, 0.6);
+    tl.to(tex1[NF - 1], { opacity: 0.3, duration: 1.0 }, at + 0.7);
+    aparece(tl, nota3[0], at + 1.2, 0.5);
+    at = tl.duration(); tl.addLabel('s5', at);
+
+    // s6: la dirección cambia de un futuro a otro; s_y la sigue, ŝ_y no puede saberla (≈ 4,6 s)
+    head.a(tl, 6, at);
+    tl.to(resalta, { opacity: 1, duration: 0.5 }, at + 0.3);
+    aparece(tl, nota3[1], at + 0.6, 0.5);
+    for (let j = 1; j < ANG.length - NF + 1; j++) {
+      const tj = at + 1.3 + (j - 1) * 1.1;
+      aFuturo(NF - 1 + j, tj, 0.7);
+      angs.a(tl, j, tj + 0.2);
+    }
+    at = tl.duration(); tl.addLabel('s6', at);
+
+    A.pasos(root, tl);
+  }
+
+  // ============================================================ enmascarado multi-bloque
+  K.register('mascaras', root => {
+    const S = A.svg(root, 1100, 560);
+    A.cuandoFuentes(() => mascaras(root, S));
+  });
+
+  function mascaras(root, S) {
+    const el = A.el, tr = A.tr;
+    const N = 14, NT = N * N, MAP = { x: 0, y: 64, s: 460 };
+
+    // -------------------------------------------------- sorteo (como src/masks/multiblock.py), semilla fija
+    // el tamaño (escala y aspecto, con un mismo número al azar) se sortea una vez y lo comparten los
+    // cuatro bloques objetivo; la posición se sortea para cada bloque
+    const rnd = K.mulberry(39);
+    function tamano(lo, hi, arLo, arHi) {
+      const u = rnd(), s = lo + (hi - lo) * u, ar = arLo + (arHi - arLo) * u, keep = Math.floor(NT * s);
+      return { h: Math.min(N - 1, Math.max(1, Math.round(Math.sqrt(keep * ar)))), w: Math.min(N - 1, Math.max(1, Math.round(Math.sqrt(keep / ar)))) };
+    }
+    const ubica = ({ h, w }) => ({ top: Math.floor(rnd() * (N - h)), left: Math.floor(rnd() * (N - w)), h, w });
+    const tm = tamano(0.15, 0.2, 0.75, 1.5);
+    const OBJ = [0, 1, 2, 3].map(() => ubica(tm));
+    const CB = ubica(tamano(0.85, 1, 1, 1));
+    const dentro = (b, k) => { const i = Math.floor(k / N), j = k % N; return i >= b.top && i < b.top + b.h && j >= b.left && j < b.left + b.w; };
+    const enObj = [...Array(NT)].map((_, k) => OBJ.some(b => dentro(b, k)));
+    const enCB = [...Array(NT)].map((_, k) => dentro(CB, k));
+    const nObj = enObj.filter(Boolean).length, nCtx = enCB.filter((v, k) => v && !enObj[k]).length, nGris = NT - nObj - nCtx;
+
+    // -------------------------------------------------- dibujo
+    const head = A.encabezado(S, 2, [
+      'La imagen se divide en una grilla de 14 × 14 parches',
+      'Se sortean 4 bloques objetivo, todos del mismo tamaño',
+      'Un bloque de contexto grande, al que se le quitan los objetivos',
+      'Lo gris no es contexto ni objetivo: sólo lo ve el encoder objetivo',
+      'Qué reporta el paper: el multi-bloque gana por lejos'
+    ]);
+    head.set(0);
+
+    const M = A.mapa(S, MAP.x, MAP.y, MAP.s, { N });
+    const q = M.q, X = k => MAP.x + (k % N) * q, Y = k => MAP.y + Math.floor(k / N) * q;
+    const grilla = M.g.querySelector('path');
+    M.celdas.forEach((c, k) => { if (enObj[k]) c.setAttribute('fill', C.coral); });
+    const capa = (fill) => { const g = el('g', {}, M.g); M.g.insertBefore(g, grilla); return { g, fill }; };
+    const cCtx = capa(C.teal), cGris = capa('#8c91a0');
+    const rectCtx = [], rectGris = [];
+    for (let k = 0; k < NT; k++) {
+      if (enCB[k]) rectCtx[k] = el('rect', { x: X(k), y: Y(k), width: q, height: q, fill: C.teal, 'fill-opacity': 0 }, cCtx.g);
+      if (!enCB[k] && !enObj[k]) rectGris[k] = el('rect', { x: X(k), y: Y(k), width: q, height: q, fill: '#8c91a0', 'fill-opacity': 0 }, cGris.g);
+    }
+    const cajaCtx = el('rect', { x: MAP.x + CB.left * q + 1.5, y: MAP.y + CB.top * q + 1.5, width: 0, height: 0, rx: 3,
+      fill: 'none', stroke: C.teal, 'stroke-width': 3, 'stroke-dasharray': '8 5' }, S);
+    cajaCtx.style.opacity = 0;
+    const bx = b => MAP.x + b.left * q, by = b => MAP.y + b.top * q;
+    const bordes = OBJ.map(b => { const g = el('g', { transform: tr(0, 0) }, S);
+      el('rect', { x: bx(b), y: by(b), width: b.w * q, height: b.h * q, rx: 3, fill: 'none', stroke: C.coralD, 'stroke-width': 3 }, g);
+      g.style.opacity = 0; return g; });
+    const insignias = OBJ.map((b, k) => { const g = el('g', {}, S);
+      el('rect', { x: bx(b) + 4, y: by(b) + 4, width: 27, height: 27, rx: 6, fill: C.coralD }, g);
+      const t = el('text', { x: bx(b) + 17.5, y: by(b) + 24.5, 'text-anchor': 'middle', 'font-size': 19, 'font-weight': 600, fill: '#fff' }, g);
+      t.textContent = k + 1; g.style.opacity = 0; return g; });
+
+    // columna derecha: los tres grupos de parches y sus conteos
+    const RX = 500, RX2 = 1100;
+    const grupo = (y, color, chip, lineas, cuantos, extra) => {
+      const g = el('g', {}, S);
+      el('rect', { x: RX, y: y - 17, width: 18, height: 18, rx: 4, fill: chip.fill, 'fill-opacity': chip.op, stroke: chip.stroke || 'none', 'stroke-width': 2 }, g);
+      A.texto(g, lineas[0], RX + 30, y, { size: 21, weight: '600', color });
+      lineas.slice(1).forEach((s, i) => A.texto(g, s, RX + 30, y + 27 + 25 * i, { size: 19, color: C.grey2 }));
+      const c = el('g', {}, S);
+      A.texto(c, String(cuantos), RX2, y + 8, { size: 32, weight: '600', color: C.navy, anchor: 'end' });
+      A.texto(c, extra, RX2, y + 36, { size: 19, color: C.grey2, anchor: 'end' });
+      oculto(g, c); return { g, c };
+    };
+    const gObj = grupo(98, C.coralD, { fill: C.coral, op: 0.75, stroke: C.coralD }, ['4 bloques objetivo', 'escala 0,15–0,2 · aspecto 0,75–1,5', 'un tamaño por lote; pueden superponerse'], nObj, 'parches');
+    const gCtx = grupo(196, C.teal, { fill: C.teal, op: 0.35, stroke: C.teal }, ['1 bloque de contexto', 'escala 0,85–1, cuadrado', 'sin los parches objetivo'], nCtx, 'parches (' + Math.round(100 * nCtx / NT) + ' %)');
+    const gGris = grupo(294, C.grey2, { fill: '#8c91a0', op: 0.8 }, ['ni contexto ni objetivo', 'sólo lo ve el encoder objetivo'], nGris, 'parches');
+    const seps = [168, 266].map(y => { const l = el('line', { x1: RX, y1: y, x2: RX2, y2: y, stroke: C.grid, 'stroke-width': 1.2 }, S); l.style.opacity = 0; return l; });
+
+    // ablación de estrategias (tabla 6 del paper)
+    const AB = { y: 372, lx: RX, bx: RX + 150, esc: 6.2 };
+    const abT = el('g', {}, S);
+    el('line', { x1: RX, y1: AB.y - 36, x2: RX2, y2: AB.y - 36, stroke: C.grid, 'stroke-width': 1.2 }, abT);
+    A.texto(abT, 'Qué reporta el paper', AB.lx, AB.y, { size: 21, weight: '600', color: C.navy });
+    A.texto(abT, 'top-1 lineal con 1 % de etiquetas · ViT-B/16, 300 épocas', AB.lx, AB.y + 26, { size: 19, color: C.grey2 });
+    oculto(abT);
+    const EST = [['multi-bloque', 54.2], ['un bloque', 20.2], ['aleatorio', 17.6], ['rasterizado', 15.5]];
+    const barras = EST.map(([n, v], k) => {
+      const y = AB.y + 52 + k * 36, on = k === 0;
+      const lab = A.texto(S, n, AB.lx, y + 17, { size: 19, weight: on ? '600' : '400', color: on ? C.navy : C.grey2 });
+      const bar = el('rect', { x: AB.bx, y: y, width: 0, height: 22, rx: 4, fill: on ? C.teal : '#c9ccd6' }, S);
+      const val = A.texto(S, num(v), AB.bx + v * AB.esc + 10, y + 18, { size: 19, weight: on ? '600' : '400', color: on ? C.navy : C.grey2 });
+      oculto(lab, val); return { lab, bar, val, w: v * AB.esc };
+    });
+
+    // -------------------------------------------------- línea de tiempo
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    tl.addLabel('s0', 0);
+
+    // s1: los bloques objetivo uno por uno; el mismo rectángulo viaja de una posición a la siguiente (≈ 5 s)
+    let at = 0;
+    head.a(tl, 1, at);
+    aparece(tl, gObj.g, at + 0.3);
+    OBJ.forEach((b, k) => {
+      const t0 = at + 0.8 + k * 1.05;
+      if (k === 0) tl.fromTo(bordes[0], { opacity: 0 }, { opacity: 1, duration: 0.5, immediateRender: false }, t0);
+      else {
+        const a = OBJ[k - 1];
+        tl.fromTo(bordes[k], { opacity: 0, attr: { transform: tr(bx(a) - bx(b), by(a) - by(b)) } },
+          { opacity: 1, duration: 0.2, immediateRender: false }, t0)
+          .to(bordes[k], { attr: { transform: tr(0, 0) }, duration: 0.75 }, t0 + 0.05);
+      }
+      const cel = M.celdas.filter((_, j) => dentro(b, j));
+      tl.to(cel, { attr: { 'fill-opacity': 0.6 }, duration: 0.45 }, t0 + 0.7)
+        .to(insignias[k], { opacity: 1, duration: 0.35 }, t0 + 0.7);
+    });
+    at = tl.duration(); tl.addLabel('s1', at);
+
+    // s2: el bloque de contexto crece desde su esquina y se le quitan los parches objetivo (≈ 3,4 s)
+    head.a(tl, 2, at);
+    tl.to(seps[0], { opacity: 1, duration: 0.4 }, at + 0.3);
+    aparece(tl, gCtx.g, at + 0.3);
+    tl.to(cajaCtx, { opacity: 1, duration: 0.2 }, at + 0.6)
+      .to(cajaCtx, { attr: { width: CB.w * q - 3, height: CB.h * q - 3 }, duration: 1.2 }, at + 0.6);
+    rectCtx.forEach((rc, k) => { if (rc) tl.to(rc, { attr: { 'fill-opacity': 0.32 }, duration: 0.4 }, at + 0.7 + 0.045 * (Math.floor(k / N) + k % N)); });
+    tl.to(rectCtx.filter((rc, k) => rc && enObj[k]), { attr: { 'fill-opacity': 0 }, duration: 0.7 }, at + 2.5);
+    at = tl.duration(); tl.addLabel('s2', at);
+
+    // s3: lo gris y los conteos de cada grupo (≈ 2,6 s)
+    head.a(tl, 3, at);
+    tl.to(seps[1], { opacity: 1, duration: 0.4 }, at + 0.3);
+    aparece(tl, gGris.g, at + 0.3);
+    rectGris.forEach((rg, k) => { if (rg) tl.to(rg, { attr: { 'fill-opacity': 0.8 }, duration: 0.4 }, at + 0.6 + 0.03 * (Math.floor(k / N) + k % N)); });
+    [gObj.c, gCtx.c, gGris.c].forEach((c, i) => aparece(tl, c, at + 1.4 + 0.3 * i, 0.5));
+    at = tl.duration(); tl.addLabel('s3', at);
+
+    // s4: la ablación de estrategias, de mayor a menor (≈ 2,8 s)
+    head.a(tl, 4, at);
+    aparece(tl, abT, at + 0.3);
+    barras.forEach((b, k) => {
+      const t0 = at + 0.8 + 0.35 * k;
+      aparece(tl, b.lab, t0, 0.4, 0);
+      tl.to(b.bar, { attr: { width: b.w }, duration: 0.9, ease: 'power2.out' }, t0);
+      aparece(tl, b.val, t0 + 0.7, 0.35, 0);
+    });
+    at = tl.duration(); tl.addLabel('s4', at);
+
+    A.pasos(root, tl);
+  }
+
+  // ============================================================ la arquitectura cognitiva de LeCun (2022)
+  K.register('mundo', root => {
+    const S = A.svg(root, 1100, 480);
+    A.cuandoFuentes(() => mundo(root, S));
+  });
+
+  function mundo(root, S) {
+    const el = A.el, tr = A.tr;
+    const M = [
+      { n: 'Percepción', x: 30, y: 150, w: 220, h: 76, rol: 'Estima el estado actual del mundo a partir de los sensores.' },
+      { n: 'Modelo del mundo', x: 440, y: 140, w: 220, h: 96, rol: 'Completa lo que no se observa y predice estados futuros, incluidos los que resultan de una acción.' },
+      { n: 'Costo', x: 850, y: 150, w: 220, h: 76, s: 'intrínseco + crítico', rol: 'Mide el «malestar» en un número: un costo intrínseco fijo y un crítico entrenable que lo anticipa.' },
+      { n: 'Actor', x: 850, y: 280, w: 220, h: 60, rol: 'Propone secuencias de acciones que minimizan el costo futuro estimado.' },
+      { n: 'Memoria de corto plazo', x: 390, y: 296, w: 250, h: 56, rol: 'Guarda el estado actual y los predichos, junto con sus costos.' },
+      { n: 'Configurador', x: 410, y: 20, w: 280, h: 56, rol: 'Control ejecutivo: prepara a los demás módulos para la tarea que toca.' }];
+    const MUNDO = 1;
+
+    // flechas de cada módulo (aparecen con él) y sus etiquetas
+    const lab = (padre, s, x, y, anchor = 'middle') => A.texto(padre, s, x, y, { size: 19, color: C.grey2, anchor });
+    const fl = [[], [], [], [], [], []], labs = [[], [], [], [], [], []];
+    const capaF = el('g', {}, S);
+    // sensores → percepción (visible desde el principio)
+    const sens = el('g', {}, S);
+    A.flecha(sens, [[140, 268], [140, 232]], C.grey, { lw: 2.2 });
+    lab(sens, 'sensores', 140, 292);
+    fl[MUNDO].push(A.flecha(capaF, [[250, 188], [434, 188]], C.navy)); labs[MUNDO].push(lab(S, 'estado', 342, 178));
+    fl[2].push(A.flecha(capaF, [[660, 182], [844, 182]], C.navy)); labs[2].push(lab(S, 'estados predichos', 752, 172));
+    fl[3].push(A.flecha(capaF, [[960, 226], [960, 274]], C.navy)); labs[3].push(lab(S, 'costo', 972, 257, 'start'));
+    fl[3].push(A.flecha(capaF, [[850, 310], [750, 310], [750, 218], [666, 218]], C.navy)); labs[3].push(lab(S, 'acciones propuestas', 842, 336, 'end'));
+    fl[4].push(A.flecha(capaF, [[560, 292], [560, 242]], C.navy, { lw: 2.2 }), A.flecha(capaF, [[536, 242], [536, 292]], C.navy, { lw: 2.2 }));
+    const punt = [[[410, 48], [140, 48], [140, 144]], [[550, 76], [550, 134]], [[690, 48], [960, 48], [960, 144]], [[960, 48], [1088, 48], [1088, 310], [1076, 310]]]
+      .map(p => A.flecha(capaF, p, C.grey, { lw: 1.8, dash: '4 5' }));
+    fl.forEach(a => a.forEach(p => { p.style.opacity = 0; }));
+    punt.forEach(p => { p.style.opacity = 0; });
+    labs.forEach(a => a.forEach(g => oculto(g)));
+
+    // módulos: caja, nombre, resaltado
+    const mods = M.map((m, k) => {
+      const g = el('g', {}, S), mundoK = k === MUNDO;
+      el('rect', { x: m.x, y: m.y, width: m.w, height: m.h, rx: 12, fill: '#fff', stroke: mundoK ? C.coral : C.blue, 'stroke-width': 2.2 }, g);
+      const hl = el('rect', { x: m.x, y: m.y, width: m.w, height: m.h, rx: 12, fill: mundoK ? '#fff6f5' : '#f1f8f7', stroke: mundoK ? C.coralD : C.teal, 'stroke-width': 4 }, g);
+      hl.style.opacity = 0;
+      const dy = m.s || mundoK ? -4 : 7;
+      A.texto(g, m.n, m.x + m.w / 2, m.y + m.h / 2 + dy, { size: 20, weight: '600', color: mundoK ? C.coralD : C.navy, anchor: 'middle' });
+      if (m.s) A.texto(g, m.s, m.x + m.w / 2, m.y + m.h / 2 + 22, { size: 19, color: C.grey2, anchor: 'middle' });
+      let jepa = null;
+      if (mundoK) { jepa = A.texto(g, 'acá entra JEPA', m.x + m.w / 2, m.y + m.h / 2 + 24, { size: 19, weight: '600', color: C.coralD, anchor: 'middle' }); jepa.style.opacity = 0; }
+      oculto(g); return { g, hl, jepa };
+    });
+
+    // rol de cada módulo, abajo
+    const RY = 392;
+    el('rect', { x: 20, y: RY, width: 1060, height: 82, rx: 10, fill: C.light }, S);
+    const roles = relevos([
+      ...[0].map(() => { const g = el('g', {}, S);
+        A.texto(g, 'Seis módulos diferenciables para un agente que aprende, razona y planifica', 40, RY + 34, { size: 20, weight: '600', color: C.navy });
+        A.texto(g, 'La figura los recorre de a uno, empezando por lo que llega de los sensores.', 40, RY + 62, { size: 19, color: C.text }); return g; }),
+      ...M.map((m, k) => { const g = el('g', {}, S);
+        A.texto(g, m.n, 40, RY + 34, { size: 20, weight: '600', color: k === MUNDO ? C.coralD : C.teal });
+        A.texto(g, m.rol, 40, RY + 62, { size: 19, color: C.text }); return g; }),
+      (() => { const g = el('g', {}, S);
+        A.texto(g, 'La pieza central es el modelo del mundo: acá entra JEPA', 40, RY + 34, { size: 20, weight: '600', color: C.coralD });
+        A.texto(g, 'Se entrena prediciendo en un espacio de representaciones, sin reconstruir píxeles.', 40, RY + 62, { size: 19, color: C.text }); return g; })()
+    ]);
+    roles.items[0].style.opacity = 1;
+
+    // -------------------------------------------------- línea de tiempo
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    tl.addLabel('s0', 0);
+    let at = 0;
+    M.forEach((m, k) => {
+      roles.a(tl, k + 1, at);
+      if (k > 0) tl.to(mods[k - 1].hl, { opacity: 0, duration: 0.5 }, at + 0.2);
+      aparece(tl, mods[k].g, at + 0.3, 0.7, 12);
+      tl.to(mods[k].hl, { opacity: 1, duration: 0.5 }, at + 0.5);
+      fl[k].forEach((p, i) => { tl.to(p, { opacity: 1, duration: 0.1 }, at + 0.8 + 0.4 * i); A.trazar(tl, p, at + 0.8 + 0.4 * i, 0.7); });
+      labs[k].forEach((g, i) => aparece(tl, g, at + 1.2 + 0.4 * i, 0.45, 6));
+      if (k === M.length - 1) punt.forEach((p, i) => tl.to(p, { opacity: 0.85, duration: 0.5 }, at + 0.8 + 0.2 * i));
+      at = tl.duration(); tl.addLabel('s' + (k + 1), at);
+    });
+    // final: se resalta el modelo del mundo y se apaga el resto
+    roles.a(tl, M.length + 1, at);
+    tl.to(mods[M.length - 1].hl, { opacity: 0, duration: 0.5 }, at + 0.2)
+      .to(mods.filter((_, k) => k !== MUNDO).map(m => m.g), { opacity: 0.45, duration: 0.8 }, at + 0.4)
+      .to([capaF, sens], { opacity: 0.45, duration: 0.8 }, at + 0.4)
+      .to(labs.flat(), { opacity: 0.45, duration: 0.8 }, at + 0.4)
+      .to(mods[MUNDO].hl, { opacity: 1, duration: 0.6 }, at + 0.6)
+      .to(mods[MUNDO].jepa, { opacity: 1, duration: 0.6 }, at + 1.0);
+    at = tl.duration(); tl.addLabel('s' + (M.length + 1), at);
+
+    A.pasos(root, tl);
+  }
+})();
+</script>

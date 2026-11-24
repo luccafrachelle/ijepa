@@ -1,1 +1,587 @@
-<script>/* m-colapso: widgets migrados a SVG + GSAP (ver widgets/anim.html). Vacío hasta que se migren. */</script>
+<script>
+/* m-colapso: widgets del colapso migrados a SVG + GSAP (sobre widgets/anim.html).
+   Reemplazan a los de widgets/ijepa.html con el mismo nombre:
+     tres          tres familias de arquitecturas, una columna por vez        s0 … s4
+     colapsoPasos  la pérdida no distingue la solución buena del colapso      s0 … s5
+     noColapsa     stop-gradient y EMA, escenario por escenario               s0 … s4
+     colapso       simulación real (encoder lineal 4→2, predictor 2×2), sólo en el blog;
+                   se precalcula al construir y se anima por tramos           s0 … s4
+   Los valores que dependen de un estado continuo (pérdida, dispersión, la nube de la simulación) se
+   dibujan desde un "proxy": un objeto con una propiedad con setter que la timeline interpola. GSAP
+   llama al setter también en los saltos (tl.seek), así que ida, vuelta y reentrada dan lo mismo. */
+(function () {
+  const K = window.OTK, A = window.OTA, C = A.C;
+  const el = A.el, tr = A.tr;
+  const num = (v, d = 2) => v.toFixed(d).replace('.', ',');
+  const lerp = (a, b, u) => a + (b - a) * u;
+  const lerp2 = (a, b, u) => [lerp(a[0], b[0], u), lerp(a[1], b[1], u)];
+  const ORO = '#c9a227', VIOLETA = '#7b5ea7';
+
+  // ---------------------------------------------------------------- helpers locales
+  // grupos que se reemplazan uno a otro en el mismo lugar (como A.rotulos, con cualquier contenido)
+  function seq(items) {
+    const R = { items };
+    items.forEach(g => { g.setAttribute('transform', tr(0, 0)); g.style.opacity = 0; });
+    R.set = i => items.forEach((g, j) => { g.style.opacity = j === i ? 1 : 0; });
+    R.a = (tl, i, at) => {
+      tl.to(items.filter((_, j) => j !== i), { opacity: 0, attr: { transform: tr(0, -8) }, duration: 0.35 }, at)
+        .fromTo(items[i], { opacity: 0, attr: { transform: tr(0, 10) } }, { opacity: 1, attr: { transform: tr(0, 0) }, duration: 0.6, immediateRender: false }, at + 0.25);
+    };
+    return R;
+  }
+  // títulos con un color por parada
+  const titulos = (padre, lista, o = {}) =>
+    seq(lista.map(([s, col]) => A.texto(padre, s, o.x || 0, o.y || 32, { size: o.size || 22, weight: '600', color: col })));
+  // párrafo con corte de líneas
+  function parrafo(padre, s, x, y, w, o = {}) {
+    const size = o.size || 19, lh = o.lh || Math.round(size * 1.36), g = el('g', {}, padre);
+    let linea = '', yy = y;
+    for (const p of s.split(' ')) {
+      const t = linea ? linea + ' ' + p : p;
+      if (linea && A.medir(t, size, o.weight || '400') > w) { A.texto(g, linea, x, yy, o); linea = p; yy += lh; } else linea = t;
+    }
+    if (linea) A.texto(g, linea, x, yy, o);
+    return g;
+  }
+  // flecha con la punta aparte: el trazo se dibuja y la punta aparece al llegar
+  function flechaH(padre, pts, color = C.grey, o = {}) {
+    const n = pts.length, [x1, y1] = pts[n - 1], [x0, y0] = pts[n - 2];
+    const L = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / L, uy = (y1 - y0) / L, hl = o.hl || 11, hw = o.hw || 6;
+    const q = pts.slice(); q[n - 1] = [x1 - ux * (hl - 2), y1 - uy * (hl - 2)];
+    const path = A.flecha(padre, q, color, { lw: o.lw || 2.2, punta: false });
+    path.setAttribute('stroke-dasharray', '1 1'); path.setAttribute('stroke-dashoffset', 1); path.style.opacity = 0;
+    const head = el('path', { d: `M${x1},${y1} L${x1 - ux * hl - uy * hw},${y1 - uy * hl + ux * hw} L${x1 - ux * hl + uy * hw},${y1 - uy * hl - ux * hw} Z`, fill: color }, padre);
+    head.style.opacity = 0;
+    return { path, head };
+  }
+  function traza(tl, f, at, dur = 0.55) {
+    tl.to(f.path, { opacity: 1, duration: 0.05 }, at);
+    A.trazar(tl, f.path, at, dur);
+    tl.to(f.head, { opacity: 1, duration: 0.2 }, at + dur - 0.15);
+  }
+  // aparece: un grupo sube 10 unidades y se funde; una flecha se traza
+  function aparece(tl, item, at) {
+    if (item.path) traza(tl, item, at);
+    else tl.fromTo(item, { opacity: 0, attr: { transform: tr(0, 10) } }, { opacity: 1, attr: { transform: tr(0, 0) }, duration: 0.55, immediateRender: false }, at);
+  }
+  const oculto = g => { g.setAttribute('transform', tr(0, 10)); g.style.opacity = 0; return g; };
+  // proxy: tl.fromTo(P, { v: a }, { v: b }) llama a dibujar(v) en cada render, también al saltar
+  function proxy(dibujar) {
+    let v = 0; const P = {};
+    Object.defineProperty(P, 'v', { get: () => v, set: x => { v = x; dibujar(x); } });
+    return P;
+  }
+  const va = (tl, P, a, b, at, dur, ease = 'power2.inOut') =>
+    tl.fromTo(P, { v: a }, { v: b, duration: dur, ease, immediateRender: false, lazy: false }, at);
+  const texto0 = (padre, x, y, o = {}) => { const t = el('text', { x, y, 'font-size': o.size || 19, 'font-weight': o.weight || '400', fill: o.color || C.text,
+    'text-anchor': o.anchor || 'start', style: 'font-variant-numeric: tabular-nums' }, padre); return t; };
+
+  // ================================================================ tres: las tres familias
+  K.register('tres', root => {
+    const S = A.svg(root, 1100, 440);
+    A.cuandoFuentes(() => tres(root, S));
+  });
+  function tres(root, S) {
+    const CX = [200, 565, 930], COL = [C.blue, C.coralD, C.teal];
+    const T = [['Joint-embedding', 'compara dos representaciones'], ['Generativa', 'reconstruye $y$ en píxeles'], ['JEPA', 'predice la representación de $y$']];
+    const EJ = ['SimCLR, DINO, iBOT…', 'MAE', 'I-JEPA'];
+    const DY = 128, NY = 384, EY = 316;
+    const nodo = (g, x, cy, src, color) => { const n = oculto(el('g', {}, g)); A.tex(n, src.replace(/^\$|\$$/g, ''), x, cy + 8, { size: 25, color, anchor: 'middle' }); return n; };
+    const caja = (g, x, cy, t, color) => { const n = oculto(el('g', {}, g));
+      el('rect', { x: x - 56, y: cy - 22, width: 112, height: 44, rx: 10, fill: '#fff', stroke: color, 'stroke-width': 2.4 }, n);
+      A.texto(n, t, x, cy + 7, { size: 19, weight: '600', color, anchor: 'middle' }); return n; };
+    const cols = CX.map((c, k) => {
+      const g = el('g', {}, S), col = COL[k], xl = c - 75, xr = c + 75;
+      const head = el('g', {}, g);
+      A.texto(head, T[k][0], c, 32, { size: 23, weight: '600', color: col, anchor: 'middle' });
+      A.texto(head, T[k][1], c, 60, { size: 19, color: C.grey2, anchor: 'middle' });
+      head.style.opacity = 0.45;
+      const fl = pts => flechaH(g, pts, C.grey);
+      const aD = (x, y0, lado) => fl([[x, y0], [x, DY], [c + lado * 26, DY]]);
+      const et = [[nodo(g, xl, NY, '$x$', C.navy), nodo(g, xr, NY, '$y$', C.navy)]];
+      if (k === 0) {
+        et.push([fl([[xl, NY - 16], [xl, EY + 24]]), caja(g, xl, EY, 'encoder', col), fl([[xr, NY - 16], [xr, EY + 24]]), caja(g, xr, EY, 'encoder', col)]);
+        et.push([fl([[xl, EY - 22], [xl, 250]]), nodo(g, xl, 234, '$s_x$', col), fl([[xr, EY - 22], [xr, 250]]), nodo(g, xr, 234, '$s_y$', col)]);
+        et.push([aD(xl, 216, -1), aD(xr, 216, 1)]);
+      } else if (k === 1) {
+        et.push([fl([[xl, NY - 16], [xl, EY + 24]]), caja(g, xl, EY, 'encoder', col)]);
+        const z = nodo(g, xl - 92, 244, '$z$', C.grey2);
+        et.push([fl([[xl, EY - 22], [xl, 268]]), caja(g, xl, 244, 'decoder', col), z, fl([[xl - 80, 244], [xl - 58, 244]])]);
+        et.push([fl([[xl, 222], [xl, 196]]), nodo(g, xl, 180, '$\\hat y$', col)]);
+        et.push([aD(xl, 160, -1), aD(xr, NY - 16, 1)]);
+      } else {
+        et.push([fl([[xl, NY - 16], [xl, EY + 24]]), caja(g, xl, EY, 'encoder', col), fl([[xr, NY - 16], [xr, EY + 24]]), caja(g, xr, EY, 'encoder', col)]);
+        et.push([fl([[xl, EY - 22], [xl, 282]]), nodo(g, xl, 266, '$s_x$', col), fl([[xr, EY - 22], [xr, 250]]), nodo(g, xr, 234, '$s_y$', col)]);
+        const z = nodo(g, xl - 92, 218, '$z$', C.grey2);
+        const pos = oculto(el('g', {}, g)); A.texto(pos, 'posición', xl - 92, 248, { size: 18, color: C.grey2, anchor: 'middle' });
+        et.push([fl([[xl, 250], [xl, 242]]), caja(g, xl, 218, 'predictor', C.blue), z, pos, fl([[xl - 80, 218], [xl - 58, 218]])]);
+        et.push([fl([[xl, 196], [xl, 182]]), nodo(g, xl, 166, '$\\hat s_y$', C.blue)]);
+        et.push([aD(xl, 148, -1), aD(xr, 216, 1)]);
+      }
+      const D = oculto(el('g', {}, g));
+      const circ = el('circle', { cx: c, cy: DY, r: 24, fill: '#fff', stroke: C.coralD, 'stroke-width': 2.6 }, D);
+      const dT = el('text', { x: c, y: DY + 7, 'text-anchor': 'middle', 'font-size': 20, 'font-weight': 600, fill: C.coralD }, D); dT.textContent = 'D';
+      et.push([D]);
+      const rot = oculto(el('g', {}, g));
+      A.texto(rot, k === 1 ? 'distancia en píxeles' : 'distancia entre representaciones', c, 90, { size: 18, weight: '600', color: C.coralD, anchor: 'middle' });
+      A.texto(rot, EJ[k], c, 428, { size: 19, color: C.grey2, anchor: 'middle' });
+      et.push([rot]);
+      return { g, head, et, circ, dT };
+    });
+
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    tl.addLabel('s0', 0);
+    const arma = (k, at) => {
+      tl.to(cols[k].head, { opacity: 1, duration: 0.5 }, at);
+      cols[k].et.forEach((items, j) => items.forEach(it => aparece(tl, it, at + 0.45 + j * 0.42)));
+    };
+    let at = 0;
+    for (let k = 0; k < 3; k++) {
+      if (k > 0) tl.to(cols[k - 1].g, { opacity: 0.32, duration: 0.7 }, at);
+      arma(k, at + (k > 0 ? 0.3 : 0));
+      at = tl.duration(); tl.addLabel('s' + (k + 1), at);
+    }
+    // s4: las tres juntas; el círculo D marca dónde se mide la distancia
+    tl.to(cols.map(c => c.g), { opacity: 1, duration: 0.8 }, at);
+    cols.forEach((c, k) => tl.to(c.circ, { attr: { fill: C.coral }, duration: 0.5 }, at + 0.7 + k * 0.3)
+      .to(c.dT, { attr: { fill: '#fff' }, duration: 0.5 }, at + 0.7 + k * 0.3));
+    at = tl.duration(); tl.addLabel('s4', at);
+    A.pasos(root, tl);
+  }
+
+  // ================================================================ colapsoPasos: el precio, el colapso
+  K.register('colapsoPasos', root => {
+    const S = A.svg(root, 1100, 450);
+    A.cuandoFuentes(() => colapsoPasos(root, S));
+  });
+  function colapsoPasos(root, S) {
+    const COL = [C.coralD, C.teal, C.blue, ORO];
+    const ROWS = [126, 190, 254, 318], TS = 44;
+    const P = { x: 455, y: 100, w: 320, h: 250 }, RX = 810;
+    const kf = [
+      { c: [[-0.2, 0.3], [0.5, -0.1], [-0.45, -0.35], [0.2, 0.55]], u: [[0.5, 0.25], [-0.3, 0.45], [0.4, -0.4], [-0.45, -0.3]] },
+      { c: [[-0.6, 0.55], [0.6, 0.5], [-0.55, -0.55], [0.6, -0.5]], u: [[0.06, 0.03], [-0.04, 0.05], [0.05, -0.04], [-0.05, -0.03]] },
+      { c: [[0, 0], [0, 0], [0, 0], [0, 0]], u: [[0, 0], [0, 0], [0, 0], [0, 0]] },
+      { c: [[-0.72, -0.36], [-0.24, -0.12], [0.24, 0.12], [0.72, 0.36]], u: [[0.05, 0.025], [-0.05, -0.025], [0.05, 0.025], [-0.05, -0.025]] }
+    ];
+    const estado = t => {
+      const k = Math.min(2, Math.floor(t)), s = A.clamp(t - k, 0, 1), a = kf[k], b = kf[k + 1];
+      return [0, 1, 2, 3].map(i => { const c = lerp2(a.c[i], b.c[i], s), u = lerp2(a.u[i], b.u[i], s);
+        return { sx: [c[0] + u[0], c[1] + u[1]], sy: [c[0] - u[0], c[1] - u[1]] }; });
+    };
+    const mx = v => P.x + P.w / 2 + v * P.w * 0.44, my = v => P.y + P.h / 2 - v * P.h * 0.44;
+
+    // título
+    const head = titulos(S, [
+      ['Joint-embedding: dos vistas por el mismo encoder; la pérdida acerca $s_x$ a $s_y$', C.navy],
+      ['Sin entrenar: cada vista da un punto y los pares quedan lejos', C.navy],
+      ['Solución buena: cada par coincide y las imágenes quedan separadas', C.teal],
+      ['Solución trivial: el encoder devuelve el mismo vector para todo', C.coralD],
+      ['Colapso dimensional: las imágenes se separan en una sola dirección', C.coralD],
+      ['Para evitarlo hace falta algo más que la pérdida', C.navy]
+    ], { y: 32 });
+    head.set(0);
+
+    // entrada: dos vistas por imagen, encoder compartido
+    A.texto(S, 'dos vistas por imagen', 20, 88, { size: 18, color: C.grey2 });
+    function miniatura(x, y, i, corr) {
+      const id = S.uid('clip'), cp = el('clipPath', { id }, S.defs);
+      el('rect', { x, y, width: TS, height: TS, rx: 5 }, cp);
+      el('rect', { x, y, width: TS, height: TS, rx: 5, fill: COL[i], 'fill-opacity': 0.16, stroke: COL[i], 'stroke-opacity': 0.6, 'stroke-width': 1.4 }, S);
+      const h = el('g', { 'clip-path': `url(#${id})`, fill: COL[i] }, S), cx = x + TS / 2 + corr, cy = y + TS / 2 + corr * 0.6;
+      if (i === 0) { el('path', { d: `M${cx - 14},${cy + 5} L${cx},${cy - 11} L${cx + 14},${cy + 5} Z` }, h); el('rect', { x: cx - 10, y: cy + 5, width: 20, height: 11 }, h); }
+      else if (i === 1) { el('circle', { cx, cy: cy - 3, r: 11 }, h); el('rect', { x: cx - 2, y: cy + 6, width: 4, height: 11 }, h); }
+      else if (i === 2) el('ellipse', { cx, cy: cy + 2, rx: 17, ry: 8 }, h);
+      else el('circle', { cx, cy, r: 11 }, h);
+    }
+    ROWS.forEach((y, i) => { miniatura(20, y - TS / 2, i, -4); miniatura(72, y - TS / 2, i, 5);
+      A.flecha(S, [[124, y], [172, y]], C.grey, { lw: 1.8 }); });
+    el('rect', { x: 186, y: 100, width: 120, height: 244, rx: 12, fill: '#fff', stroke: C.blue, 'stroke-width': 2.4 }, S);
+    A.texto(S, 'encoder', 246, 218, { size: 19, weight: '600', color: C.blue, anchor: 'middle' });
+    A.texto(S, '(compartido)', 246, 242, { size: 18, color: C.grey2, anchor: 'middle' });
+    A.flecha(S, [[314, 222], [444, 222]], C.grey, { lw: 2 });
+    A.texto(S, 'un punto', 379, 190, { size: 18, color: C.grey2, anchor: 'middle' });
+    A.texto(S, 'por vista', 379, 210, { size: 18, color: C.grey2, anchor: 'middle' });
+
+    // espacio de representaciones
+    el('rect', { x: P.x, y: P.y, width: P.w, height: P.h, rx: 8, fill: '#fafafc', stroke: C.grid, 'stroke-width': 1.3 }, S);
+    A.texto(S, 'espacio de representaciones', P.x + P.w / 2, P.y - 12, { size: 18, weight: '600', color: C.navy, anchor: 'middle' });
+    const recta = el('line', { x1: mx(-0.95), y1: my(-0.475), x2: mx(0.95), y2: my(0.475), stroke: C.coralD, 'stroke-opacity': 0.4, 'stroke-width': 1.6, 'stroke-dasharray': '5 4' }, S);
+    recta.style.opacity = 0;
+    const ptsG = el('g', {}, S); ptsG.style.opacity = 0;
+    const pts = COL.map(col => ({
+      ln: el('line', { stroke: C.grey2, 'stroke-opacity': 0.7, 'stroke-width': 1.5, 'stroke-dasharray': '3 3' }, ptsG),
+      sy: el('circle', { r: 7, fill: '#fff', stroke: col, 'stroke-width': 2.8 }, ptsG),
+      sx: el('circle', { r: 7.5, fill: col }, ptsG)
+    }));
+    const encimados = A.texto(S, 'los 8 puntos, encimados', mx(0), my(0) + 38, { size: 18, weight: '600', color: C.coralD, anchor: 'middle' });
+    encimados.style.opacity = 0;
+    const LY = P.y + P.h + 32;
+    el('circle', { cx: P.x + 12, cy: LY - 6, r: 6.5, fill: C.grey2 }, S); A.texto(S, '$s_x$', P.x + 26, LY, { size: 19, color: C.grey2 });
+    el('circle', { cx: P.x + 84, cy: LY - 6, r: 6, fill: '#fff', stroke: C.grey2, 'stroke-width': 2.4 }, S); A.texto(S, '$s_y$', P.x + 98, LY, { size: 19, color: C.grey2 });
+    A.texto(S, 'color = imagen', P.x + P.w, LY, { size: 18, color: C.grey2, anchor: 'end' });
+
+    // viajeros: cada vista sale de su miniatura, pasa por el encoder y cae en el espacio
+    const st0 = estado(0);
+    const viaj = [];
+    ROWS.forEach((y, i) => [0, 1].forEach(v => {
+      const c = el('circle', { cx: v ? 94 : 42, cy: y, r: 6.5, fill: COL[i] }, S); c.style.opacity = 0;
+      const dest = v ? st0[i].sy : st0[i].sx;
+      viaj.push({ c, y, v, x0: v ? 94 : 42, dx: mx(dest[0]), dy: my(dest[1]) });
+    }));
+
+    // lecturas
+    const lect = el('g', {}, S); lect.style.opacity = 0;
+    const filaY = [118, 196, 274];
+    ['pérdida (distancia de cada par)', '¿distingue las imágenes?', 'dimensiones que usa'].forEach((s, j) => A.texto(lect, s, RX, filaY[j], { size: 18, color: C.grey2 }));
+    const perdT = texto0(lect, RX, filaY[0] + 34, { size: 27, weight: '600' });
+    const valores = (j, lista) => seq(lista.map(([s, col]) => A.texto(lect, s, RX, filaY[j] + 34, { size: 27, weight: '600', color: col })));
+    const DIST = valores(1, [['—', C.grey2], ['sí', C.teal], ['no', C.coralD]]), IDX_D = [0, 0, 1, 2, 1, 1];
+    const DIM = valores(2, [['—', C.grey2], ['2 de 2', C.teal], ['0 de 2', C.coralD], ['1 de 2', C.coralD]]), IDX_M = [0, 0, 1, 2, 3, 3];
+    DIST.set(0); DIM.set(0);
+    const NOTA = seq([
+      'La pérdida sólo mira cada par por separado: nada en ella obliga a separar imágenes distintas.',
+      'Pérdida casi cero y representación útil.',
+      'Pérdida exactamente cero y representación inútil: la pérdida no distingue este caso del anterior.',
+      'Pérdida casi cero, pero la representación ocupa un subespacio chico. Es más sutil y más común que el colapso total.'
+    ].map(s => parrafo(S, s, RX, 346, 284, { size: 18, lh: 24, color: C.navy })));
+    // cierre: tres maneras de romper la simetría
+    const pills = ['negativos', 'un regularizador', 'una asimetría entre ramas'].map((s, j) => {
+      const g = oculto(el('g', {}, S)), w = A.medir(s, 18, '500') + 28, y = 336 + j * 40;
+      el('rect', { x: RX, y, width: w, height: 32, rx: 16, fill: C.light, stroke: C.blue, 'stroke-width': 1.6 }, g);
+      A.texto(g, s, RX + 14, y + 22, { size: 18, weight: '500', color: C.blue });
+      return g;
+    });
+
+    const dibuja = t => {
+      const st = estado(t);
+      st.forEach((p, i) => {
+        const a = [mx(p.sx[0]), my(p.sx[1])], b = [mx(p.sy[0]), my(p.sy[1])], E = pts[i];
+        E.sx.setAttribute('cx', a[0]); E.sx.setAttribute('cy', a[1]); E.sy.setAttribute('cx', b[0]); E.sy.setAttribute('cy', b[1]);
+        E.ln.setAttribute('x1', a[0]); E.ln.setAttribute('y1', a[1]); E.ln.setAttribute('x2', b[0]); E.ln.setAttribute('y2', b[1]);
+      });
+      const perd = st.reduce((s, p) => s + Math.hypot(p.sx[0] - p.sy[0], p.sx[1] - p.sy[1]), 0) / 4;
+      perdT.textContent = num(perd); perdT.setAttribute('fill', perd < 0.2 ? C.teal : C.coralD);
+    };
+    const PX = proxy(dibuja); dibuja(0);
+
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    tl.addLabel('s0', 0);
+    // s1: cada vista viaja por el encoder hasta su punto
+    let at = 0;
+    head.a(tl, 1, at);
+    viaj.forEach((q, j) => {
+      const t0 = at + 0.5 + j * 0.08;
+      tl.to(q.c, { opacity: 1, duration: 0.25 }, t0)
+        .to(q.c, { attr: { cx: 176 }, duration: 0.6, ease: 'power1.in' }, t0 + 0.1)
+        .to(q.c, { attr: { cx: 246, cy: 222 }, opacity: 0.35, duration: 0.45, ease: 'none' }, t0 + 0.7)
+        .to(q.c, { attr: { cx: 314 }, opacity: 1, duration: 0.3, ease: 'none' }, t0 + 1.15)
+        .to(q.c, { attr: { cx: q.dx, cy: q.dy }, duration: 0.75, ease: 'power2.out' }, t0 + 1.45)
+        .to(q.c, { opacity: 0, duration: 0.2 }, t0 + 2.2);
+    });
+    tl.to(ptsG, { opacity: 1, duration: 0.3 }, at + 2.65)
+      .to(lect, { opacity: 1, duration: 0.5 }, at + 2.7);
+    NOTA.a(tl, 0, at + 2.8);
+    at = tl.duration(); tl.addLabel('s1', at);
+    // s2–s4: los puntos se reacomodan; la pérdida y las lecturas cambian
+    for (let n = 2; n <= 4; n++) {
+      head.a(tl, n, at);
+      if (n === 4) tl.to(encimados, { opacity: 0, duration: 0.4 }, at + 0.3);
+      va(tl, PX, n - 2, n - 1, at + 0.5, 1.9);
+      if (n === 3) tl.to(encimados, { opacity: 1, duration: 0.5 }, at + 2.2);
+      if (n === 4) tl.to(recta, { opacity: 1, duration: 0.8 }, at + 1.6);
+      DIST.a(tl, IDX_D[n], at + 2.0); DIM.a(tl, IDX_M[n], at + 2.2);
+      NOTA.a(tl, n - 1, at + 2.4);
+      at = tl.duration(); tl.addLabel('s' + n, at);
+    }
+    // s5: hace falta algo más que la pérdida
+    head.a(tl, 5, at);
+    tl.to(NOTA.items, { opacity: 0, duration: 0.4 }, at + 0.3);
+    pills.forEach((g, j) => aparece(tl, g, at + 0.8 + j * 0.4));
+    at = tl.duration(); tl.addLabel('s5', at);
+    A.pasos(root, tl);
+  }
+
+  // ================================================================ noColapsa: stop-gradient y EMA
+  K.register('noColapsa', root => {
+    const S = A.svg(root, 1100, 440);
+    A.cuandoFuentes(() => noColapsa(root, S));
+  });
+  function noColapsa(root, S) {
+    const NI = 5, COL = [C.blue, C.teal, C.coralD, ORO, VIOLETA];
+    const CEN = [...Array(NI)].map((_, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / NI; return [0.66 * Math.cos(a), 0.66 * Math.sin(a)]; });
+    const OFF = [[0.32, 0.1], [-0.2, 0.28], [0.25, -0.26], [-0.3, -0.12], [0.12, 0.33]];
+    const DR = [[0.12, 0.1], [0.1, 0.14], [-0.04, 0.16], [-0.14, 0.06], [0.02, -0.12]];
+    const LN = [0.89, 0.45];                              // dirección a la que se aplasta sin EMA
+    const proy = p => { const d = p[0] * LN[0] + p[1] * LN[1]; return [d * LN[0], d * LN[1]]; };
+    const P = { x: 30, y: 74, s: 300 }, RX = 410;
+    const mx = v => P.x + P.s / 2 + v * P.s * 0.42, my = v => P.y + P.s / 2 - v * P.s * 0.42;
+    // escenario n (1..4) en avance u (la timeline pone la curva de velocidad)
+    function estado(n, u) {
+      return CEN.map((c, i) => {
+        const p0 = [c[0] + OFF[i][0], c[1] + OFF[i][1]];
+        if (n === 0) return { p: p0, o: c, tr: null };
+        if (n === 1) { const k = 1 - 0.97 * u; return { p: lerp2(p0, c, u).map(v => v * k), o: c.map(v => v * k), tr: null }; }
+        if (n === 2) return { p: lerp2(p0, c, u), o: c, tr: null };
+        if (n === 3) { const o = [c[0] + DR[i][0] * u, c[1] + DR[i][1] * u]; return { p: lerp2(p0, o, u), o, tr: u > 0 ? c : null }; }
+        const o = lerp2(c, proy(c), u); return { p: lerp2(p0, o, Math.min(1, u * 1.3)), o, tr: null };
+      });
+    }
+    // v ∈ [0, 4]: tramo k-1..k = escenario k; desde el 2, el primer 30 % vuelve a la configuración inicial
+    const VUELTA = 0.3;
+    function enV(v) {
+      if (v <= 1) return estado(1, Math.max(0, v));
+      const k = Math.min(4, Math.ceil(v - 1e-9)), f = v - (k - 1);
+      if (f >= VUELTA) return estado(k, (f - VUELTA) / (1 - VUELTA));
+      const a = estado(k - 1, 1), b = estado(0, 0), w = f / VUELTA;
+      return a.map((e, i) => ({ p: lerp2(e.p, b[i].p, w), o: lerp2(e.o, b[i].o, w), tr: null }));
+    }
+
+    const head = titulos(S, [
+      ['Dos salidas por imagen: la predicción y el objetivo', C.navy],
+      ['Si el gradiente pasara por las dos ramas, ambas se juntan en un punto', C.coralD],
+      ['Con stop-gradient, la pérdida no puede mover el objetivo', C.teal],
+      ['Con EMA, el objetivo sigue al encoder de contexto, despacio', C.teal],
+      ['Sin EMA (m = 0), el objetivo cambia con cada paso y la nube se aplasta', C.coralD]
+    ], { y: 32 });
+    head.set(0);
+
+    el('rect', { x: P.x, y: P.y, width: P.s, height: P.s, rx: 8, fill: '#fafafc', stroke: C.grid, 'stroke-width': 1.3 }, S);
+    A.texto(S, 'espacio de representaciones', P.x + P.s / 2, P.y - 10, { size: 18, color: C.grey2, anchor: 'middle' });
+    const recta = el('line', { x1: mx(-LN[0]), y1: my(-LN[1]), x2: mx(LN[0]), y2: my(LN[1]), stroke: C.coralD, 'stroke-opacity': 0.4, 'stroke-width': 1.6, 'stroke-dasharray': '5 4' }, S);
+    recta.style.opacity = 0;
+    const E = COL.map(col => ({
+      fant: el('circle', { r: 8, fill: 'none', stroke: col, 'stroke-opacity': 0.35, 'stroke-width': 2 }, S),
+      est: el('line', { stroke: col, 'stroke-opacity': 0.5, 'stroke-width': 2.2, 'stroke-dasharray': '2 3' }, S),
+      ln: el('line', { stroke: C.grey2, 'stroke-opacity': 0.6, 'stroke-width': 1.3, 'stroke-dasharray': '3 3' }, S),
+      o: el('circle', { r: 8.5, fill: '#fff', stroke: col, 'stroke-width': 2.9 }, S),
+      p: el('circle', { r: 6.5, fill: col }, S)
+    }));
+    const LY = P.y + P.s + 30;
+    el('circle', { cx: P.x + 10, cy: LY - 6, r: 6, fill: C.grey2 }, S); A.texto(S, 'predicción $\\hat s_y$', P.x + 24, LY, { size: 18, color: C.grey2 });
+    el('circle', { cx: P.x + 188, cy: LY - 6, r: 6.5, fill: '#fff', stroke: C.grey2, 'stroke-width': 2.4 }, S); A.texto(S, 'objetivo $s_y$', P.x + 202, LY, { size: 18, color: C.grey2 });
+
+    const filaY = [100, 172, 244];
+    ['pérdida (distancia predicción–objetivo)', 'dispersión de los objetivos', 'ancho en la dirección más angosta'].forEach((s, j) => A.texto(S, s, RX, filaY[j], { size: 18, color: C.grey2 }));
+    const V = filaY.map(y => texto0(S, RX, y + 34, { size: 27, weight: '600' }));
+    const NOTA = seq([
+      'La pérdida sólo pide que cada predicción caiga sobre su objetivo.',
+      'Mover las dos salidas hacia la misma constante es el camino más corto a pérdida cero: colapso.',
+      'El objetivo queda fijo durante el paso; para bajar la pérdida, la única salida es predecir bien.',
+      'Los objetivos se desplazan, pero siguen separados: vienen de un encoder que todavía distingue las imágenes.',
+      'Sin el promedio lento, predicción y objetivo se mueven juntos y la representación pierde dimensiones.'
+    ].map(s => parrafo(S, s, RX, 324, 660, { size: 19, lh: 26, color: C.navy })));
+    NOTA.set(0);
+    A.texto(S, 'Esquema. La solución trivial sigue existiendo: lo que la evita es la dinámica del entrenamiento, sin garantía.', 0, 432, { size: 18, color: C.grey2 });
+
+    const pon = (e, a, b) => { e.setAttribute('x1', a[0]); e.setAttribute('y1', a[1]); e.setAttribute('x2', b[0]); e.setAttribute('y2', b[1]); };
+    const dibuja = v => {
+      const st = enV(v);
+      st.forEach((s, i) => {
+        const p = [mx(s.p[0]), my(s.p[1])], o = [mx(s.o[0]), my(s.o[1])], e = E[i];
+        e.p.setAttribute('cx', p[0]); e.p.setAttribute('cy', p[1]); e.o.setAttribute('cx', o[0]); e.o.setAttribute('cy', o[1]);
+        pon(e.ln, p, o);
+        if (s.tr) { const t = [mx(s.tr[0]), my(s.tr[1])]; pon(e.est, t, o); e.fant.setAttribute('cx', t[0]); e.fant.setAttribute('cy', t[1]); }
+        e.est.style.opacity = e.fant.style.opacity = s.tr ? 1 : 0;
+      });
+      const perd = st.reduce((a, e) => a + Math.hypot(e.p[0] - e.o[0], e.p[1] - e.o[1]), 0) / NI;
+      const mu = [0, 1].map(d => st.reduce((a, e) => a + e.o[d], 0) / NI);
+      const cxx = st.reduce((a, e) => a + (e.o[0] - mu[0]) ** 2, 0) / NI, cyy = st.reduce((a, e) => a + (e.o[1] - mu[1]) ** 2, 0) / NI;
+      const cxy = st.reduce((a, e) => a + (e.o[0] - mu[0]) * (e.o[1] - mu[1]), 0) / NI;
+      const tra = cxx + cyy, det = cxx * cyy - cxy * cxy, l2 = Math.max(0, tra / 2 - Math.sqrt(Math.max(0, tra * tra / 4 - det)));
+      V[0].textContent = num(perd); V[0].setAttribute('fill', perd < 0.12 ? C.teal : C.navy);
+      V[1].textContent = num(Math.sqrt(tra)); V[1].setAttribute('fill', tra < 0.05 ? C.coralD : C.teal);
+      V[2].textContent = num(Math.sqrt(l2)); V[2].setAttribute('fill', l2 < 0.01 ? C.coralD : C.teal);
+    };
+    // estado inicial (s0): configuración de partida
+    const PX = proxy(dibuja);
+    const dib0 = () => { const st = estado(0, 0); const o = enV; dibuja.__ = 1; return st; };
+    dib0();
+    (function inicial() { const keep = enV; dibuja(0); })();
+    // v = 0 en enV es el escenario 1 sin avance, que coincide con la configuración inicial
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    tl.addLabel('s0', 0);
+    let at = 0;
+    for (let k = 1; k <= 4; k++) {
+      head.a(tl, k, at);
+      if (k > 1) va(tl, PX, k - 1, k - 1 + VUELTA, at + 0.5, 1.0);
+      if (k === 4) tl.to(recta, { opacity: 1, duration: 0.8 }, at + 1.6);
+      const t0 = at + (k > 1 ? 1.6 : 0.6);
+      va(tl, PX, k > 1 ? k - 1 + VUELTA : 0, k, t0, 2.2);
+      NOTA.a(tl, k, t0 + 0.3);
+      if (k === 4) { /* la recta queda */ }
+      at = tl.duration(); tl.addLabel('s' + k, at);
+    }
+    A.pasos(root, tl);
+  }
+
+  // ================================================================ colapso: simulación (blog)
+  // Encoder lineal 4 → 2 y predictor 2 × 2, datos de juguete en tres grupos. Misma dinámica, semilla y
+  // números que la versión en canvas: root._sim(cfg) devuelve { varianza, perdida } al final (pruebas).
+  const SIM = { T: 1800, CADA: 15 };
+  function simular(sg, m, registrar) {
+    const { mulberry, gauss } = K;
+    const CEN = [[1.2, 0.2], [-0.9, 0.9], [-0.2, -1.3]], AM = [[1, 0], [0, 1], [0.6, -0.4], [-0.3, 0.7]];
+    const LR = 0.02, T = SIM.T, B = 32;
+    const mv = (M, v) => M.map(row => row.reduce((s, a, i) => s + a * v[i], 0));
+    const r = mulberry(1);
+    const vista = c => { const z = [c[0] + 0.25 * gauss(r), c[1] + 0.25 * gauss(r)]; return AM.map(a => a[0] * z[0] + a[1] * z[1] + 0.35 * gauss(r)); };
+    const Wm = [0, 1].map(() => [0, 1, 2, 3].map(() => 0.5 * gauss(r))), Wb = Wm.map(q => q.slice()), Pm = [[1, 0], [0, 1]];
+    const ev = []; for (let k = 0; k < 150; k++) ev.push({ k: k % 3, x: vista(CEN[k % 3]) });
+    let t = 0, lossS = 0, varE = 0;
+    const hist = [], fotos = [];
+    const mide = () => {
+      const S = ev.map(e => mv(Wm, e.x)), mu = [0, 1].map(k => S.reduce((s, v) => s + v[k], 0) / S.length);
+      varE = S.reduce((s, v) => s + (v[0] - mu[0]) ** 2 + (v[1] - mu[1]) ** 2, 0) / S.length;
+      return S;
+    };
+    const foto = S => fotos.push(S.map(v => [v[0], v[1]]));
+    { const S0 = mide(); hist.push([0, varE, null]); if (registrar) foto(S0); }
+    while (t < T) {
+      const gW = [[0, 0, 0, 0], [0, 0, 0, 0]], gP = [[0, 0], [0, 0]]; let loss = 0;
+      for (let b = 0; b < B; b++) {
+        const c = CEN[Math.floor(r() * 3)], x = vista(c), y = vista(c);
+        const sx = mv(Wm, x), pr = mv(Pm, sx), sy = mv(sg ? Wb : Wm, y), e = [pr[0] - sy[0], pr[1] - sy[1]];
+        loss += (e[0] * e[0] + e[1] * e[1]) / B;
+        const Pte = [Pm[0][0] * e[0] + Pm[1][0] * e[1], Pm[0][1] * e[0] + Pm[1][1] * e[1]];
+        for (let i = 0; i < 2; i++) {
+          for (let j = 0; j < 2; j++) gP[i][j] += 2 * e[i] * sx[j] / B;
+          for (let j = 0; j < 4; j++) { gW[i][j] += 2 * Pte[i] * x[j] / B; if (!sg) gW[i][j] -= 2 * e[i] * y[j] / B; }  // sin stop-gradient, el objetivo también recibe gradiente
+        }
+      }
+      for (let i = 0; i < 2; i++) { for (let j = 0; j < 2; j++) Pm[i][j] -= LR * gP[i][j]; for (let j = 0; j < 4; j++) Wm[i][j] -= LR * gW[i][j]; }
+      if (sg) for (let i = 0; i < 2; i++) for (let j = 0; j < 4; j++) Wb[i][j] = m * Wb[i][j] + (1 - m) * Wm[i][j];
+      lossS = t ? 0.9 * lossS + 0.1 * loss : loss; t++;
+      if (t % 3 === 0) { const S = mide(); hist.push([t, varE, lossS]); if (registrar && t % SIM.CADA === 0) foto(S); }
+    }
+    mide();
+    return { varianza: varE, perdida: lossS, hist, fotos, grupo: ev.map(e => e.k) };
+  }
+
+  K.register('colapso', root => {
+    root._sim = cfg => { const R = simular(!!cfg.sg, cfg.m); return { varianza: R.varianza, perdida: R.perdida }; };  // para las pruebas
+    const S = A.svg(root, 1100, 465);
+    A.cuandoFuentes(() => colapso(root, S));
+  });
+  function colapso(root, S) {
+    const RUNS = [{ sg: false, m: 0, et: 'sin stop-gradient' }, { sg: true, m: 0.99, et: 'm = 0,99' }, { sg: true, m: 0, et: 'm = 0' }]
+      .map(c => ({ ...c, ...simular(c.sg, c.m, true) }));
+    const COLG = [C.blue, C.teal, C.coral];
+    const L = { x: 20, y: 84, s: 330 }, lcx = L.x + L.s / 2, lcy = L.y + L.s / 2, sc = L.s / 7;
+    const R = { x: 480, y: 84, w: 500, h: 290 }, YM = 4, T = SIM.T;
+    const X = v => R.x + v / T * R.w, Y = v => R.y + R.h - A.clamp(v, 0, YM) / YM * R.h;
+
+    const head = titulos(S, [
+      ['Un encoder lineal y tres grupos de datos: tres colores', C.navy],
+      ['Sin stop-gradient: un solo encoder, gradiente por las dos ramas', C.coralD],
+      ['Con stop-gradient y encoder objetivo por EMA (m = 0,99)', C.teal],
+      ['Con stop-gradient y m = 0: el objetivo es una copia sin gradiente', C.teal],
+      ['La pérdida baja en los tres casos; el colapso lo delata la varianza', C.navy]
+    ], { y: 32 });
+    head.set(0);
+
+    // izquierda: los embeddings s = W x
+    A.texto(S, 'Embeddings del encoder de contexto', L.x, L.y - 14, { size: 18, weight: '600', color: C.navy });
+    el('rect', { x: L.x, y: L.y, width: L.s, height: L.s, rx: 8, fill: '#fafafc', stroke: C.grid, 'stroke-width': 1.5 }, S);
+    el('path', { d: `M${L.x},${lcy}h${L.s}M${lcx},${L.y}v${L.s}`, stroke: C.grid, 'stroke-width': 1 }, S);
+    const cid = S.uid('clip'), cp = el('clipPath', { id: cid }, S.defs); el('rect', { x: L.x, y: L.y, width: L.s, height: L.s }, cp);
+    const nube = el('g', { 'clip-path': `url(#${cid})` }, S);
+    const PTS = RUNS[0].grupo.map(k => el('circle', { r: 4.6, fill: COLG[k], 'fill-opacity': 0.9 }, nube));
+    const estB = A.texto(S, 'tres grupos de datos, tres colores', L.x, L.y + L.s + 30, { size: 18, color: C.grey2 });
+    const estM = A.texto(S, 'colapso: todas las entradas dan el mismo vector', L.x, L.y + L.s + 30, { size: 18, weight: '600', color: C.coralD });
+    estM.style.opacity = 0;
+
+    // derecha: varianza y pérdida
+    for (let v = 0; v <= YM; v++) {
+      el('line', { x1: R.x, y1: Y(v), x2: R.x + R.w, y2: Y(v), stroke: C.grid, 'stroke-width': 1 }, S);
+      A.texto(S, String(v), R.x - 10, Y(v) + 6, { size: 18, color: C.grey, anchor: 'end' });
+    }
+    for (const v of [0, 600, 1200, 1800]) A.texto(S, String(v), X(v), R.y + R.h + 26, { size: 18, color: C.grey, anchor: 'middle' });
+    A.texto(S, 'pasos de entrenamiento', R.x + R.w, R.y + R.h + 52, { size: 18, color: C.grey2, anchor: 'end' });
+    const lectura = texto0(S, R.x + R.w, 455, { size: 18, color: C.navy, anchor: 'end' });
+
+    const camino = (h, k) => 'M' + h.filter(q => q[k] !== null).map(q => X(q[0]).toFixed(1) + ',' + Y(q[k]).toFixed(1)).join(' L');
+    RUNS.forEach(run => {
+      run.g = el('g', {}, S);
+      const id = S.uid('clip'), c = el('clipPath', { id }, S.defs);
+      run.clip = el('rect', { x: R.x - 8, y: R.y - 12, width: 0, height: R.h + 24 }, c);
+      const cg = el('g', { 'clip-path': `url(#${id})` }, run.g);
+      run.pL = el('path', { d: camino(run.hist, 2), fill: 'none', stroke: C.coral, 'stroke-width': 3, 'stroke-linejoin': 'round' }, cg);
+      run.pV = el('path', { d: camino(run.hist, 1), fill: 'none', stroke: C.teal, 'stroke-width': 3, 'stroke-linejoin': 'round' }, cg);
+      run.cab = el('g', {}, run.g);
+      run.dV = el('circle', { r: 5.5, fill: C.teal }, run.cab); run.dL = el('circle', { r: 5.5, fill: C.coral }, run.cab);
+      run.tV = A.texto(run.cab, 'varianza', 0, 0, { size: 18, weight: '600', color: C.teal });
+      run.tL = A.texto(run.cab, 'pérdida', 0, 0, { size: 18, weight: '600', color: C.coralD });
+      run.cab.style.opacity = 0;
+      const fin = run.hist[run.hist.length - 1];
+      run.fin = A.texto(run.g, run.et, R.x + R.w - 4, 0, { size: 18, weight: '600', color: C.teal, anchor: 'end' });
+      run.finY = Y(fin[1]) - 10; run.fin.style.opacity = 0;
+    });
+    // rótulos finales sin encimarse
+    { const o = RUNS.slice().sort((a, b) => b.finY - a.finY); for (let i = 1; i < o.length; i++) o[i].finY = Math.min(o[i].finY, o[i - 1].finY - 22);
+      RUNS.forEach(r => r.fin.setAttribute('transform', tr(0, r.finY))); }
+
+    const nubeDe = (run, s) => {          // posiciones de la nube en el paso s (interpoladas entre fotos)
+      const f = A.clamp(s / SIM.CADA, 0, run.fotos.length - 1), i = Math.min(run.fotos.length - 2, Math.floor(f)), u = f - i;
+      const a = run.fotos[i], b = run.fotos[i + 1];
+      return a.map((p, k) => [lerp(p[0], b[k][0], u), lerp(p[1], b[k][1], u)]);
+    };
+    const histDe = (run, s) => {
+      const f = A.clamp(s / 3, 0, run.hist.length - 1), i = Math.min(run.hist.length - 2, Math.floor(f)), u = f - i;
+      const a = run.hist[i], b = run.hist[i + 1];
+      return { v: lerp(a[1], b[1], u), l: a[2] === null ? (u > 0.5 ? b[2] : null) : lerp(a[2], b[2], u) };
+    };
+    const ponNube = (Q, varE) => {
+      Q.forEach((p, k) => { PTS[k].setAttribute('cx', (lcx + p[0] * sc).toFixed(1)); PTS[k].setAttribute('cy', (lcy - p[1] * sc).toFixed(1)); });
+      const col = varE < 0.02; estB.style.opacity = col ? 0 : 1; estM.style.opacity = col ? 1 : 0;
+    };
+    const dibRun = run => s => {
+      ponNube(nubeDe(run, s), histDe(run, s).v);
+      const h = histDe(run, s), x = X(s), yv = Y(h.v), yl = Y(h.l || 0), piso = Y(0) - 10;
+      run.clip.setAttribute('width', (x - R.x + 9).toFixed(1));
+      run.dV.setAttribute('cx', x); run.dV.setAttribute('cy', yv);
+      run.dL.setAttribute('cx', x); run.dL.setAttribute('cy', yl); run.dL.style.opacity = run.tL.style.opacity = h.l === null ? 0 : 1;
+      let a1 = Math.min(yv + 6, piso), a2 = Math.min(yl + 6, piso);
+      if (Math.abs(a1 - a2) < 20) { if (yv <= yl) a1 = a2 - 20; else a2 = a1 - 20; }
+      run.tV.setAttribute('transform', tr(x + 11, a1)); run.tL.setAttribute('transform', tr(x + 11, a2));
+      lectura.textContent = 'paso ' + Math.round(s) + '  ·  varianza de los embeddings = ' + num(h.v, 3) + '  ·  pérdida = ' + (h.l === null ? '—' : num(h.l, 3));
+    };
+    // al cambiar de corrida, la nube vuelve a la configuración inicial (misma semilla en las tres)
+    const vuelta = (de, a) => w => {
+      const Q0 = nubeDe(de, T), Q1 = nubeDe(a, 0), v0 = de.varianza, v1 = a.hist[0][1];
+      ponNube(Q0.map((p, k) => [lerp(p[0], Q1[k][0], w), lerp(p[1], Q1[k][1], w)]), lerp(v0, v1, w));
+      lectura.textContent = w < 1 ? '' : 'paso 0  ·  varianza de los embeddings = ' + num(v1, 3) + '  ·  pérdida = —';
+    };
+    dibRun(RUNS[0])(0);
+
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    tl.addLabel('s0', 0);
+    let at = 0;
+    RUNS.forEach((run, k) => {
+      head.a(tl, k + 1, at);
+      let t0 = at + 0.6;
+      if (k > 0) {
+        const prev = RUNS[k - 1];
+        tl.to(prev.cab, { opacity: 0, duration: 0.4 }, at + 0.3)
+          .to([prev.pV, prev.pL], { attr: { 'stroke-width': 2 }, opacity: 0.22, duration: 0.6 }, at + 0.3);
+        va(tl, proxy(vuelta(prev, run)), 0, 1, at + 0.5, 1.2);
+        t0 = at + 1.8;
+      }
+      tl.to(run.cab, { opacity: 1, duration: 0.3 }, t0);
+      va(tl, proxy(dibRun(run)), 0, T, t0, 4.2, 'power1.in');
+      at = tl.duration(); tl.addLabel('s' + (k + 1), at);
+    });
+    // s4: las tres curvas juntas
+    head.a(tl, 4, at);
+    const ult = RUNS[RUNS.length - 1];
+    tl.to(ult.cab, { opacity: 0, duration: 0.4 }, at + 0.3);
+    RUNS.forEach((run, k) => {
+      tl.to(run.pV, { attr: { 'stroke-width': 3 }, opacity: 1, duration: 0.7 }, at + 0.6 + k * 0.25)
+        .to(run.pL, { attr: { 'stroke-width': 2 }, opacity: 0.45, duration: 0.7 }, at + 0.6 + k * 0.25)
+        .to(run.fin, { opacity: 1, duration: 0.5 }, at + 0.9 + k * 0.25);
+    });
+    at = tl.duration(); tl.addLabel('s4', at);
+    A.pasos(root, tl);
+  }
+})();
+</script>
