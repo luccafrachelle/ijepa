@@ -104,7 +104,9 @@
     ctx.strokeRect(xs[h] - tw / 2 - 3, y + 2, tw + 6, 58);
     ctx.restore();
   }
-  const nota = (ctx, W, H, s) => tx(ctx, s, 24, H - 12, { color: C.grey2, size: 13.5 });
+  // en las slides, estas animaciones se ven al 75 % del ancho: los textos chicos se agrandan
+  const fs = v => (K.enReveal() ? Math.round(v * 1.22 * 10) / 10 : v);
+  const nota = (ctx, W, H, s) => tx(ctx, s, 24, H - 12, { color: C.grey2, size: fs(13.5) });
 
   // ============================================================ 1. de la imagen a los tokens
   K.register('parches', root => {
@@ -169,7 +171,7 @@
           tx(ctx, 'embedding posicional $p_k$: cada coordenada es un seno o coseno de la fila o la columna; no se entrena', X0, PY + 40, { color: alfa(VIO, f4), size: 13.5, weight: '600' });
         } else if (f5 >= 1) {
           tx(ctx, 'token de entrada: $E\\,x_k + p_k$', X0, VY + VH + 22, { color: C.navy, size: 15, weight: '600' });
-          tx(ctx, 'Como cada token lleva su posición, después se pueden quitar tokens sin perder dónde estaba cada uno.', X0, VY + VH + 46, { color: C.grey2, size: 13.5 });
+          tx(ctx, 'Como cada token lleva su posición, después se pueden quitar tokens sin perder dónde estaba cada uno.', X0, VY + VH + 46, { color: C.grey2, size: fs(13.5) });
         }
       }
       nota(ctx, W, H, 'Simplificado a 6 × 6 parches. Un ViT-B/16 a 224 px corta 14 × 14 = 196 parches de 16 × 16 píxeles.');
@@ -213,7 +215,7 @@
       });
       if (d > 0.3 && e < 0.6) arcos(ctx, CTX.map((_, n) => xComp(n) + TW / 2), BOX.y + 48, t, C.teal, fase(d, 0.3, 0.5) * (1 - fase(e, 0, 0.6)), PARES);
       if (e > 0.5) tx(ctx, '$s_x$: cada vector ya mezcló información de los demás parches visibles; ninguno vio los objetivos', 222, OY + TH + 24, { color: C.teal, size: 14, weight: '600' });
-      nota(ctx, W, H, 'Como sólo procesa una parte de los parches, este encoder es más barato que uno que ve la imagen entera.');
+      nota(ctx, W, H, 'Ninguno de estos vectores vio los parches objetivo.');
     };
     K.pasos(root, [0.155, 0.355, 0.505, 0.805, 1], draw);
   });
@@ -234,7 +236,7 @@
       const a = fase(t, 0.02, 0.12);
       mapa(ctx, MAP.x, MAP.y, MAP.s, { color: k => (ROL[k].r === 'obj' ? alfa(C.coral, 0.6) : null) });
       tx(ctx, 'bloques objetivo', MAP.x + MAP.s / 2, MAP.y + MAP.s + 20, { color: C.grey2, size: 13.5, align: 'center' });
-      red(ctx, BOX.x, BOX.y, BOX.w, BOX.h, 'Encoder objetivo $f_{\\bar\\theta}$', 'misma arquitectura · sin gradiente', C.navy, 1);
+      red(ctx, BOX.x, BOX.y, BOX.w, BOX.h, 'Encoder objetivo $f_{\\bar\\theta}$', 'misma arquitectura · sin gradiente (stop-gradient)', C.navy, 1);
       if (modo === 'salida') {
         const b = fase(t, 0.14, 0.44), c = fase(t, 0.46, 0.6), d = fase(t, 0.62, 0.72), e = fase(t, 0.74, 0.94);
         encabezado(ctx, 4, t < 0.13 ? 'El encoder objetivo recibe la imagen completa: los 36 tokens'
@@ -350,11 +352,11 @@
         });
       }
       if (e > 0.5) {
-        tx(ctx, 'las salidas del contexto se descartan', CX0, OY + TH0 + 22, { color: C.grey, size: 13.5 });
+        tx(ctx, 'las salidas del contexto se descartan', CX0, OY + TH0 + 22, { color: C.grey, size: fs(13.5) });
         tx(ctx, `$\\hat s_y$ bloque ${bq + 1}`, xm(0), OY + TH0 + 22, { color: C.blue, size: 14, weight: '600' });
-        tx(ctx, '(de vuelta a la dimensión del encoder)', xm(0), OY + TH0 + 40, { color: C.grey2, size: 12.5 });
+        tx(ctx, '(de vuelta a la dimensión del encoder)', xm(0), OY + TH0 + 42, { color: C.grey2, size: fs(12.5) });
       }
-      tx(ctx, 'Se repite una vez por bloque objetivo: 4 en el paper, 2 en este dibujo.', 24, H - 12, { color: C.grey2, size: 13.5 });
+      tx(ctx, 'Se repite una vez por bloque objetivo: 4 en el paper, 2 en este dibujo.', 24, H - 12, { color: C.grey2, size: fs(13.5) });
     };
     K.pasos(root, [0.165, 0.365, 0.505, 0.765, 0.999, 1.365, 1.765, 2], draw, { ms: 7000 });
   });
@@ -482,27 +484,27 @@
       tx(ctx, 'una coordenada de los pesos a lo largo del entrenamiento', S.x, S.y - 14, { color: C.navy, size: 14.5, weight: '600' });
       tx(ctx, 'pasos →', S.x + S.w, S.y + S.h + 18, { color: C.grey2, size: 12.5, align: 'right' });
       // θ: siempre de fondo una vez dibujado
-      capa(th, Math.round(T * u0), alfa(C.coral, t > 1 ? 0.45 : 0.8), 1.2);
+      capa(th, Math.round(T * u0), alfa(C.teal, t > 1 ? 0.45 : 0.8), 1.2);
       // m = 0,9
       if (u1 > 0) capa(E90, Math.round(T * u1), alfa(C.blue, t > 2 ? 0.25 : 1), 2);
       // m = 0,996 fijo
-      if (u2 > 0) capa(E996, Math.round(T * u2), alfa(C.teal, t > 3 ? 0.3 : 1), 3);
+      if (u2 > 0) capa(E996, Math.round(T * u2), alfa(C.navy, t > 3 ? 0.3 : 1), 3);
       // m de 0,996 a 1
       if (u3 > 0) {
-        capa(ESCH, Math.round(T * u3), C.teal, 3.4);
+        capa(ESCH, Math.round(T * u3), C.navy, 3.4);
         caja(ctx, MS.x - 10, MS.y - 26, MS.w + 20, MS.h + 46, { r: 8, fill: '#fafafc' });
         tx(ctx, '$m$ durante el entrenamiento', MS.x, MS.y - 8, { color: C.navy, size: 13, weight: '600' });
         ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.strokeRect(MS.x, MS.y, MS.w, MS.h);
-        ctx.strokeStyle = C.teal; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(MS.x, MS.y + MS.h); ctx.lineTo(MS.x + MS.w * u3, MS.y + MS.h - MS.h * u3); ctx.stroke();
+        ctx.strokeStyle = C.navy; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(MS.x, MS.y + MS.h); ctx.lineTo(MS.x + MS.w * u3, MS.y + MS.h - MS.h * u3); ctx.stroke();
         tx(ctx, '0,996', MS.x - 4, MS.y + MS.h + 4, { color: C.grey2, size: 11.5, align: 'right' });
         tx(ctx, '1', MS.x - 4, MS.y + 8, { color: C.grey2, size: 11.5, align: 'right' });
       }
       // leyenda
       const LY = S.y + S.h + 44;
-      tx(ctx, '$\\theta$: encoder de contexto', S.x, LY, { color: C.coralD, size: 14, weight: '600' });
+      tx(ctx, '$\\theta$: encoder de contexto', S.x, LY, { color: C.teal, size: 14, weight: '600' });
       if (u1 > 0) tx(ctx, '$\\bar\\theta$ con $m = 0{,}9$', S.x, LY + 22, { color: alfa(C.blue, t > 2 ? 0.45 : 1), size: 14, weight: '600' });
-      if (u2 > 0) tx(ctx, '$\\bar\\theta$ con $m = 0{,}996$', S.x, LY + 44, { color: alfa(C.teal, t > 3 ? 0.5 : 1), size: 14, weight: '600' });
-      if (u3 > 0) tx(ctx, '$\\bar\\theta$ con $m$ de 0,996 a 1 (I-JEPA)', S.x, LY + 66, { color: C.teal, size: 14, weight: '700' });
+      if (u2 > 0) tx(ctx, '$\\bar\\theta$ con $m = 0{,}996$', S.x, LY + 44, { color: alfa(C.navy, t > 3 ? 0.5 : 1), size: 14, weight: '600' });
+      if (u3 > 0) tx(ctx, '$\\bar\\theta$ con $m$ de 0,996 a 1 (I-JEPA)', S.x, LY + 66, { color: C.navy, size: 14, weight: '700' });
     };
     K.pasos(root, [0, 1, 2, 3, 4], draw, { ms: 4200, max: 4200 });
   });
@@ -521,14 +523,14 @@
         : t < 0.73 ? 'Average pooling: los vectores de todos los parches se promedian en uno solo'
         : 'Encima se entrena sólo un clasificador lineal: la evaluación lineal');
       // las tres redes entrenadas
-      const top = [['Encoder de contexto', C.teal, true], ['Predictor', C.blue, true], ['Encoder objetivo', C.coralD, false]];
+      const top = [['Encoder de contexto', C.teal, true], ['Predictor', C.blue, true], ['Encoder objetivo', C.navy, false]];
       top.forEach(([n, col, fuera], i) => {
         const x = 230 + i * 250, y = 56;
         const al = fuera ? 1 - 0.7 * a : 1;
         caja(ctx, x, y, 220, 50, { r: 12, fill: '#ffffff', stroke: alfa(col, al), lw: 2.4 });
         tx(ctx, n, x + 110, y + 31, { color: alfa(col, al), size: 15.5, weight: '600', align: 'center' });
         if (fuera && a > 0) { ctx.strokeStyle = alfa(C.coralD, a); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + 12, y + 8); ctx.lineTo(x + 208, y + 42); ctx.stroke(); tx(ctx, 'se descarta', x + 110, y + 70, { color: alfa(C.coralD, a), size: 13.5, align: 'center' }); }
-        if (!fuera && a > 0.5) tx(ctx, 'se usa, congelado ↓', x + 110, y + 70, { color: C.coralD, size: 13.5, weight: '600', align: 'center' });
+        if (!fuera && a > 0.5) tx(ctx, 'se usa, congelado ↓', x + 110, y + 70, { color: C.navy, size: 13.5, weight: '600', align: 'center' });
       });
       // imagen nueva y encoder
       if (b > 0) {

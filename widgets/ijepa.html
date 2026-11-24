@@ -216,15 +216,16 @@
     // panel derecho: la representación de este futuro (objetivo) y la predicción
     function tabla() {
       const x = P[2].x, cO = x + 238, cP = x + 306, y0 = PY + 22, dy = 44, nitido = u < 0.06;
+      const ang = Math.round(actual.th * 180 / Math.PI) + '°';
       K.rich(ctx, '$s_y$', cO, y0, { color: C.teal, size: 17, align: 'right' });
       K.rich(ctx, '$\\hat s_y$', cP, y0, { color: C.blue, size: 17, align: 'right' });
       const F = [['hay una pelota', 'sí', 'sí', true], ['tamaño', '0,21', '0,21', true], ['distancia recorrida', '0,46', '0,46', true],
-                 ['dirección', nitido ? '0°' : '', nitido ? '0°' : '', nitido], ['textura del fondo', '', '', false]];
+                 ['dirección', ang, nitido ? '0°' : '?', true], ['textura del fondo', '', '', false]];
       F.forEach(([n, o, pr, ok], k) => {
         const y = y0 + 36 + k * dy;
         ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y - 26); ctx.lineTo(x + 310, y - 26); ctx.stroke();
         text(ctx, n, x, y, { color: ok ? C.navy : C.grey, size: 15, weight: ok ? '600' : '400' });
-        if (ok) { text(ctx, o, cO, y, { color: C.teal, size: 15, weight: '600', align: 'right' }); text(ctx, pr, cP, y, { color: C.blue, size: 15, weight: '600', align: 'right' }); }
+        if (ok) { text(ctx, o, cO, y, { color: C.teal, size: 15, weight: '600', align: 'right' }); text(ctx, pr, cP, y, { color: pr === '?' ? C.coralD : C.blue, size: 15, weight: '600', align: 'right' }); }
         else text(ctx, 'no se representa', cP, y, { color: C.grey, size: 13.5, align: 'right' });
       });
     }
@@ -245,8 +246,8 @@
       text(ctx, 'Predicción en representación', P[2].x, 30, { color: C.teal, size: 18, weight: '600' });
       K.rich(ctx, 'objetivo $s_y$ y predicción $\\hat s_y$', P[2].x, 51, { color: C.grey2, size: 14 });
       tabla();
-      text(ctx, 'error en lo representado: 0', P[2].x, PY + PS + 26, { color: C.teal, size: 16, weight: '600' });
-      text(ctx, 'mismo objetivo para todos los futuros', P[2].x, PY + PS + 48, { color: C.grey2, size: 14 });
+      text(ctx, 'la textura, irrelevante, se descarta', P[2].x, PY + PS + 26, { color: C.teal, size: 15, weight: '600' });
+      K.rich(ctx, u < 0.06 ? 'sin incertidumbre, también se predice' : 'la dirección importa y es incierta: falta $z$', P[2].x, PY + PS + 48, { color: u < 0.06 ? C.grey2 : C.coralD, size: 14, align: 'left' });
       text(ctx, 'punto de partida', P[0].x, PY + PS + 26, { color: C.coralD, size: 14 });
       text(ctx, 'y dirección de este futuro', P[0].x, PY + PS + 46, { color: C.coralD, size: 14 });
     }
@@ -530,7 +531,7 @@
     const draw = t => {
       ctx.clearRect(0, 0, W, H);
       const n = Math.round(t), st = estado(t);
-      const HEAD = ['Dos vistas de cada imagen pasan por el mismo encoder; la pérdida acerca $s_x$ a $s_y$',
+      const HEAD = ['Joint-embedding: dos vistas por el mismo encoder; la pérdida acerca $s_x$ a $s_y$',
         'Solución buena: cada par coincide y las imágenes quedan separadas',
         'Solución trivial: el encoder devuelve el mismo vector para todo',
         'Colapso dimensional: las imágenes se separan en una sola dirección'];
@@ -769,16 +770,15 @@
   K.register('pasada', root => {
     const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
     const SC = 0.84, OX = 150, OY = (H - 500 * SC) / 2 + 4;
-    const ITEMS = [
-      ['Tokens', 'La imagen se corta en parches y cada uno lleva su posición.'],
-      ['Máscaras', 'Se sortean un bloque de contexto y varios bloques objetivo.'],
-      ['Encoder de contexto', 'Procesa sólo los tokens de contexto y da $s_x$.'],
-      ['Encoder objetivo', 'Procesa la imagen entera; se recortan los objetivos $s_y$.'],
-      ['Predictor', 'Con $s_x$ y la posición de cada objetivo, predice $\\hat s_y$.'],
-      ['Pérdida', 'Distancia entre $\\hat s_y$ y $s_y$, promediada sobre los objetivos.'],
-      ['Gradiente', 'Actualiza el predictor y el encoder de contexto; $s_y$ no recibe gradiente.'],
-      ['EMA', 'El encoder objetivo pasa a ser un promedio móvil del de contexto.']
-    ];
+    const ITEMS = ['Tokens', 'Máscaras', 'Encoder de contexto', 'Encoder objetivo', 'Predictor', 'Pérdida', 'Gradiente y EMA'];
+    const DESC = ['La imagen se corta en parches y cada uno lleva su posición.',
+      'Se sortean un bloque de contexto y varios bloques objetivo.',
+      'Procesa sólo los tokens de contexto y da $s_x$.',
+      'Procesa la imagen entera; se recortan los objetivos $s_y$.',
+      'Con $s_x$ y la posición de cada objetivo, predice $\\hat s_y$.',
+      'Distancia entre $\\hat s_y$ y $s_y$, promediada sobre los objetivos.',
+      'El gradiente actualiza el predictor y el encoder de contexto; $s_y$ no recibe gradiente.',
+      'Después, el encoder objetivo se mueve hacia el de contexto por EMA.'];
     const draw = t => {
       ctx.clearRect(0, 0, W, H);
       const n = Math.round(t), f = 1 - Math.min(1, Math.abs(t - n) * 2);
@@ -787,13 +787,14 @@
       MAPA.dibujar(ctx, OX / SC, OY / SC, act, { grilla: n === 0 });
       ctx.restore();
       // lista de etapas
-      const LX = 470, LY = 44, DY = 43;
-      ITEMS.forEach(([tit, desc], k) => {
-        const on = k === n, ya = k < n, y = LY + k * DY;
+      const LX = 470, LY = 50, DY = 48;
+      const item = Math.min(n, 6);
+      ITEMS.forEach((tit, k) => {
+        const on = k === item, ya = k < item, y = LY + k * DY;
         caja(ctx, LX, y - 15, 26, 26, { r: 7, fill: on ? C.blue : ya ? alfa(C.blue, 0.25) : '#ffffff', stroke: on || ya ? C.blue : C.grid, lw: 1.4 });
         text(ctx, String(k + 1), LX + 13, y + 4, { color: on ? '#fff' : ya ? C.blue : C.grey2, size: 13.5, weight: '700', align: 'center' });
         text(ctx, tit, LX + 40, y + 4, { color: on ? C.navy : ya ? alfa(C.navy, 0.6) : C.grey2, size: on ? 17 : 15, weight: on ? '700' : '600' });
-        if (on) K.rich(ctx, desc, LX + 40, y + 25, { color: C.navy, size: 14.5, align: 'left' });
+        if (on) K.rich(ctx, DESC[n], LX + 40, y + 25, { color: C.navy, size: 14.5, align: 'left' });
       });
       text(ctx, 'Se repite en cada lote, con máscaras nuevas.', LX, H - 12, { color: C.grey2, size: 13.5 });
     };
@@ -831,6 +832,7 @@
         lin([[xr, 338], [xr, 322]], C.grey, a); red(xr, 300, 'encoder', col, a); lin([[xr, 278], [xr, 222]], C.grey, a); nodo(xr, 204, '$s_y$', col, a);
         lin([[xr, 188], [xr, 106], [cx + 28, 106]], C.grey, a);
         nodo(xl - 86, 196, '$z$', C.grey2, a); lin([[xl - 74, 196], [xl - 56, 196]], C.grey, a);
+        if (!solo || solo === 'jepa') text(ctx, 'posición', xl - 86, 222, { color: alfa(C.grey2, a), size: 12, align: 'center' });
       }
       ctx.fillStyle = alfa(activo ? C.coral : '#ffffff', a); ctx.strokeStyle = alfa(C.coralD, a); ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.arc(D[0], D[1], 22, 0, 7); ctx.fill(); ctx.stroke();
@@ -856,8 +858,8 @@
       lineal: { titulo: 'Evaluación lineal en ImageNet-1k (top-1, %)', min: 74, max: 83, filas: [
         ['MAE', 'ViT-H/14', 77.2, 0, '1600 épocas'], ['data2vec', 'ViT-L/16', 77.3, 0, '1600 épocas'], ['CAE', 'ViT-L/16', 78.1, 0, '1600 épocas'],
         ['I-JEPA', 'ViT-H/14', 79.3, 0, '300 épocas'], ['I-JEPA', 'ViT-H/16 a 448 px', 81.1, 0, '300 épocas'],
-        ['SimCLR v2', 'RN152 (2×)', 79.1, 1, ''], ['DINO', 'ViT-B/8', 80.1, 1, ''], ['iBOT', 'ViT-L/16', 81.0, 1, '']] },
-      uno: { titulo: 'ImageNet con el 1 % de las etiquetas, con ajuste fino (top-1, %)', min: 66, max: 79, filas: [
+        ['SimCLR v2', 'RN152 (2×)', 79.1, 1, '800 épocas'], ['DINO', 'ViT-B/8', 80.1, 1, '300 épocas'], ['iBOT', 'ViT-L/16', 81.0, 1, '250 épocas']] },
+      uno: { titulo: 'ImageNet con el 1 % de las etiquetas: lo mejor entre ajuste fino y lineal (I-JEPA: ajuste fino)', min: 66, max: 79, filas: [
         ['MAE', 'ViT-H/14', 71.5, 0, ''], ['data2vec', 'ViT-L/16', 73.3, 0, ''],
         ['I-JEPA', 'ViT-H/14', 73.3, 0, ''], ['I-JEPA', 'ViT-H/16 a 448 px', 77.3, 0, ''],
         ['iBOT', 'ViT-B/16', 69.7, 1, ''], ['DINO', 'ViT-B/8', 70.0, 1, ''], ['MSN', 'ViT-B/4', 75.7, 1, '']] },

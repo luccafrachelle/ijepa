@@ -84,7 +84,7 @@ $$
 s_{t+1} = \text{Pred}(s_t,\ a_t,\ z_t)
 $$
 - $z_t$ es una variable latente: cubre lo que no se puede saber y permite varios desenlaces.
-- **Planificar** es buscar la secuencia de acciones que minimiza un costo sobre lo predicho.
+- Planificar es buscar la secuencia de acciones que minimiza un costo sobre lo predicho.
 :::
 ::: {.column width="45%"}
 ::: {.caja .idea}
@@ -94,7 +94,7 @@ Antes de planificar hay que aprender, sin etiquetas, un encoder que produzca $s$
 
 ::: {.caja .prueba}
 <span class="tag">Dónde entra I-JEPA</span>
-Resuelve sólo esa pieza, en imágenes estáticas: sin tiempo, sin acciones y sin $z$.
+Resuelve sólo esa pieza, en imágenes estáticas: sin tiempo ni acciones, y con una $z$ que sólo indica qué posición predecir, no una latente que admita varios desenlaces.
 :::
 :::
 :::
@@ -107,7 +107,7 @@ Resuelve sólo esa pieza, en imágenes estáticas: sin tiempo, sin acciones y si
 
 - Predecir los píxeles que faltan.
 - Es lo que hace un MAE.
-- El objetivo es fijo y no hay colapso, pero lo aprendido suele ser de menor nivel semántico.
+- El objetivo es fijo: no colapsa mientras $z$ lleve poca información. Pero lo aprendido suele ser de menor nivel semántico.
 :::
 ::: {.column width="50%"}
 **predecir una representación**
@@ -119,7 +119,7 @@ Resuelve sólo esa pieza, en imágenes estáticas: sin tiempo, sin acciones y si
 :::
 
 ::: {.caja .idea}
-<span class="tag">La tesis</span>
+<span class="tag">La tesis de LeCun</span>
 Un modelo del mundo tiene que predecir en un espacio de representaciones, porque buena parte de los detalles del mundo son impredecibles e irrelevantes.
 :::
 
@@ -150,7 +150,7 @@ Un modelo del mundo tiene que predecir en un espacio de representaciones, porque
 
 ## Evitar el colapso: contrastivo o regularizado
 
-La energía $F(x, y)$ tiene que quedar baja sobre los datos y alta en el resto.
+La energía $F(x, y)$ (en una JEPA, la distancia $D(\hat s_y, s_y)$) tiene que quedar baja sobre los datos y alta en el resto. LeCun distingue dos maneras; I-JEPA usa una tercera.
 
 ![](img/lecun-contrastivo-regularizado.png){style="max-height:500px; width:auto; display:block; margin:4px auto 0;" fig-alt="Tres paneles: (a) paisaje de energía con la región de baja energía y las muestras de entrenamiento; (b) método contrastivo, con muestras contrastivas fuera de la región; (c) método regularizado, con flechas que comprimen la región de baja energía"}
 
@@ -182,7 +182,7 @@ La energía $F(x, y)$ tiene que quedar baja sobre los datos y alta en el resto.
 <div class="ot-widget" data-widget="mapaJepa" data-paso="1" data-alt="Diagrama de I-JEPA con el paso 1 resaltado"><canvas width="300" height="500"></canvas></div>
 </div></div>
 
-<p class="leyenda">Como en cualquier ViT. Cada token lleva su posición, así que el encoder puede procesar <strong>sólo algunos</strong>.</p>
+<p class="leyenda">Como en cualquier ViT. Cada token lleva su posición, así que el encoder de contexto puede recibir sólo un subconjunto.</p>
 ```
 
 ## Paso 2: El enmascarado multi-bloque
@@ -195,7 +195,7 @@ La energía $F(x, y)$ tiene que quedar baja sobre los datos y alta en el resto.
 </div><div class="paso-mapa">
 <div class="ot-widget" data-widget="mapaJepa" data-paso="2" data-alt="Diagrama de I-JEPA con el paso 2 resaltado"><canvas width="300" height="500"></canvas></div>
 </div></div>
-<p class="leyenda">El objetivo <strong>no</strong> es el complemento del contexto. Lo gris no es ni uno ni otro: sólo lo ve el encoder objetivo.</p>
+<p class="leyenda">El objetivo no es el complemento del contexto. Lo gris no es ni uno ni otro: sólo lo ve el encoder objetivo.</p>
 ```
 
 ## Paso 3: El encoder de contexto
@@ -223,7 +223,7 @@ La energía $F(x, y)$ tiene que quedar baja sobre los datos y alta en el resto.
 <div class="ot-widget" data-widget="mapaJepa" data-paso="4" data-alt="Diagrama de I-JEPA con el paso 4 resaltado"><canvas width="300" height="500"></canvas></div>
 </div></div>
 
-<p class="leyenda">Procesa la imagen entera y recorta los bloques <strong>a la salida</strong>: cada objetivo ya trae información de la escena.</p>
+<p class="leyenda">Procesa la imagen entera y recorta los bloques a la salida: cada $s_y$ ya incorpora el resto de la imagen.</p>
 ```
 
 ## Paso 5: El predictor
@@ -249,7 +249,7 @@ La energía $F(x, y)$ tiene que quedar baja sobre los datos y alta en el resto.
 ```
 
 ::: {.leyenda}
-Paper: $\frac{1}{M}\sum_{i}\sum_{j\in B_i}\lVert \hat s_{y_j} - s_{y_j}\rVert_2^2$ (suma sobre parches, promedio sobre bloques). Código, como en la animación: smooth L1 promediada sobre todo, contra objetivos con layer norm.
+Paper: $\frac{1}{M}\sum_{i}\sum_{j\in B_i}\lVert \hat s_{y_j} - s_{y_j}\rVert_2^2$ ($M$ bloques; $B_i$, los parches del bloque $i$: suma sobre parches, promedio sobre bloques). Código, como en la animación: smooth L1 promediada sobre todo, contra objetivos con layer norm.
 :::
 
 ## Paso 7: La actualización por EMA
@@ -296,7 +296,7 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 <div class="ot-widget" data-widget="resultados" data-alt="Resultados reportados en evaluación lineal, 1 por ciento de etiquetas y bajo nivel">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda"><strong>El fuerte es el costo</strong>: ViT-H/14 en menos de 72 h con 16 A100; una sola vista frente a iBOT, ~5× menos iteraciones que MAE.</p>
+<p class="leyenda">Lo distintivo es el costo: un ViT-H/14 en menos de 72 h con 16 A100; una sola vista frente a iBOT, ~5× menos iteraciones que MAE. El 81,1 es a 448 px; el resto, a 224.</p>
 ```
 
 ## Problemas y qué fue después
@@ -304,8 +304,8 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 ::: {.columns}
 ::: {.column width="48%"}
 - Muy sensible a la máscara, que también es diseño a mano.
-- No gana en todo: iNaturalist, conteo, ajuste fino.
-- El colapso se evita sin garantía.
+- No gana en todo: iNaturalist (47,6 contra 57,3 de iBOT), conteo (86,7 contra 90,5 de MAE), ajuste fino.
+- Nada garantiza que no colapse: EMA y stop-gradient funcionan en la práctica, sin una explicación completa.
 - Sin tiempo, sin acciones y sin variable latente para varios desenlaces: lejos del programa de 2022.
 
 :::
