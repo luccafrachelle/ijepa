@@ -340,6 +340,18 @@ El *momentum* $m$ arranca en 0,996 y sube linealmente hasta 1 a lo largo del ent
 
 Con $m = 0$ el encoder objetivo es una copia del de contexto en cada paso. A medida que $m$ se acerca a 1 la trayectoria verde se vuelve más suave y más atrasada: con $m = 0{,}99$ promedia aproximadamente los últimos 100 pasos; con $m = 0{,}996$, los últimos 250. Los objetivos $s_y$ cambian despacio y el predictor no persigue un blanco que salta en cada paso.
 
+### Una pasada completa
+
+Los siete pasos, juntos, son una iteración de entrenamiento. Se repite en cada lote con máscaras nuevas.
+
+::: {.column-page-right}
+```{=html}
+<div class="ot-widget" data-widget="pasada" data-alt="Diagrama de I-JEPA que se prende etapa por etapa: tokens, máscaras, encoder de contexto, encoder objetivo, predictor, pérdida, gradiente y EMA">
+  <canvas width="1100" height="430"></canvas>
+</div>
+```
+:::
+
 ### Por qué esto evita el colapso
 
 La combinación de predictor en una sola rama, detención del gradiente hacia el objetivo y encoder objetivo por EMA es la misma que usa BYOL [@grill2020byol], y funciona en la práctica. La intuición es que el encoder objetivo no puede acordar con el de contexto una salida constante, porque no se optimiza: sólo lo sigue con retraso. No hay, sin embargo, una demostración de que el colapso sea imposible; lo que existe son análisis en modelos simplificados, como redes lineales [@tian2021understanding].

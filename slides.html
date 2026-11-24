@@ -1225,6 +1225,12 @@ Assran, Duval, Misra, Bojanowski, Vincent, Rabbat, LeCun y Ballas · CVPR 2023
 <p>Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA.</p>
 </div>
 </section>
+<section id="una-pasada-completa" class="slide level2">
+<h2>Una pasada completa</h2>
+<div class="ot-widget" data-widget="pasada" data-alt="Diagrama de I-JEPA que se prende etapa por etapa: tokens, máscaras, encoder de contexto, encoder objetivo, predictor, pérdida, gradiente y EMA">
+  <canvas width="1100" height="430"></canvas>
+</div>
+</section>
 <section id="después-de-entrenar-la-evaluación" class="slide level2">
 <h2>Después de entrenar: la evaluación</h2>
 <div class="ot-widget" data-widget="evaluacion" data-alt="Se descartan el encoder de contexto y el predictor; el encoder objetivo congelado produce vectores que se promedian y alimentan un clasificador lineal">
@@ -3471,78 +3477,155 @@ window.QuartoSupport = function () {
         K.pasos(root, [0, 1, 2, 3], draw, { ms: 2600, max: 2600 });
       });
 
-      // ============================================================ mapa vertical de I-JEPA (al costado de cada paso)
-      // data-paso: 1 tokens · 2 máscaras · 3 encoder de contexto · 4 encoder objetivo · 5 predictor
+      // ============================================================ mapa vertical de I-JEPA
+      // dibujarMapa: diagrama de 300 × 500 (unidades lógicas) en (ox, oy); act[elemento] = 0..1 lo prende.
+      const MAPA = (() => {
+        const XL = 72, XR = 228, S = 92, H0 = 500, TY = H0 - S - 34;
+        const yE = TY - 56, yS = yE - 64, yP = yS - 62, yH = yP - 62, yD = yH - 58, XM = (XL + XR) / 2;
+        const RA = [{ r: 1, c: 3, h: 2, w: 2 }, { r: 3, c: 1, h: 2, w: 2 }];
+        const CB = { r: 0, c: 0, h: 5, w: 5 };
+        const dentro = (b, r, c) => r >= b.r && r < b.r + b.h && c >= b.c && c < b.c + b.w;
+        const BASE = 0.38, al = v => BASE + (1 - BASE) * (v || 0);
+        return { XL, XR, S, TY, yE, yS, yP, yH, yD, XM, dibujar };
+        function dibujar(ctx, ox, oy, act, opt = {}) {
+          const A = k => act[k] || 0;
+          ctx.save(); ctx.translate(ox, oy);
+          const grilla = !!opt.grilla;
+          function miniatura(x, lado, v) {
+            const q = S / 6, y = TY;
+            ctx.save(); ctx.globalAlpha = al(v);
+            ctx.drawImage(escena(), x, y, S, S);
+            if (!grilla) {
+              if (lado === 'ctx') {
+                ctx.fillStyle = '#eceef3';
+                for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++)
+                  if (!dentro(CB, r, c) || RA.some(b => dentro(b, r, c))) ctx.fillRect(x + c * q, y + r * q, q + 0.5, q + 0.5);
+                ctx.setLineDash([4, 3]); ctx.strokeStyle = C.teal; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, CB.w * q - 2, CB.h * q - 2); ctx.setLineDash([]);
+              } else {
+                RA.forEach(b => { ctx.fillStyle = alfa(C.coral, 0.35); ctx.fillRect(x + b.c * q, y + b.r * q, b.w * q, b.h * q);
+                  ctx.strokeStyle = C.coralD; ctx.lineWidth = 2; ctx.strokeRect(x + b.c * q, y + b.r * q, b.w * q, b.h * q); });
+              }
+            } else {
+              ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1;
+              for (let k = 1; k < 6; k++) { ctx.beginPath(); ctx.moveTo(x + k * q, y); ctx.lineTo(x + k * q, y + S); ctx.moveTo(x, y + k * q); ctx.lineTo(x + S, y + k * q); ctx.stroke(); }
+            }
+            ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.strokeRect(x, y, S, S);
+            ctx.restore();
+            if (v > 0.02) caja(ctx, x - 4, y - 4, S + 8, S + 8, { r: 6, stroke: alfa(lado === 'ctx' ? C.teal : C.coralD, v), lw: 2.5 });
+          }
+          function bloque(x, y, l1, sim, color, v) {
+            const a = al(v), w = 120, h = 52;
+            caja(ctx, x - w / 2, y - h / 2, w, h, { r: 9, fill: v > 0 ? alfa(color, 0.13 * v) : '#ffffff', stroke: alfa(color, a), lw: 1.8 + 1.6 * v });
+            text(ctx, l1, x, y - 4, { color: alfa(color, a), size: 12.5, weight: '600', align: 'center' });
+            K.rich(ctx, sim, x, y + 17, { color: alfa(color, a), size: 15, align: 'center' });
+          }
+          const lin = (pts, v, color = C.grey) => flecha(ctx, pts, v > 0.02 ? alfa(C.navy, al(v)) : alfa(color, BASE), { lw: 1.8 + 1.2 * v, cabeza: 6 + 2 * v });
+          const simb = (x, y, s, color, v) => K.rich(ctx, s, x, y + 6, { color: alfa(color, al(v)), size: 18 + 2 * v, align: 'center' });
+          // entradas
+          miniatura(XL - S / 2, 'ctx', A('thumbC')); miniatura(XR - S / 2, 'obj', A('thumbT'));
+          const lb = grilla ? ['parches + posición', 'parches + posición'] : ['contexto', 'imagen completa'];
+          text(ctx, lb[0], XL, TY + S + 22, { color: alfa(grilla ? C.navy : C.teal, al(A('thumbC'))), size: 12, weight: '600', align: 'center' });
+          text(ctx, lb[1], XR, TY + S + 22, { color: alfa(grilla ? C.navy : C.coralD, al(A('thumbT'))), size: 12, weight: '600', align: 'center' });
+          // rama de contexto
+          lin([[XL, TY - 6], [XL, yE + 28]], A('aC')); bloque(XL, yE, 'encoder contexto', '$f_\\theta$', C.teal, A('encC'));
+          lin([[XL, yE - 28], [XL, yS + 14]], A('aSx')); simb(XL, yS, '$s_x$', C.teal, A('sx'));
+          lin([[XL, yS - 14], [XL, yP + 28]], A('aP')); bloque(XL, yP, 'predictor', '$g_\\phi$', C.blue, A('pred'));
+          lin([[XL, yP - 28], [XL, yH + 14]], A('aH')); simb(XL, yH, '$\\hat s_y$', C.blue, A('sh'));
+          // rama objetivo
+          lin([[XR, TY - 6], [XR, yE + 28]], A('aT')); bloque(XR, yE, 'encoder objetivo', '$f_{\\bar\\theta}$', C.navy, A('encT'));
+          lin([[XR, yE - 28], [XR, yH + 14]], A('aSy')); simb(XR, yH, '$s_y$', C.coralD, A('sy'));
+          // EMA
+          const ve = A('ema');
+          ctx.setLineDash([5, 4]); flecha(ctx, [[XL + 62, yE], [XR - 62, yE]], alfa(ve > 0.02 ? C.navy : C.grey2, al(ve)), { lw: 1.6 + 1.2 * ve, cabeza: 6 }); ctx.setLineDash([]);
+          text(ctx, 'EMA', XM, yE - 7, { color: alfa(ve > 0.02 ? C.navy : C.grey2, al(ve)), size: 12, weight: '700', align: 'center' });
+          // posiciones de los objetivos
+          const vp = A('pos');
+          flecha(ctx, [[XR - 18, yP], [XL + 62, yP]], alfa(C.coralD, al(vp)), { lw: 1.6 + 1.2 * vp, cabeza: 6 });
+          text(ctx, 'posiciones', XM + 26, yP - 8, { color: alfa(C.coralD, al(vp)), size: 12, weight: vp > 0.5 ? '700' : '400', align: 'center' });
+          // pérdida
+          const vd = A('D');
+          lin([[XL, yH - 14], [XL, yD], [XM - 20, yD]], A('dL')); lin([[XR, yH - 14], [XR, yD], [XM + 20, yD]], A('dL'));
+          ctx.fillStyle = vd > 0 ? alfa(C.coral, 0.25 * vd) : '#ffffff'; ctx.strokeStyle = alfa(C.coralD, al(vd)); ctx.lineWidth = 2 + 1.5 * vd;
+          ctx.beginPath(); ctx.arc(XM, yD, 18, 0, 7); ctx.fill(); ctx.stroke();
+          text(ctx, 'D', XM, yD + 6, { color: alfa(C.coralD, al(vd)), size: 16, weight: '700', align: 'center' });
+          // gradiente (sólo en la pasada completa)
+          const vg = A('grad');
+          if (vg > 0.02) {
+            ctx.setLineDash([6, 4]);
+            const xg = XL - 78;
+            flecha(ctx, [[XM - 18, yD - 6], [xg, yD - 6], [xg, yP], [XL - 62, yP]], alfa(C.coralD, vg), { lw: 2.4, cabeza: 8 });
+            flecha(ctx, [[xg, yP], [xg, yE], [XL - 62, yE]], alfa(C.coralD, vg), { lw: 2.4, cabeza: 8 });
+            ctx.setLineDash([]);
+            text(ctx, 'gradiente', xg - 6, yD - 14, { color: alfa(C.coralD, vg), size: 13, weight: '700' });
+            ctx.strokeStyle = alfa(C.coralD, vg); ctx.lineWidth = 2.4;
+            const xs = XR + 26, ys = yH;   // s_y sin gradiente
+            ctx.beginPath(); ctx.moveTo(xs - 7, ys - 7); ctx.lineTo(xs + 7, ys + 7); ctx.moveTo(xs + 7, ys - 7); ctx.lineTo(xs - 7, ys + 7); ctx.stroke();
+          }
+          ctx.restore();
+        }
+      })();
+
+      // al costado de cada paso (data-paso 1..5): se prende cuando termina la animación del paso
+      const ACT = {
+        1: ['thumbC', 'thumbT'],
+        2: ['thumbC', 'thumbT'],
+        3: ['thumbC', 'aC', 'encC', 'aSx', 'sx'],
+        4: ['thumbT', 'aT', 'encT', 'aSy', 'sy'],
+        5: ['sx', 'aP', 'pred', 'pos', 'aH', 'sh'],
+        6: ['sh', 'sy', 'dL', 'D'],
+        7: ['D', 'grad', 'pred', 'encC'],
+        8: ['ema', 'encC', 'encT']
+      };
       K.register('mapaJepa', root => {
         const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
         const paso = +root.dataset.paso || 0;
-        const XL = 72, XR = 228, S = 92, TY = H - S - 34;
-        const RA = [{ r: 1, c: 3, h: 2, w: 2 }, { r: 3, c: 1, h: 2, w: 2 }];   // bloques objetivo (grilla 6×6)
-        const CB = { r: 0, c: 0, h: 5, w: 5 };                                  // bloque de contexto
-        const dentro = (b, r, c) => r >= b.r && r < b.r + b.h && c >= b.c && c < b.c + b.w;
-        const BASE = 0.42;
-        let hl = 0;                                   // resaltado: aparece cuando termina la animación del paso
+        let hl = 0;
         const terminado = () => {
-          const main = root.closest('.con-mapa') && root.closest('.con-mapa').querySelector('.paso-main .ot-widget');
-          const P = main && main._pasos;
+          const cm = root.closest('.con-mapa'), main = cm && cm.querySelector('.paso-main .ot-widget'), P = main && main._pasos;
           return !P || (P.i >= P.stops.length - 1 && !P.dur);
         };
-        const al = v => BASE + (1 - BASE) * v;        // v: activación 0..1
-        function miniatura(x, y, lado, v) {
-          const q = S / 6;
-          ctx.save(); ctx.globalAlpha = al(v);
-          ctx.drawImage(escena(), x, y, S, S);
-          if (paso !== 1) {
-            if (lado === 'ctx') {
-              ctx.fillStyle = '#eceef3';
-              for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++)
-                if (!dentro(CB, r, c) || RA.some(b => dentro(b, r, c))) ctx.fillRect(x + c * q, y + r * q, q + 0.5, q + 0.5);
-              ctx.setLineDash([4, 3]); ctx.strokeStyle = C.teal; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, CB.w * q - 2, CB.h * q - 2); ctx.setLineDash([]);
-            } else {
-              RA.forEach(b => { ctx.fillStyle = alfa(C.coral, 0.35); ctx.fillRect(x + b.c * q, y + b.r * q, b.w * q, b.h * q);
-                ctx.strokeStyle = C.coralD; ctx.lineWidth = 2; ctx.strokeRect(x + b.c * q, y + b.r * q, b.w * q, b.h * q); });
-            }
-          } else {
-            ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1;
-            for (let k = 1; k < 6; k++) { ctx.beginPath(); ctx.moveTo(x + k * q, y); ctx.lineTo(x + k * q, y + S); ctx.moveTo(x, y + k * q); ctx.lineTo(x + S, y + k * q); ctx.stroke(); }
-          }
-          ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.strokeRect(x, y, S, S);
-          ctx.restore();
-        }
-        function bloque(x, y, l1, sim, color, v) {
-          const a = al(v), w = 120, h = 52;
-          caja(ctx, x - w / 2, y - h / 2, w, h, { r: 9, fill: v > 0 ? alfa(color, 0.12 * v) : '#ffffff', stroke: alfa(color, a), lw: 1.8 + 1.4 * v });
-          text(ctx, l1, x, y - 4, { color: alfa(color, a), size: 12.5, weight: '600', align: 'center' });
-          K.rich(ctx, sim, x, y + 17, { color: alfa(color, a), size: 15, align: 'center' });
-        }
-        const lin = pts => flecha(ctx, pts, alfa(C.grey, BASE), { lw: 1.8, cabeza: 6 });
-        const simb = (x, y, s, color, v) => K.rich(ctx, s, x, y + 6, { color: alfa(color, al(v)), size: 18, align: 'center' });
         K.frame(root, () => {
           hl += ((terminado() ? 1 : 0) - hl) * 0.12; if (Math.abs(hl - Math.round(hl)) < 0.01) hl = Math.round(hl);
-          const v = k => (paso === k ? hl : 0);
+          const act = {}; (ACT[paso] || []).forEach(k => { act[k] = hl; });
           ctx.clearRect(0, 0, W, H);
-          const vT = Math.max(v(1), v(2));
-          miniatura(XL - S / 2, TY, 'ctx', vT); miniatura(XR - S / 2, TY, 'obj', vT);
-          text(ctx, paso === 1 ? 'parches + posición' : 'contexto', XL, TY + S + 20, { color: alfa(paso === 1 ? C.navy : C.teal, al(vT)), size: 12, weight: '600', align: 'center' });
-          text(ctx, paso === 1 ? 'parches + posición' : 'imagen completa', XR, TY + S + 20, { color: alfa(paso === 1 ? C.navy : C.coralD, al(vT)), size: 12, weight: '600', align: 'center' });
-          if (vT > 0.02) caja(ctx, 14, TY - 10, W - 28, S + 42, { r: 12, stroke: alfa(C.blue, vT), lw: 2.5 });
-          const yE = TY - 56, yS = yE - 64, yP = yS - 62, yH = yP - 62;
-          lin([[XL, TY - 4], [XL, yE + 28]]); bloque(XL, yE, 'encoder contexto', '$f_\\theta$', C.teal, v(3));
-          lin([[XL, yE - 28], [XL, yS + 14]]); simb(XL, yS, '$s_x$', C.teal, Math.max(v(3), v(5)));
-          lin([[XL, yS - 14], [XL, yP + 28]]); bloque(XL, yP, 'predictor', '$g_\\phi$', C.blue, v(5));
-          lin([[XL, yP - 28], [XL, yH + 14]]); simb(XL, yH, '$\\hat s_y$', C.blue, v(5));
-          lin([[XR, TY - 4], [XR, yE + 28]]); bloque(XR, yE, 'encoder objetivo', '$f_{\\bar\\theta}$', C.navy, v(4));
-          lin([[XR, yE - 28], [XR, yH + 14]]); simb(XR, yH, '$s_y$', C.coralD, v(4));
-          ctx.setLineDash([5, 4]); flecha(ctx, [[XL + 62, yE], [XR - 62, yE]], alfa(C.grey2, BASE), { lw: 1.6, cabeza: 6 }); ctx.setLineDash([]);
-          text(ctx, 'EMA', (XL + XR) / 2, yE - 7, { color: alfa(C.grey2, BASE), size: 12, weight: '600', align: 'center' });
-          flecha(ctx, [[XR - 18, yP], [XL + 62, yP]], alfa(C.coralD, al(v(5))), { lw: 1.6, cabeza: 6 });
-          text(ctx, 'posiciones', (XL + XR) / 2 + 26, yP - 8, { color: alfa(C.coralD, al(v(5))), size: 12, align: 'center' });
-          const yD = yH - 58;
-          lin([[XL, yH - 14], [XL, yD], [(XL + XR) / 2 - 20, yD]]); lin([[XR, yH - 14], [XR, yD], [(XL + XR) / 2 + 20, yD]]);
-          ctx.fillStyle = '#ffffff'; ctx.strokeStyle = alfa(C.coralD, BASE); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc((XL + XR) / 2, yD, 18, 0, 7); ctx.fill(); ctx.stroke();
-          text(ctx, 'D', (XL + XR) / 2, yD + 6, { color: alfa(C.coralD, BASE), size: 16, weight: '700', align: 'center' });
+          MAPA.dibujar(ctx, 0, 0, act, { grilla: paso === 1 });
           text(ctx, 'I-JEPA', 16, 22, { color: C.grey2, size: 13, weight: '600' });
         });
+      });
+
+      // una pasada completa de entrenamiento, por pasos
+      K.register('pasada', root => {
+        const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
+        const SC = 0.84, OX = 150, OY = (H - 500 * SC) / 2 + 4;
+        const ITEMS = [
+          ['Tokens', 'La imagen se corta en parches y cada uno lleva su posición.'],
+          ['Máscaras', 'Se sortean un bloque de contexto y varios bloques objetivo.'],
+          ['Encoder de contexto', 'Procesa sólo los tokens de contexto y da $s_x$.'],
+          ['Encoder objetivo', 'Procesa la imagen entera; se recortan los objetivos $s_y$.'],
+          ['Predictor', 'Con $s_x$ y la posición de cada objetivo, predice $\\hat s_y$.'],
+          ['Pérdida', 'Distancia entre $\\hat s_y$ y $s_y$, promediada sobre los objetivos.'],
+          ['Gradiente', 'Actualiza el predictor y el encoder de contexto; $s_y$ no recibe gradiente.'],
+          ['EMA', 'El encoder objetivo pasa a ser un promedio móvil del de contexto.']
+        ];
+        const draw = t => {
+          ctx.clearRect(0, 0, W, H);
+          const n = Math.round(t), f = 1 - Math.min(1, Math.abs(t - n) * 2);
+          const act = {}; ACT[n + 1].forEach(k => { act[k] = f; });
+          ctx.save(); ctx.scale(SC, SC);
+          MAPA.dibujar(ctx, OX / SC, OY / SC, act, { grilla: n === 0 });
+          ctx.restore();
+          // lista de etapas
+          const LX = 470, LY = 44, DY = 43;
+          ITEMS.forEach(([tit, desc], k) => {
+            const on = k === n, ya = k < n, y = LY + k * DY;
+            caja(ctx, LX, y - 15, 26, 26, { r: 7, fill: on ? C.blue : ya ? alfa(C.blue, 0.25) : '#ffffff', stroke: on || ya ? C.blue : C.grid, lw: 1.4 });
+            text(ctx, String(k + 1), LX + 13, y + 4, { color: on ? '#fff' : ya ? C.blue : C.grey2, size: 13.5, weight: '700', align: 'center' });
+            text(ctx, tit, LX + 40, y + 4, { color: on ? C.navy : ya ? alfa(C.navy, 0.6) : C.grey2, size: on ? 17 : 15, weight: on ? '700' : '600' });
+            if (on) K.rich(ctx, desc, LX + 40, y + 25, { color: C.navy, size: 14.5, align: 'left' });
+          });
+          text(ctx, 'Se repite en cada lote, con máscaras nuevas.', LX, H - 12, { color: C.grey2, size: 13.5 });
+        };
+        K.pasos(root, [0, 1, 2, 3, 4, 5, 6, 7], draw, { ms: 1400, max: 1400 });
       });
 
       // ============================================================ las tres arquitecturas

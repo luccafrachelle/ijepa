@@ -264,6 +264,14 @@ Paper: $\frac{1}{M}\sum_{i}\sum_{j\in B_i}\lVert \hat s_{y_j} - s_{y_j}\rVert_2^
 Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA.
 :::
 
+## Una pasada completa
+
+```{=html}
+<div class="ot-widget" data-widget="pasada" data-alt="Diagrama de I-JEPA que se prende etapa por etapa: tokens, máscaras, encoder de contexto, encoder objetivo, predictor, pérdida, gradiente y EMA">
+  <canvas width="1100" height="430"></canvas>
+</div>
+```
+
 ## Después de entrenar: la evaluación
 
 ```{=html}
