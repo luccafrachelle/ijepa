@@ -56,7 +56,7 @@
     const TS = [[0.075, 0.2, 19.2], [0.1, 0.2, 39.2], [0.125, 0.2, 42.4], [0.15, 0.2, 54.2], [0.2, 0.25, 38.9], [0.2, 0.3, 33.6]];
     const CS = [[0.40, 1.0, 31.2], [0.65, 1.0, 47.1], [0.75, 1.0, 49.3], [0.85, 1.0, 54.2]];
     const NT = { 1: 9.0, 2: 22.0, 3: 48.5, 4: 54.2 };
-    const EST = [['multi', 'multi-bloque', 54.2], ['raster', 'rasterizado', 15.5], ['bloque', 'un bloque', 20.2], ['azar', 'aleatorio', 17.6]];
+    const EST = [['multi', 'multi-bloque', 54.2], ['bloque', 'un bloque', 20.2], ['azar', 'aleatorio', 17.6], ['raster', 'rasterizado', 15.5]];
     let est = root.dataset.estrategia || 'multi', iT = 3, iC = 3, nT = 4, auto = false, reloj = 0, entra = 1;
     let enCtx = new Uint8Array(N * N), enObj = new Uint8Array(N * N), bloques = [], cajaCtx = null;
     const rnd = Math.random;
@@ -486,6 +486,96 @@
       text(ctx, 'posibles y para un x fijo', L.x + L.w, Y(0) + 26, { color: C.grey2, size: 14, align: 'right' });
     };
     K.pasos(root, [0, 1], draw, { ms: 3000 });
+  });
+
+  // ============================================================ el colapso, por pasos
+  // Dos vistas de cada imagen pasan por el mismo encoder; la pérdida sólo mide D(s_x, s_y).
+  // Estados: sin entrenar → solución buena → colapso total → colapso dimensional.
+  K.register('colapsoPasos', root => {
+    const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
+    const COL = [C.coralD, C.teal, C.blue, '#c9a227'];
+    const P = { x: 470, y: 92, w: 300, h: 250 };
+    const RX = 800;                                        // columna de lecturas
+    const ROWS = [118, 182, 246, 310];
+    const kf = [
+      { c: [[-0.2, 0.3], [0.5, -0.1], [-0.45, -0.35], [0.2, 0.55]], u: [[0.5, 0.25], [-0.3, 0.45], [0.4, -0.4], [-0.45, -0.3]] },
+      { c: [[-0.6, 0.55], [0.6, 0.5], [-0.55, -0.55], [0.6, -0.5]], u: [[0.06, 0.03], [-0.04, 0.05], [0.05, -0.04], [-0.05, -0.03]] },
+      { c: [[0, 0], [0, 0], [0, 0], [0, 0]], u: [[0, 0], [0, 0], [0, 0], [0, 0]] },
+      { c: [[-0.72, -0.36], [-0.24, -0.12], [0.24, 0.12], [0.72, 0.36]], u: [[0.05, 0.025], [-0.05, -0.025], [0.05, 0.025], [-0.05, -0.025]] },
+    ];
+    const lerp = (a, b, s) => a + (b - a) * s;
+    const estado = t => {
+      const k = Math.min(2, Math.floor(t)), s = ease(clamp(t - k, 0, 1)), A = kf[k], B = kf[k + 1];
+      return [0, 1, 2, 3].map(i => {
+        const c = [0, 1].map(d => lerp(A.c[i][d], B.c[i][d], s)), u = [0, 1].map(d => lerp(A.u[i][d], B.u[i][d], s));
+        return { sx: [c[0] + u[0], c[1] + u[1]], sy: [c[0] - u[0], c[1] - u[1]], c };
+      });
+    };
+    const mx = v => P.x + P.w / 2 + v * P.w * 0.44, my = v => P.y + P.h / 2 - v * P.h * 0.44;
+    function miniatura(x, y, i, corr) {
+      const s = 38;
+      caja(ctx, x, y, s, s, { r: 5, fill: alfa(COL[i], 0.16), stroke: alfa(COL[i], 0.6), lw: 1.3 });
+      ctx.save(); ctx.beginPath(); ctx.rect(x, y, s, s); ctx.clip();
+      const cx = x + s / 2 + corr, cy = y + s / 2 + corr * 0.6;
+      ctx.fillStyle = COL[i]; ctx.beginPath();
+      if (i === 0) { ctx.moveTo(cx - 12, cy + 4); ctx.lineTo(cx, cy - 10); ctx.lineTo(cx + 12, cy + 4); ctx.fill(); ctx.fillRect(cx - 9, cy + 4, 18, 10); }
+      else if (i === 1) { ctx.arc(cx, cy - 3, 10, 0, 7); ctx.fill(); ctx.fillRect(cx - 2, cy + 5, 4, 10); }
+      else if (i === 2) { ctx.ellipse(cx, cy + 2, 15, 7, 0, 0, 7); ctx.fill(); }
+      else { ctx.arc(cx, cy, 10, 0, 7); ctx.fill(); }
+      ctx.restore();
+    }
+    const draw = t => {
+      ctx.clearRect(0, 0, W, H);
+      const n = Math.round(t), st = estado(t);
+      const HEAD = ['Dos vistas de cada imagen pasan por el mismo encoder; la pérdida acerca $s_x$ a $s_y$',
+        'Solución buena: cada par coincide y las imágenes quedan separadas',
+        'Solución trivial: el encoder devuelve el mismo vector para todo',
+        'Colapso dimensional: las imágenes se separan en una sola dirección'];
+      K.rich(ctx, HEAD[n], 24, 34, { color: n === 1 ? C.teal : n === 0 ? C.navy : C.coralD, size: 19, weight: '600', align: 'left' });
+      // entrada: dos vistas por imagen
+      text(ctx, 'dos vistas por imagen', 40, 84, { color: C.grey2, size: 13 });
+      ROWS.forEach((y, i) => { miniatura(40, y - 19, i, -4); miniatura(86, y - 19, i, 5); flecha(ctx, [[132, y], [176, y]], C.grey, { lw: 1.6, cabeza: 6 }); });
+      caja(ctx, 182, 92, 120, 240, { r: 10, fill: '#ffffff', stroke: C.blue, lw: 2.2 });
+      text(ctx, 'encoder', 242, 206, { color: C.blue, size: 16, weight: '600', align: 'center' });
+      text(ctx, '(compartido)', 242, 228, { color: C.grey2, size: 13, align: 'center' });
+      flecha(ctx, [[310, 212], [452, 212]], C.grey, { lw: 2, cabeza: 8 });
+      K.rich(ctx, 'un punto por vista', 381, 200, { color: C.grey2, size: 13, align: 'center' });
+      // espacio de representaciones
+      caja(ctx, P.x, P.y, P.w, P.h, { r: 8, fill: '#fafafc', stroke: C.grid, lw: 1.2 });
+      text(ctx, 'espacio de representaciones', P.x + P.w / 2, P.y - 10, { color: C.navy, size: 14.5, weight: '600', align: 'center' });
+      if (n === 3 || (t > 2 && t < 3)) {
+        const a = clamp(t - 2, 0, 1);
+        ctx.strokeStyle = alfa(C.coralD, 0.35 * a); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(mx(-0.95), my(-0.475)); ctx.lineTo(mx(0.95), my(0.475)); ctx.stroke(); ctx.setLineDash([]);
+      }
+      st.forEach((p, i) => {
+        ctx.strokeStyle = alfa(C.grey2, 0.7); ctx.lineWidth = 1.4; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(mx(p.sx[0]), my(p.sx[1])); ctx.lineTo(mx(p.sy[0]), my(p.sy[1])); ctx.stroke(); ctx.setLineDash([]);
+        dot(ctx, mx(p.sx[0]), my(p.sx[1]), COL[i], 7);
+        ctx.fillStyle = '#ffffff'; ctx.strokeStyle = COL[i]; ctx.lineWidth = 2.6;
+        ctx.beginPath(); ctx.arc(mx(p.sy[0]), my(p.sy[1]), 6.5, 0, 7); ctx.fill(); ctx.stroke();
+      });
+      const a2 = clamp(1 - Math.abs(t - 2) * 2.5, 0, 1);
+      if (a2 > 0) text(ctx, 'los 8 puntos, encimados', mx(0), my(0) + 34, { color: alfa(C.coralD, a2), size: 14, weight: '600', align: 'center' });
+      dot(ctx, P.x + 14, P.y + P.h + 22, C.grey2, 6); K.rich(ctx, '$s_x$', P.x + 26, P.y + P.h + 27, { color: C.grey2, size: 15, align: 'left' });
+      ctx.fillStyle = '#ffffff'; ctx.strokeStyle = C.grey2; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(P.x + 80, P.y + P.h + 22, 5.5, 0, 7); ctx.fill(); ctx.stroke();
+      K.rich(ctx, '$s_y$', P.x + 92, P.y + P.h + 27, { color: C.grey2, size: 15, align: 'left' });
+      text(ctx, 'color = imagen', P.x + P.w, P.y + P.h + 27, { color: C.grey2, size: 13.5, align: 'right' });
+      // lecturas
+      const perd = st.reduce((a, p) => a + Math.hypot(p.sx[0] - p.sy[0], p.sx[1] - p.sy[1]), 0) / 4;
+      let sep = Infinity; for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) sep = Math.min(sep, Math.hypot(st[i].c[0] - st[j].c[0], st[i].c[1] - st[j].c[1]));
+      const fila = (y, et, val, col) => { text(ctx, et, RX, y, { color: C.grey2, size: 14 }); text(ctx, val, RX, y + 28, { color: col, size: 22, weight: '700' }); };
+      fila(120, 'pérdida (distancia de cada par)', num(perd, 2), perd < 0.2 ? C.teal : C.coralD);
+      fila(190, '¿distingue las imágenes?', n === 0 ? '—' : sep > 0.25 ? 'sí' : 'no', n === 0 ? C.grey2 : sep > 0.25 ? C.teal : C.coralD);
+      fila(260, 'dimensiones que usa', ['—', '2 de 2', '0 de 2', '1 de 2'][n], [C.grey2, C.teal, C.coralD, C.coralD][n]);
+      const NOTA = ['La pérdida sólo mira cada par por separado: nada en ella obliga a separar imágenes distintas.',
+        'Pérdida casi cero y representación útil.',
+        'Pérdida exactamente cero y representación inútil: la pérdida no distingue este caso del anterior.',
+        'Pérdida casi cero, pero la representación ocupa un subespacio chico. Es más sutil y más común que el colapso total.'];
+      parrafo(ctx, NOTA[n], RX, 340, 280, { color: C.navy, size: 14.5, lh: 20 });
+      text(ctx, 'Para evitarlo hace falta algo más que la pérdida: negativos, un regularizador o una asimetría entre ramas.', 24, H - 12, { color: C.grey2, size: 13.5 });
+    };
+    K.pasos(root, [0, 1, 2, 3], draw, { ms: 2600, max: 2600 });
   });
 
   // ============================================================ las tres arquitecturas

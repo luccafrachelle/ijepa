@@ -143,12 +143,10 @@ Un modelo del mundo tiene que predecir en un espacio de representaciones, porque
 ## El precio: el colapso
 
 ```{=html}
-<div class="ot-widget" data-widget="energia" style="width: 86%; margin: 0 auto;" data-param="de bien formada a colapsada" data-alt="Paisaje de energía que se aplana">
-  <canvas width="1100" height="360"></canvas>
+<div class="ot-widget" data-widget="colapsoPasos" data-alt="Dos vistas de cuatro imágenes pasan por un encoder compartido: sin entrenar los pares están lejos; en la solución buena cada par coincide y las imágenes quedan separadas; en el colapso todas van al mismo punto con pérdida cero; en el colapso dimensional quedan sobre una recta">
+  <canvas width="1100" height="430"></canvas>
 </div>
 ```
-
-Si el encoder devuelve lo mismo para toda entrada, la pérdida es mínima y la representación no sirve.
 
 ## Evitar el colapso: contrastivo o regularizado
 
@@ -271,7 +269,7 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 <p class="leyenda"><strong>El fuerte es el costo</strong>: ViT-H/14 en menos de 72 h con 16 A100; una sola vista frente a iBOT, ~5× menos iteraciones que MAE.</p>
 ```
 
-## Límites de I-JEPA y lo que vino después
+## Problemas y que fue despues
 
 ::: {.columns}
 ::: {.column width="48%"}

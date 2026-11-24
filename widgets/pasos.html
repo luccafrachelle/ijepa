@@ -85,6 +85,25 @@
       ctx.beginPath(); ctx.moveTo(x1, y); ctx.quadraticCurveTo((x1 + x2) / 2, y - 8 - Math.min(34, 0.25 * Math.abs(x2 - x1)), x2, y); ctx.stroke();
     });
   }
+  // atención completa: un token resaltado (que va rotando) manda flechas a todos los demás
+  function todosConTodos(ctx, xs, y, now, color, a, tw) {
+    if (a < 0.03) return;
+    const n = xs.length, h = Math.floor(now / 260) % n;
+    ctx.save();
+    for (let j = 0; j < n; j++) {
+      if (j === h) continue;
+      const x1 = xs[h], x2 = xs[j], cx = (x1 + x2) / 2, cy = y - 4 - Math.min(18, 0.05 * Math.abs(x2 - x1));
+      ctx.strokeStyle = alfa(color, 0.55 * a); ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(x1, y); ctx.quadraticCurveTo(cx, cy, x2, y); ctx.stroke();
+      const ang = Math.atan2(y - cy, x2 - cx), L = 6;
+      ctx.fillStyle = alfa(color, 0.8 * a); ctx.beginPath(); ctx.moveTo(x2, y);
+      ctx.lineTo(x2 - L * Math.cos(ang - 0.45), y - L * Math.sin(ang - 0.45));
+      ctx.lineTo(x2 - L * Math.cos(ang + 0.45), y - L * Math.sin(ang + 0.45)); ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle = alfa(color, a); ctx.lineWidth = 2.2;
+    ctx.strokeRect(xs[h] - tw / 2 - 3, y + 2, tw + 6, 58);
+    ctx.restore();
+  }
   const nota = (ctx, W, H, s) => tx(ctx, s, 24, H - 12, { color: C.grey2, size: 13.5 });
 
   // ============================================================ 1. de la imagen a los tokens
@@ -210,7 +229,7 @@
     const xEntrada = k => { const b = bloqueDe(k), n = OBJK[b].indexOf(k); return (b === 0 ? 380 : 720) + n * 30; };
     const PARES = paresDe(NT, 11), PB = [paresDe(6, 4), paresDe(6, 8)];
     let modo = root.dataset.modo || 'salida';
-    const draw = t => {
+    const draw = (t, now = performance.now()) => {
       ctx.clearRect(0, 0, W, H);
       const a = fase(t, 0.02, 0.12);
       mapa(ctx, MAP.x, MAP.y, MAP.s, { color: k => (ROL[k].r === 'obj' ? alfa(C.coral, 0.6) : null) });
@@ -220,7 +239,7 @@
         const b = fase(t, 0.14, 0.44), c = fase(t, 0.46, 0.6), d = fase(t, 0.62, 0.72), e = fase(t, 0.74, 0.94);
         encabezado(ctx, 4, t < 0.13 ? 'El encoder objetivo recibe la imagen completa: los 36 tokens'
           : t < 0.27 ? 'Entran todos los tokens, sin quitar ninguno'
-          : t < 0.45 ? 'Todos los tokens se mezclan con atención: cada uno ve toda la escena'
+          : t < 0.45 ? 'Atención completa: cada token mira a los 36, también a los que no son objetivo'
           : t < 0.61 ? 'Sale un vector por parche, para toda la imagen'
           : t < 0.73 ? 'Cada vector se normaliza (layer norm)'
           : 'Recién ahora se recortan las posiciones de los bloques: son los objetivos $s_y$');
@@ -234,7 +253,7 @@
           if (d > 0 && d < 1) { const pulso = Math.sin(Math.PI * d); ctx.fillStyle = alfa(C.navy, 0.15 * pulso); ctx.fillRect(x - 3, y - 3, TW + 6, TH + 6); }
           vec(ctx, x, y, TW, TH, k, col, al, { vals, borde: e > 0.6 && esObj ? C.coralD : null });
         }
-        if (b > 0.3 && c < 0.6) arcos(ctx, [...Array(NT)].map((_, k) => xFila(k) + TW / 2), BOX.y + 48, t, C.coralD, fase(b, 0.3, 0.5) * (1 - fase(c, 0, 0.6)), PARES);
+        if (b > 0.3 && c < 0.6) todosConTodos(ctx, [...Array(NT)].map((_, k) => xFila(k) + TW / 2), BOX.y + 48, now, C.coralD, fase(b, 0.3, 0.5) * (1 - fase(c, 0, 0.6)), TW);
         if (d > 0 && e < 0.3) tx(ctx, 'layer norm', 222 + 36 * DX / 2, OY + TH + 24, { color: C.navy, size: 14, weight: '600', align: 'center' });
         if (e > 0.5) {
           tx(ctx, '$s_y$ bloque 1', 420 + 2.5 * 24 + 7, OY + TH + 24, { color: C.coralD, size: 14, weight: '600', align: 'center' });

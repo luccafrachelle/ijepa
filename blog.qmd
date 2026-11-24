@@ -137,10 +137,10 @@ Cuando se comparan representaciones, un encoder que devuelve el mismo vector par
 
 ::: {.column-page-right}
 ```{=html}
-<div class="ot-widget" data-widget="energia" data-param="de bien formada a colapsada" data-alt="Curva de energía con mínimos sobre los datos que se va aplanando hasta quedar en cero en todos lados">
-  <canvas width="1100" height="360"></canvas>
+<div class="ot-widget" data-widget="colapsoPasos" data-alt="Dos vistas de cuatro imágenes pasan por un encoder compartido: sin entrenar los pares están lejos; en la solución buena cada par coincide y las imágenes quedan separadas; en el colapso todas van al mismo punto con pérdida cero; en el colapso dimensional quedan sobre una recta">
+  <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Esquema. Un paisaje de energía útil tiene pozos sobre los datos. En el colapso se aplana y el par incompatible (coral) queda con la misma energía que los compatibles.</p>
+<p class="leyenda">Esquema en dos dimensiones. La pérdida mide sólo la distancia dentro de cada par, así que vale lo mismo, cero o casi, en la solución buena y en las dos formas de colapso. En el colapso dimensional las imágenes siguen siendo distinguibles, pero la representación usa pocas dimensiones.</p>
 ```
 :::
 
