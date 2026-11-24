@@ -2536,7 +2536,7 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 <div class="ot-widget" data-widget="perdida" data-alt="Animación: para cada parche del bloque, barras de la predicción y del objetivo que se van acercando durante el entrenamiento, con la distancia de cada parche y la curva de la pérdida">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Paso 6: Ilustración con vectores de 8 números; en el modelo tienen cientos. Durante el entrenamiento las barras azules (predicción) se acercan a los contornos rojo (objetivo).</p>
+<p class="leyenda">Paso 6: la pérdida se arma por niveles. Una distancia por parche (vectores de 8 números en el dibujo; cientos en el modelo), promediada dentro de cada bloque, sobre los bloques de cada imagen y sobre el lote. Los valores son ilustrativos.</p>
 </div>
 <p>La pérdida no llega a cero, y no tiene por qué: parte de lo que hay en un bloque no se puede deducir del contexto.</p>
 <p>Los parámetros del encoder de contexto, <span class="math inline">\theta</span>, y del predictor, <span class="math inline">\phi</span>, se optimizan por descenso de gradiente sobre <span class="math inline">\mathcal{L}</span>. Los del encoder objetivo, <span class="math inline">\bar\theta</span>, no reciben gradiente: hay una detención del gradiente (<em>stop-gradient</em>), que en el código se implementa calculando los objetivos dentro de <code>torch.no_grad()</code> y con <code>requires_grad=False</code> en esos pesos. Arrancan como una copia de <span class="math inline">\theta</span> y después de cada paso se actualizan con un promedio móvil exponencial (EMA) de los pesos del encoder de contexto:</p>
@@ -2564,6 +2564,12 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 </section>
 <section id="por-qué-esto-evita-el-colapso" class="level3 page-columns page-full" data-number="7.2">
 <h3 data-number="7.2" class="anchored" data-anchor-id="por-qué-esto-evita-el-colapso"><span class="header-section-number">7.2</span> Por qué esto evita el colapso</h3>
+<div class="column-page-right">
+<div class="ot-widget" data-widget="noColapsa" data-alt="Cinco imágenes con su predicción y su objetivo: con gradiente por las dos ramas se juntan en un punto; con stop-gradient el objetivo queda fijo; con EMA se mueve despacio y sigue separado; sin EMA la nube se aplasta">
+  <canvas width="1100" height="430"></canvas>
+</div>
+<p class="leyenda">Esquema. La pérdida compara cada predicción con su objetivo. Si el objetivo también recibiera gradiente, el camino más corto a pérdida cero sería mover las dos salidas a una misma constante. La detención del gradiente fija el objetivo durante cada paso, y el EMA hace que cambie despacio, heredando la diversidad de un encoder que todavía distingue las imágenes. Tian et al. (2021) estudian esta dinámica en redes lineales; en el experimento de la sección 11, sin EMA el rango efectivo final cae de 102 a 28.</p>
+</div>
 <p>La combinación de predictor en una sola rama, detención del gradiente hacia el objetivo y encoder objetivo por EMA es la misma que usa BYOL <span class="citation" data-cites="grill2020byol">(<a href="#ref-grill2020byol" role="doc-biblioref">Grill et al. 2020</a>)</span>, y funciona en la práctica. La intuición es que el encoder objetivo no puede acordar con el de contexto una salida constante, porque no se optimiza: sólo lo sigue con retraso. No hay, sin embargo, una demostración de que el colapso sea imposible; lo que existe son análisis en modelos simplificados, como redes lineales <span class="citation" data-cites="tian2021understanding">(<a href="#ref-tian2021understanding" role="doc-biblioref">Tian, Chen, y Ganguli 2021</a>)</span>.</p>
 <p>La simulación de abajo es uno de esos modelos: un encoder lineal, un predictor lineal y datos de juguete en tres grupos, entrenados en el navegador. No reproduce I-JEPA; muestra el mecanismo.</p>
 <div class="column-page-right">
@@ -3557,7 +3563,8 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
       'La pérdida compara predicción y objetivo en el espacio de representaciones',
       'El gradiente actualiza contexto y predictor; el encoder objetivo sigue al de contexto por EMA'];
     const NP = PASOS.length - 1;
-    let paso = +(root.dataset.paso || 0), al = PASOS.map((_, k) => (k <= paso ? 1 : 0)), fase = 0;
+    let paso = +(root.dataset.paso || 0), al = PASOS.map((_, k) => (k <= paso ? 1 : 0)), en = PASOS.map((_, k) => (k === paso ? 1 : 0)), fase = 0;
+    const vis = k => al[k] * (0.42 + 0.58 * en[k]);   // lo de pasos anteriores queda atenuado
     const conFragments = () => { const sec = root.closest('.reveal .slides section'); return sec && sec.querySelector('.fragment.paso') ? sec : null; };
     const N = 6, IM = { x: 24, y: 131, s: 168 }, q = IM.s / N;
     const OBJ = [{ top: 0, left: 3, h: 2, w: 3 }, { top: 3, left: 0, h: 3, w: 2 }], CTX = { top: 1, left: 0, h: 5, w: 5 };
@@ -3572,8 +3579,9 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
       for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++)
         caja(ctx, x + j * 13, y + i * 13, 10, 10, { r: 2.5, fill: hueco ? alfa('#ffffff', a) : alfa(color, a), stroke: hueco ? alfa(color, a) : null, lw: 1.6, dash: hueco === 'punteado' ? [3, 2] : [] });
     }
-    function red(x, y, w, h, titulo, simbolo, color, a, barra) {
-      caja(ctx, x, y, w, h, { r: 12, fill: alfa('#ffffff', a), stroke: alfa(color, a), lw: 2.5 });
+    function red(x, y, w, h, titulo, simbolo, color, a, e = 0) {
+      if (e > 0.02) caja(ctx, x - 6, y - 6, w + 12, h + 12, { r: 16, fill: alfa(color, 0.1 * e) });
+      caja(ctx, x, y, w, h, { r: 12, fill: e > 0.02 ? alfa(color, 0.12 * e) : alfa('#ffffff', a), stroke: alfa(color, a), lw: 2.5 + 1.5 * e });
       text(ctx, titulo, x + w / 2, y + 30, { color: alfa(color, a), size: 16, weight: '600', align: 'center' });
       K.rich(ctx, simbolo, x + w / 2, y + 54, { color: alfa(C.navy, a), size: 18, align: 'center' });
     }
@@ -3605,45 +3613,46 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
       if (al[1] > 0.5) { text(ctx, 'gris: ni contexto ni objetivo', IM.x + IM.s / 2, IM.y + IM.s + 22, { color: C.grey2, size: 13, align: 'center' }); }
       else text(ctx, 'imagen en parches', IM.x + IM.s / 2, IM.y + IM.s + 22, { color: C.grey2, size: 14, align: 'center' });
       // rama de contexto
-      let a = al[2];
-      flecha(ctx, F.ctx, alfa(C.teal, a), { t: a }); mini(222, 94, 52, true, C.teal, a); flecha(ctx, F.ctx2, alfa(C.teal, a), { t: a });
+      let a = vis(2), tA = al[2];
+      flecha(ctx, F.ctx, alfa(C.teal, a), { t: tA }); mini(222, 94, 52, true, C.teal, a); flecha(ctx, F.ctx2, alfa(C.teal, a), { t: tA });
       text(ctx, 'verde sin rojo', 248, 84, { color: alfa(C.teal, a), size: 13, weight: '600', align: 'center' });
-      red(300, 85, 190, 70, 'Encoder de contexto', '$f_\\theta$', C.teal, a);
-      flecha(ctx, F.sx, alfa(C.teal, a), { t: a }); tokens(527, 101, 7, 3, C.teal, a);
+      red(300, 85, 190, 70, 'Encoder de contexto', '$f_\\theta$', C.teal, a, en[2]);
+      flecha(ctx, F.sx, alfa(C.teal, a), { t: tA }); tokens(527, 101, 7, 3, C.teal, a);
       if (a > 0.02) K.rich(ctx, '$s_x$', 572, 164, { color: alfa(C.teal, a), size: 19, align: 'center' });
       viaja(F.ctx, C.teal, paso === 2); viaja(F.ctx2, C.teal, paso === 2);
       // rama objetivo
-      a = al[3];
-      flecha(ctx, F.obj, alfa(C.navy, a), { t: a }); mini(222, 304, 52, false, C.navy, a); flecha(ctx, F.obj2, alfa(C.navy, a), { t: a });
+      a = vis(3); tA = al[3];
+      flecha(ctx, F.obj, alfa(C.navy, a), { t: tA }); mini(222, 304, 52, false, C.navy, a); flecha(ctx, F.obj2, alfa(C.navy, a), { t: tA });
       text(ctx, 'imagen completa', 248, 376, { color: alfa(C.navy, a), size: 13, weight: '600', align: 'center' });
-      red(300, 295, 190, 70, 'Encoder objetivo', '$f_{\\bar\\theta}$', C.navy, a);
-      flecha(ctx, F.sy, alfa(C.coralD, a), { t: a });
+      red(300, 295, 190, 70, 'Encoder objetivo', '$f_{\\bar\\theta}$', C.navy, a, en[3]);
+      flecha(ctx, F.sy, alfa(C.coralD, a), { t: tA });
       text(ctx, 'se recortan los bloques objetivo', 695, 318, { color: alfa(C.grey2, a), size: 13.5, align: 'center' });
       tokens(912, 311, 3, 2, C.coral, a); tokens(968, 304, 2, 3, C.coral, a);
       if (a > 0.02) K.rich(ctx, '$s_y$', 1030, 338, { color: alfa(C.coralD, a), size: 19, align: 'center' });
       viaja(F.obj, C.navy, paso === 3); viaja(F.obj2, C.navy, paso === 3); viaja(F.sy, C.coralD, paso === 3, 0.25);
       // predictor
-      a = al[4];
-      flecha(ctx, F.pred, alfa(C.blue, a), { t: a });
-      red(670, 85, 170, 70, 'Predictor', '$g_\\phi$', C.blue, a);
-      tokens(675, 200, 4, 1, C.blue, a, 'punteado'); flecha(ctx, F.mask, alfa(C.blue, a), { t: a, lw: 2 });
+      a = vis(4); tA = al[4];
+      flecha(ctx, F.pred, alfa(C.blue, a), { t: tA });
+      red(670, 85, 170, 70, 'Predictor', '$g_\\phi$', C.blue, a, en[4]);
+      tokens(675, 200, 4, 1, C.blue, a, 'punteado'); flecha(ctx, F.mask, alfa(C.blue, a), { t: tA, lw: 2 });
       text(ctx, 'tokens de máscara', 700, 234, { color: alfa(C.blue, a), size: 13.5, weight: '600', align: 'center' });
       text(ctx, '+ posición del objetivo', 700, 252, { color: alfa(C.blue, a), size: 13.5, align: 'center' });
-      flecha(ctx, F.sh, alfa(C.blue, a), { t: a });
+      flecha(ctx, F.sh, alfa(C.blue, a), { t: tA });
       tokens(912, 108, 3, 2, C.blue, a, 'lleno'); tokens(968, 101, 2, 3, C.blue, a, 'lleno');
       if (a > 0.02) K.rich(ctx, '$\\hat s_y$', 1030, 128, { color: alfa(C.blue, a), size: 19, align: 'center' });
       viaja(F.pred, C.blue, paso === 4); viaja(F.sh, C.blue, paso === 4, 0.3);
       // pérdida
-      a = al[5];
-      flecha(ctx, [[950, 204], [950, 152]], alfa(C.navy, a), { t: a, lw: 2 }); flecha(ctx, [[950, 252], [950, 296]], alfa(C.navy, a), { t: a, lw: 2 });
+      a = vis(5); tA = al[5];
+      flecha(ctx, [[950, 204], [950, 152]], alfa(C.navy, a), { t: tA, lw: 2 }); flecha(ctx, [[950, 252], [950, 296]], alfa(C.navy, a), { t: tA, lw: 2 });
+      if (en[5] > 0.02) caja(ctx, 878, 200, 206, 56, { r: 28, fill: alfa(C.navy, 0.14 * en[5]) });
       caja(ctx, 886, 208, 190, 40, { r: 20, fill: alfa(C.navy, a) });
       K.rich(ctx, 'distancia  $D(\\hat s_y, s_y)$', 981, 236, { color: alfa('#ffffff', a), size: 15, weight: '600', align: 'center' });
       // gradiente y EMA
-      a = al[6];
-      flecha(ctx, F.g1, alfa(C.navy, a), { t: a, dash: [6, 5], lw: 2 }); flecha(ctx, F.g2, alfa(C.navy, a), { t: a, dash: [6, 5], lw: 2 });
+      a = vis(6); tA = al[6];
+      flecha(ctx, F.g1, alfa(C.navy, a), { t: tA, dash: [6, 5], lw: 2 }); flecha(ctx, F.g2, alfa(C.navy, a), { t: tA, dash: [6, 5], lw: 2 });
       text(ctx, 'gradiente', 843, 221, { color: alfa(C.navy, a), size: 13.5, weight: '600', align: 'center' });
       K.rich(ctx, 'gradiente: se actualizan $\\theta$ y $\\phi$', 575, 76, { color: alfa(C.navy, a), size: 13.5, weight: '600', align: 'center' });
-      flecha(ctx, F.ema, alfa(C.teal, a), { t: a, dash: [2, 6], lw: 3 });
+      flecha(ctx, F.ema, alfa(C.teal, a), { t: tA, dash: [2, 6], lw: 3 });
       text(ctx, 'promedio móvil (EMA)', 408, 218, { color: alfa(C.teal, a), size: 13.5, weight: '600' });
       text(ctx, 'de los pesos del contexto', 408, 236, { color: alfa(C.teal, a), size: 13.5 });
       text(ctx, 'sin gradiente por esta rama', 695, 352, { color: alfa(C.coralD, a), size: 13.5, weight: '600', align: 'center' });
@@ -3660,7 +3669,7 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
     root._paso = va;
     K.frame(root, (now, dt) => {
       fase = (fase + dt / 1600) % 1;
-      for (let k = 0; k <= NP; k++) al[k] = clamp(al[k] + (k <= paso ? 1 : -1) * dt / 450, 0, 1);
+      for (let k = 0; k <= NP; k++) { al[k] = clamp(al[k] + (k <= paso ? 1 : -1) * dt / 450, 0, 1); en[k] = clamp(en[k] + (k === paso ? 1 : -1) * dt / 450, 0, 1); }
       draw();
     });
     draw();
@@ -3784,13 +3793,81 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
     K.pasos(root, [0, 1, 2, 3], draw, { ms: 2600, max: 2600 });
   });
 
+  // ============================================================ por qué no colapsa (stop-gradient + EMA), por pasos
+  // Esquema: cinco imágenes; punto = predicción, anillo = objetivo. Cada escenario se anima al avanzar.
+  K.register('noColapsa', root => {
+    const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
+    const NI = 5, COL = [C.blue, C.teal, C.coralD, '#c9a227', '#7b5ea7'];
+    const CEN = [...Array(NI)].map((_, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / NI; return [0.66 * Math.cos(a), 0.66 * Math.sin(a)]; });
+    const OFF = [[0.32, 0.1], [-0.2, 0.28], [0.25, -0.26], [-0.3, -0.12], [0.12, 0.33]];
+    const DR = [[0.12, 0.1], [0.1, 0.14], [-0.04, 0.16], [-0.14, 0.06], [0.02, -0.12]];
+    const LN = [0.89, 0.45];                       // dirección a la que se aplasta sin EMA
+    const proy = p => { const d = p[0] * LN[0] + p[1] * LN[1]; return [d * LN[0], d * LN[1]]; };
+    const lerp2 = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+    const P = { x: 40, y: 66, s: 282 };
+    const mx = v => P.x + P.s / 2 + v * P.s * 0.42, my = v => P.y + P.s / 2 - v * P.s * 0.42;
+    function estado(n, u) {                        // escenario n (1..4) en avance u
+      u = ease(clamp(u, 0, 1));
+      return CEN.map((c, i) => {
+        const p0 = [c[0] + OFF[i][0], c[1] + OFF[i][1]];
+        if (n === 0) return { p: p0, o: c, tr: null };
+        if (n === 1) { const k = 1 - 0.97 * u; return { p: lerp2(p0, c, u).map(v => v * k), o: c.map(v => v * k), tr: null }; }
+        if (n === 2) return { p: lerp2(p0, c, u), o: c, tr: null };
+        if (n === 3) { const o = [c[0] + DR[i][0] * u, c[1] + DR[i][1] * u]; return { p: lerp2(p0, o, u), o, tr: c }; }
+        const o = lerp2(c, proy(c), u); return { p: lerp2(p0, o, Math.min(1, u * 1.3)), o, tr: null };
+      });
+    }
+    const TIT = ['Dos salidas por imagen: la predicción y el objetivo',
+      'Si el gradiente pasara por las dos ramas, ambas se juntan en un punto',
+      'Con stop-gradient, la pérdida no puede mover el objetivo',
+      'Con EMA, el objetivo sigue al encoder de contexto, despacio',
+      'Sin EMA (m = 0), el objetivo cambia con cada paso y la nube se aplasta'];
+    const NOTA = ['La pérdida sólo pide que cada predicción caiga sobre su objetivo.',
+      'Mover las dos salidas hacia la misma constante es el camino más corto a pérdida cero: colapso.',
+      'El objetivo queda fijo durante el paso; para bajar la pérdida, la única salida es predecir bien.',
+      'Los objetivos se desplazan, pero siguen separados: vienen de un encoder que todavía distingue las imágenes.',
+      'Sin el promedio lento, predicción y objetivo se mueven juntos y la representación pierde dimensiones.'];
+    const draw = t => {
+      ctx.clearRect(0, 0, W, H);
+      const n = Math.round(t), k = Math.max(1, Math.ceil(t - 1e-6)), u = t - (k - 1);
+      const st = t < 1e-6 ? estado(0, 0) : estado(k, u);
+      text(ctx, TIT[n], 24, 34, { color: n === 1 || n === 4 ? C.coralD : n === 0 ? C.navy : C.teal, size: 19, weight: '600' });
+      caja(ctx, P.x, P.y, P.s, P.s, { r: 8, fill: '#fafafc', stroke: C.grid, lw: 1.2 });
+      text(ctx, 'espacio de representaciones', P.x + P.s / 2, P.y - 8, { color: C.grey2, size: 13, align: 'center' });
+      if (k === 4 && t > 3) { ctx.strokeStyle = alfa(C.coralD, 0.35 * clamp(u, 0, 1)); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(mx(-LN[0]), my(-LN[1])); ctx.lineTo(mx(LN[0]), my(LN[1])); ctx.stroke(); ctx.setLineDash([]); }
+      st.forEach((e, i) => {
+        if (e.tr) { ctx.strokeStyle = alfa(COL[i], 0.4); ctx.lineWidth = 2; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(mx(e.tr[0]), my(e.tr[1])); ctx.lineTo(mx(e.o[0]), my(e.o[1])); ctx.stroke(); ctx.setLineDash([]); }
+        ctx.strokeStyle = alfa(C.grey2, 0.6); ctx.lineWidth = 1.2; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(mx(e.p[0]), my(e.p[1])); ctx.lineTo(mx(e.o[0]), my(e.o[1])); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = '#ffffff'; ctx.strokeStyle = COL[i]; ctx.lineWidth = 2.8; ctx.beginPath(); ctx.arc(mx(e.o[0]), my(e.o[1]), 8, 0, 7); ctx.fill(); ctx.stroke();
+        dot(ctx, mx(e.p[0]), my(e.p[1]), COL[i], 6);
+      });
+      dot(ctx, P.x + 12, P.y + P.s + 22, C.grey2, 5.5); K.rich(ctx, 'predicción $\\hat s_y$', P.x + 24, P.y + P.s + 27, { color: C.grey2, size: 14, align: 'left' });
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = C.grey2; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(P.x + 172, P.y + P.s + 22, 6, 0, 7); ctx.fill(); ctx.stroke();
+      K.rich(ctx, 'objetivo $s_y$', P.x + 184, P.y + P.s + 27, { color: C.grey2, size: 14, align: 'left' });
+      // lecturas
+      const perd = st.reduce((a, e) => a + Math.hypot(e.p[0] - e.o[0], e.p[1] - e.o[1]), 0) / NI;
+      const mu = [0, 1].map(d => st.reduce((a, e) => a + e.o[d], 0) / NI);
+      const cxx = st.reduce((a, e) => a + (e.o[0] - mu[0]) ** 2, 0) / NI, cyy = st.reduce((a, e) => a + (e.o[1] - mu[1]) ** 2, 0) / NI, cxy = st.reduce((a, e) => a + (e.o[0] - mu[0]) * (e.o[1] - mu[1]), 0) / NI;
+      const tr = cxx + cyy, det = cxx * cyy - cxy * cxy, l2 = Math.max(0, tr / 2 - Math.sqrt(Math.max(0, tr * tr / 4 - det)));
+      const RX = 420;
+      const fila = (y, et, val, col) => { text(ctx, et, RX, y, { color: C.grey2, size: 14 }); text(ctx, val, RX, y + 28, { color: col, size: 22, weight: '700' }); };
+      fila(96, 'pérdida (distancia predicción–objetivo)', num(perd, 2), perd < 0.12 ? C.teal : C.navy);
+      fila(166, 'dispersión de los objetivos', num(Math.sqrt(tr), 2), tr < 0.05 ? C.coralD : C.teal);
+      fila(236, 'ancho en la dirección más angosta', num(Math.sqrt(l2), 2), l2 < 0.01 ? C.coralD : C.teal);
+      K.parrafo(ctx, NOTA[n], RX, 320, 620, { color: C.navy, size: 15.5, lh: 22 });
+      text(ctx, 'Esquema. La solución trivial sigue existiendo: lo que la evita es la dinámica del entrenamiento, sin garantía.', 24, H - 12, { color: C.grey2, size: 13.5 });
+    };
+    K.pasos(root, [0, 1, 2, 3, 4], draw, { ms: 2600, max: 2600 });
+  });
+
   // ============================================================ mapa vertical de I-JEPA
   // dibujarMapa: diagrama de 300 × 500 (unidades lógicas) en (ox, oy); act[elemento] = 0..1 lo prende.
   const MAPA = (() => {
     const XL = 72, XR = 228, S = 92, H0 = 500, TY = H0 - S - 34;
     const yE = TY - 56, yS = yE - 64, yP = yS - 62, yH = yP - 62, yD = yH - 58, XM = (XL + XR) / 2;
-    const RA = [{ r: 1, c: 3, h: 2, w: 2 }, { r: 3, c: 1, h: 2, w: 2 }];
-    const CB = { r: 0, c: 0, h: 5, w: 5 };
+    const RA = [{ r: 0, c: 3, h: 2, w: 3 }, { r: 3, c: 0, h: 3, w: 2 }];   // mismas máscaras que widgets/pasos.html
+    const CB = { r: 1, c: 0, h: 5, w: 5 };
     const dentro = (b, r, c) => r >= b.r && r < b.r + b.h && c >= b.c && c < b.c + b.w;
     const BASE = 0.38, al = v => BASE + (1 - BASE) * (v || 0);
     return { XL, XR, S, TY, yE, yS, yP, yH, yD, XM, dibujar };
@@ -4435,54 +4512,92 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
   // ============================================================ 5. la pérdida
   K.register('perdida', root => {
     const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
+    // por parche → por bloque → por imagen → por lote: en cada nivel, un promedio
     const OB = OBJK[0], r = mulberry(21);
-    const P0 = OB.map(() => [...Array(8)].map(() => r()));
-    const RES = OB.map(() => [...Array(8)].map(() => (r() - 0.5) * 0.14));
     const T = OB.map(k => VAL2[k]);
-    const pred = (j, u) => T[j].map((s, c) => clamp(lerp(P0[j][c], s + RES[j][c], ease(u)), 0, 1));
-    const dist = (j, u) => pred(j, u).reduce((acc, p, c) => acc + (p - T[j][c]) ** 2, 0);
-    const perd = u => OB.reduce((acc, _, j) => acc + dist(j, u), 0);
-    const L0 = perd(0);
-    const BX = 30, BW = 104, BGAP = 12, BY = 96, BH = 150;
-    const R2 = { x: 760, y: 100, w: 300, h: 170 };
+    const P = T.map(v => v.map(x => clamp(x + (r() - 0.5) * 0.5, 0, 1)));
+    const D = T.map((v, j) => v.reduce((a, x, c) => a + (P[j][c] - x) ** 2, 0));
+    const prom = a => a.reduce((s, v) => s + v, 0) / a.length;
+    const mB = prom(D), BLQ = [mB, 0.21, 0.34, 0.18], mI = prom(BLQ);
+    const LOTE = [mI, ...[...Array(11)].map(() => 0.16 + 0.22 * r())], mL = prom(LOTE);
+    const n2 = v => v.toFixed(2).replace('.', ',');
+    const COL = [{ x: 24, w: 232 }, { x: 296, w: 220 }, { x: 556, w: 230 }, { x: 826, w: 250 }];
+    const TIT = ['un parche', 'un bloque', 'una imagen', 'el lote'];
     const draw = t => {
       ctx.clearRect(0, 0, W, H);
-      encabezado(ctx, 6, t < 0.01 ? 'Al principio, la predicción de cada parche no se parece al objetivo'
-        : t < 0.999 ? 'El gradiente acerca la predicción al objetivo, parche por parche'
-        : 'Al final quedan diferencias: no todo se puede predecir');
-      // leyenda de colores
-      caja(ctx, BX, 62, 14, 14, { r: 3, fill: alfa(C.blue, 0.75) }); tx(ctx, 'predicción $\\hat s_y$', BX + 22, 74, { color: C.blue, size: 14, weight: '600' });
-      caja(ctx, BX + 190, 62, 14, 14, { r: 3, stroke: C.coralD, lw: 1.8 }); tx(ctx, 'objetivo $s_y$', BX + 212, 74, { color: C.coralD, size: 14, weight: '600' });
-      OB.forEach((k, j) => {
-        const x = BX + j * (BW + BGAP), p = pred(j, t);
-        caja(ctx, x, BY, BW, BH, { r: 8, fill: '#fafafc', stroke: C.grid, lw: 1.2 });
-        const base = BY + BH - 12, alto = BH - 30;
-        for (let c = 0; c < 8; c++) {
-          const bx = x + 8 + c * 11;
-          ctx.fillStyle = alfa(C.blue, 0.75); ctx.fillRect(bx, base - alto * p[c], 7, alto * p[c]);
-          ctx.strokeStyle = C.coralD; ctx.lineWidth = 1.6; ctx.strokeRect(bx - 0.5, base - alto * T[j][c], 8, alto * T[j][c]);
+      const n = Math.round(t);
+      encabezado(ctx, 6, ['Por parche: la distancia entre el vector predicho y su objetivo',
+        'Por bloque: se promedian las distancias de sus parches',
+        'Por imagen: se promedian los M bloques objetivo (4 en el paper)',
+        'Por lote: se promedia sobre todas las imágenes. Ese número es la pérdida'][n]);
+      const ap = k => (k === 0 ? 1 : clamp(t - k + 1, 0, 1));
+      const op = k => ap(k) * (k === n ? 1 : 0.5);
+      COL.forEach((c, k) => {
+        if (ap(k) <= 0.01) return;
+        caja(ctx, c.x + 4, 62, 24, 24, { r: 6, fill: alfa(C.blue, op(k)) });
+        tx(ctx, String(k + 1), c.x + 16, 79, { color: '#fff', size: 13.5, weight: '700', align: 'center' });
+        tx(ctx, TIT[k], c.x + 38, 80, { color: alfa(C.navy, op(k)), size: 16, weight: '700' });
+        if (k > 0) {
+          flecha(ctx, [[COL[k - 1].x + COL[k - 1].w + 2, 210], [c.x - 6, 210]], alfa(C.grey2, ap(k)), { lw: 2, cabeza: 7 });
+          tx(ctx, 'promedio', (COL[k - 1].x + COL[k - 1].w + c.x) / 2 - 2, 200, { color: alfa(C.grey2, ap(k)), size: 12, align: 'center' });
         }
-        tx(ctx, 'parche ' + (j + 1), x + BW / 2, BY + BH + 20, { color: C.grey2, size: 13, align: 'center' });
-        tx(ctx, dist(j, t).toFixed(2).replace('.', ','), x + BW / 2, BY + BH + 44, { color: C.navy, size: 17, weight: '700', align: 'center' });
       });
-      tx(ctx, 'distancia $D(\\hat s_{y_j}, s_{y_j})$ de cada parche', BX, BY + BH + 70, { color: C.grey2, size: 13.5 });
-      tx(ctx, `pérdida del bloque = promedio de las seis = ${(perd(t) / OB.length).toFixed(2).replace('.', ',')}`, BX, BY + BH + 102, { color: C.navy, size: 17, weight: '700' });
-      // curva de la pérdida durante el entrenamiento
-      tx(ctx, 'pérdida a lo largo del entrenamiento', R2.x, R2.y - 8, { color: C.navy, size: 14.5, weight: '600' });
-      ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
-      for (let g = 0; g <= 4; g++) { const y = R2.y + R2.h * g / 4; ctx.beginPath(); ctx.moveTo(R2.x, y); ctx.lineTo(R2.x + R2.w, y); ctx.stroke(); }
-      ctx.strokeStyle = C.grey; ctx.beginPath(); ctx.moveTo(R2.x, R2.y + R2.h); ctx.lineTo(R2.x + R2.w, R2.y + R2.h); ctx.stroke();
-      ctx.strokeStyle = C.coral; ctx.lineWidth = 3; ctx.beginPath();
-      for (let i = 0; i <= 120; i++) { const u = t * i / 120, x = R2.x + R2.w * u, y = R2.y + R2.h * (1 - perd(u) / L0); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
-      ctx.stroke();
-      K.dot(ctx, R2.x + R2.w * t, R2.y + R2.h * (1 - perd(t) / L0), C.coral, 6);
-      tx(ctx, 'pasos de entrenamiento →', R2.x + R2.w, R2.y + R2.h + 20, { color: C.grey2, size: 13, align: 'right' });
-      tx(ctx, 'no llega a cero: no todo es predecible', R2.x, R2.y + R2.h + 44, { color: C.grey2, size: 13 });
-      // quién recibe el gradiente
-      tx(ctx, 'el gradiente llega al predictor y al encoder', R2.x, R2.y + R2.h + 72, { color: C.blue, size: 13.5, weight: '600' });
-      tx(ctx, 'de contexto; $s_y$ no recibe gradiente', R2.x, R2.y + R2.h + 92, { color: C.blue, size: 13.5, weight: '600' });
+      // 1. un parche: dos vectores de 8 números
+      {
+        const a = op(0), c = COL[0], x0 = c.x + 10, y0 = 112, bw = 22, bh = 150;
+        tx(ctx, 'predicción $\\hat s_y$', x0, y0 - 4, { color: alfa(C.blue, a), size: 13.5, weight: '600' });
+        tx(ctx, 'objetivo $s_y$', x0 + 128, y0 - 4, { color: alfa(C.coralD, a), size: 13.5, weight: '600' });
+        for (let cc = 0; cc < 8; cc++) {
+          const y = y0 + 10 + cc * (bh / 8), h = bh / 8 - 4;
+          ctx.fillStyle = alfa(C.blue, a * 0.8); ctx.fillRect(x0, y, 100 * P[0][cc], h);
+          ctx.strokeStyle = alfa(C.coralD, a); ctx.lineWidth = 1.6; ctx.strokeRect(x0 + 128, y, 100 * T[0][cc], h);
+        }
+        tx(ctx, '$D(\\hat s_y, s_y)$ = ' + n2(D[0]), x0, y0 + bh + 44, { color: alfa(C.navy, a), size: 17, weight: '700' });
+        tx(ctx, 'paper: L2 al cuadrado · código: smooth L1', x0, y0 + bh + 66, { color: alfa(C.grey2, a), size: 12 });
+      }
+      // 2. un bloque: sus parches, cada uno con su distancia
+      if (ap(1) > 0.01) {
+        const a = op(1), c = COL[1], cw = 64, chh = 58, x0 = c.x + 10, y0 = 128;
+        OB.forEach((k, j) => {
+          const x = x0 + (j % 3) * (cw + 6), y = y0 + Math.floor(j / 3) * (chh + 8);
+          parche(ctx, k, x, y, cw, 0.35 * a);
+          caja(ctx, x, y, cw, chh, { r: 5, stroke: alfa(C.coralD, a), lw: j === 0 ? 2.6 : 1.4 });
+          tx(ctx, n2(D[j]), x + cw / 2, y + chh / 2 + 6, { color: alfa(C.navy, a), size: 15, weight: '700', align: 'center' });
+        });
+        tx(ctx, 'promedio de los 6 parches', x0, y0 + 2 * (chh + 8) + 22, { color: alfa(C.grey2, a), size: 13 });
+        tx(ctx, '= ' + n2(mB), x0, y0 + 2 * (chh + 8) + 48, { color: alfa(C.navy, a), size: 17, weight: '700' });
+      }
+      // 3. una imagen: sus bloques objetivo
+      if (ap(2) > 0.01) {
+        const a = op(2), c = COL[2], s = 150, x0 = c.x + 10, y0 = 112;
+        ctx.globalAlpha = a * 0.75; ctx.drawImage(K.escena(), x0, y0, s, s); ctx.globalAlpha = 1;
+        const BB = [[0.55, 0.05, 0.4, 0.3], [0.05, 0.5, 0.3, 0.4], [0.4, 0.45, 0.32, 0.28], [0.12, 0.12, 0.3, 0.26]];
+        BB.forEach(([bx, by, bw, bh], b) => {
+          const x = x0 + bx * s, y = y0 + by * s;
+          caja(ctx, x, y, bw * s, bh * s, { r: 3, fill: alfa(C.coral, 0.25 * a), stroke: alfa(C.coralD, a), lw: b === 0 ? 2.6 : 1.6 });
+          caja(ctx, x + bw * s / 2 - 20, y + bh * s / 2 - 10, 40, 20, { r: 5, fill: alfa('#ffffff', 0.9 * a) });
+          tx(ctx, n2(BLQ[b]), x + bw * s / 2, y + bh * s / 2 + 5, { color: alfa(C.navy, a), size: 13, weight: '700', align: 'center' });
+        });
+        tx(ctx, 'promedio de los 4 bloques', x0, y0 + s + 28, { color: alfa(C.grey2, a), size: 13 });
+        tx(ctx, '= ' + n2(mI), x0, y0 + s + 54, { color: alfa(C.navy, a), size: 17, weight: '700' });
+      }
+      // 4. el lote
+      if (ap(3) > 0.01) {
+        const a = op(3), c = COL[3], s = 52, x0 = c.x + 10, y0 = 106;
+        LOTE.forEach((v, b) => {
+          const x = x0 + (b % 4) * (s + 6), y = y0 + Math.floor(b / 4) * (s + 6);
+          ctx.globalAlpha = a * 0.45; ctx.drawImage(K.escena(), x, y, s, s); ctx.globalAlpha = 1;
+          caja(ctx, x, y, s, s, { r: 4, stroke: alfa(b === 0 ? C.coralD : C.grid, a), lw: b === 0 ? 2.4 : 1.2 });
+          tx(ctx, n2(v), x + s / 2, y + s / 2 + 5, { color: alfa(C.navy, a), size: 13, weight: '700', align: 'center' });
+        });
+        tx(ctx, '… una imagen por ejemplo del lote', x0, y0 + 3 * (s + 6) + 16, { color: alfa(C.grey2, a), size: 12.5 });
+        caja(ctx, x0 - 4, y0 + 3 * (s + 6) + 30, 236, 40, { r: 10, fill: alfa(C.navy, a) });
+        tx(ctx, 'pérdida  L = ' + n2(mL), x0 + 114, y0 + 3 * (s + 6) + 56, { color: alfa('#ffffff', a), size: 17, weight: '700', align: 'center' });
+      }
+      tx(ctx, n < 3 ? 'Como el código arma bloques del mismo tamaño en todo el lote, equivale a promediar todos los parches objetivo.'
+        : 'Un solo número por lote. Su gradiente llega al predictor y al encoder de contexto; $s_y$ no recibe gradiente.', 24, H - 12, { color: C.grey2, size: 13.5 });
     };
-    K.pasos(root, [0, 1], draw, { ms: 6000 });
+    K.pasos(root, [0, 1, 2, 3], draw, { ms: 1800, max: 1800 });
   });
 
   // ============================================================ 6. el promedio móvil (EMA)

@@ -313,7 +313,7 @@ El código oficial difiere en dos puntos. Los objetivos se normalizan con *layer
 <div class="ot-widget" data-widget="perdida" data-alt="Animación: para cada parche del bloque, barras de la predicción y del objetivo que se van acercando durante el entrenamiento, con la distancia de cada parche y la curva de la pérdida">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Paso 6: Ilustración con vectores de 8 números; en el modelo tienen cientos. Durante el entrenamiento las barras azules (predicción) se acercan a los contornos rojo (objetivo).</p>
+<p class="leyenda">Paso 6: la pérdida se arma por niveles. Una distancia por parche (vectores de 8 números en el dibujo; cientos en el modelo), promediada dentro de cada bloque, sobre los bloques de cada imagen y sobre el lote. Los valores son ilustrativos.</p>
 ```
 :::
 
@@ -353,6 +353,15 @@ Los siete pasos, juntos, son una iteración de entrenamiento. Se repite en cada 
 :::
 
 ### Por qué esto evita el colapso
+
+::: {.column-page-right}
+```{=html}
+<div class="ot-widget" data-widget="noColapsa" data-alt="Cinco imágenes con su predicción y su objetivo: con gradiente por las dos ramas se juntan en un punto; con stop-gradient el objetivo queda fijo; con EMA se mueve despacio y sigue separado; sin EMA la nube se aplasta">
+  <canvas width="1100" height="430"></canvas>
+</div>
+<p class="leyenda">Esquema. La pérdida compara cada predicción con su objetivo. Si el objetivo también recibiera gradiente, el camino más corto a pérdida cero sería mover las dos salidas a una misma constante. La detención del gradiente fija el objetivo durante cada paso, y el EMA hace que cambie despacio, heredando la diversidad de un encoder que todavía distingue las imágenes. Tian et al. (2021) estudian esta dinámica en redes lineales; en el experimento de la sección 11, sin EMA el rango efectivo final cae de 102 a 28.</p>
+```
+:::
 
 La combinación de predictor en una sola rama, detención del gradiente hacia el objetivo y encoder objetivo por EMA es la misma que usa BYOL [@grill2020byol], y funciona en la práctica. La intuición es que el encoder objetivo no puede acordar con el de contexto una salida constante, porque no se optimiza: sólo lo sigue con retraso. No hay, sin embargo, una demostración de que el colapso sea imposible; lo que existe son análisis en modelos simplificados, como redes lineales [@tian2021understanding].
 

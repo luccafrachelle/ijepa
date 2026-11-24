@@ -362,54 +362,92 @@
   // ============================================================ 5. la pérdida
   K.register('perdida', root => {
     const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
+    // por parche → por bloque → por imagen → por lote: en cada nivel, un promedio
     const OB = OBJK[0], r = mulberry(21);
-    const P0 = OB.map(() => [...Array(8)].map(() => r()));
-    const RES = OB.map(() => [...Array(8)].map(() => (r() - 0.5) * 0.14));
     const T = OB.map(k => VAL2[k]);
-    const pred = (j, u) => T[j].map((s, c) => clamp(lerp(P0[j][c], s + RES[j][c], ease(u)), 0, 1));
-    const dist = (j, u) => pred(j, u).reduce((acc, p, c) => acc + (p - T[j][c]) ** 2, 0);
-    const perd = u => OB.reduce((acc, _, j) => acc + dist(j, u), 0);
-    const L0 = perd(0);
-    const BX = 30, BW = 104, BGAP = 12, BY = 96, BH = 150;
-    const R2 = { x: 760, y: 100, w: 300, h: 170 };
+    const P = T.map(v => v.map(x => clamp(x + (r() - 0.5) * 0.5, 0, 1)));
+    const D = T.map((v, j) => v.reduce((a, x, c) => a + (P[j][c] - x) ** 2, 0));
+    const prom = a => a.reduce((s, v) => s + v, 0) / a.length;
+    const mB = prom(D), BLQ = [mB, 0.21, 0.34, 0.18], mI = prom(BLQ);
+    const LOTE = [mI, ...[...Array(11)].map(() => 0.16 + 0.22 * r())], mL = prom(LOTE);
+    const n2 = v => v.toFixed(2).replace('.', ',');
+    const COL = [{ x: 24, w: 232 }, { x: 296, w: 220 }, { x: 556, w: 230 }, { x: 826, w: 250 }];
+    const TIT = ['un parche', 'un bloque', 'una imagen', 'el lote'];
     const draw = t => {
       ctx.clearRect(0, 0, W, H);
-      encabezado(ctx, 6, t < 0.01 ? 'Al principio, la predicción de cada parche no se parece al objetivo'
-        : t < 0.999 ? 'El gradiente acerca la predicción al objetivo, parche por parche'
-        : 'Al final quedan diferencias: no todo se puede predecir');
-      // leyenda de colores
-      caja(ctx, BX, 62, 14, 14, { r: 3, fill: alfa(C.blue, 0.75) }); tx(ctx, 'predicción $\\hat s_y$', BX + 22, 74, { color: C.blue, size: 14, weight: '600' });
-      caja(ctx, BX + 190, 62, 14, 14, { r: 3, stroke: C.coralD, lw: 1.8 }); tx(ctx, 'objetivo $s_y$', BX + 212, 74, { color: C.coralD, size: 14, weight: '600' });
-      OB.forEach((k, j) => {
-        const x = BX + j * (BW + BGAP), p = pred(j, t);
-        caja(ctx, x, BY, BW, BH, { r: 8, fill: '#fafafc', stroke: C.grid, lw: 1.2 });
-        const base = BY + BH - 12, alto = BH - 30;
-        for (let c = 0; c < 8; c++) {
-          const bx = x + 8 + c * 11;
-          ctx.fillStyle = alfa(C.blue, 0.75); ctx.fillRect(bx, base - alto * p[c], 7, alto * p[c]);
-          ctx.strokeStyle = C.coralD; ctx.lineWidth = 1.6; ctx.strokeRect(bx - 0.5, base - alto * T[j][c], 8, alto * T[j][c]);
+      const n = Math.round(t);
+      encabezado(ctx, 6, ['Por parche: la distancia entre el vector predicho y su objetivo',
+        'Por bloque: se promedian las distancias de sus parches',
+        'Por imagen: se promedian los M bloques objetivo (4 en el paper)',
+        'Por lote: se promedia sobre todas las imágenes. Ese número es la pérdida'][n]);
+      const ap = k => (k === 0 ? 1 : clamp(t - k + 1, 0, 1));
+      const op = k => ap(k) * (k === n ? 1 : 0.5);
+      COL.forEach((c, k) => {
+        if (ap(k) <= 0.01) return;
+        caja(ctx, c.x + 4, 62, 24, 24, { r: 6, fill: alfa(C.blue, op(k)) });
+        tx(ctx, String(k + 1), c.x + 16, 79, { color: '#fff', size: 13.5, weight: '700', align: 'center' });
+        tx(ctx, TIT[k], c.x + 38, 80, { color: alfa(C.navy, op(k)), size: 16, weight: '700' });
+        if (k > 0) {
+          flecha(ctx, [[COL[k - 1].x + COL[k - 1].w + 2, 210], [c.x - 6, 210]], alfa(C.grey2, ap(k)), { lw: 2, cabeza: 7 });
+          tx(ctx, 'promedio', (COL[k - 1].x + COL[k - 1].w + c.x) / 2 - 2, 200, { color: alfa(C.grey2, ap(k)), size: 12, align: 'center' });
         }
-        tx(ctx, 'parche ' + (j + 1), x + BW / 2, BY + BH + 20, { color: C.grey2, size: 13, align: 'center' });
-        tx(ctx, dist(j, t).toFixed(2).replace('.', ','), x + BW / 2, BY + BH + 44, { color: C.navy, size: 17, weight: '700', align: 'center' });
       });
-      tx(ctx, 'distancia $D(\\hat s_{y_j}, s_{y_j})$ de cada parche', BX, BY + BH + 70, { color: C.grey2, size: 13.5 });
-      tx(ctx, `pérdida del bloque = promedio de las seis = ${(perd(t) / OB.length).toFixed(2).replace('.', ',')}`, BX, BY + BH + 102, { color: C.navy, size: 17, weight: '700' });
-      // curva de la pérdida durante el entrenamiento
-      tx(ctx, 'pérdida a lo largo del entrenamiento', R2.x, R2.y - 8, { color: C.navy, size: 14.5, weight: '600' });
-      ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
-      for (let g = 0; g <= 4; g++) { const y = R2.y + R2.h * g / 4; ctx.beginPath(); ctx.moveTo(R2.x, y); ctx.lineTo(R2.x + R2.w, y); ctx.stroke(); }
-      ctx.strokeStyle = C.grey; ctx.beginPath(); ctx.moveTo(R2.x, R2.y + R2.h); ctx.lineTo(R2.x + R2.w, R2.y + R2.h); ctx.stroke();
-      ctx.strokeStyle = C.coral; ctx.lineWidth = 3; ctx.beginPath();
-      for (let i = 0; i <= 120; i++) { const u = t * i / 120, x = R2.x + R2.w * u, y = R2.y + R2.h * (1 - perd(u) / L0); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
-      ctx.stroke();
-      K.dot(ctx, R2.x + R2.w * t, R2.y + R2.h * (1 - perd(t) / L0), C.coral, 6);
-      tx(ctx, 'pasos de entrenamiento →', R2.x + R2.w, R2.y + R2.h + 20, { color: C.grey2, size: 13, align: 'right' });
-      tx(ctx, 'no llega a cero: no todo es predecible', R2.x, R2.y + R2.h + 44, { color: C.grey2, size: 13 });
-      // quién recibe el gradiente
-      tx(ctx, 'el gradiente llega al predictor y al encoder', R2.x, R2.y + R2.h + 72, { color: C.blue, size: 13.5, weight: '600' });
-      tx(ctx, 'de contexto; $s_y$ no recibe gradiente', R2.x, R2.y + R2.h + 92, { color: C.blue, size: 13.5, weight: '600' });
+      // 1. un parche: dos vectores de 8 números
+      {
+        const a = op(0), c = COL[0], x0 = c.x + 10, y0 = 112, bw = 22, bh = 150;
+        tx(ctx, 'predicción $\\hat s_y$', x0, y0 - 4, { color: alfa(C.blue, a), size: 13.5, weight: '600' });
+        tx(ctx, 'objetivo $s_y$', x0 + 128, y0 - 4, { color: alfa(C.coralD, a), size: 13.5, weight: '600' });
+        for (let cc = 0; cc < 8; cc++) {
+          const y = y0 + 10 + cc * (bh / 8), h = bh / 8 - 4;
+          ctx.fillStyle = alfa(C.blue, a * 0.8); ctx.fillRect(x0, y, 100 * P[0][cc], h);
+          ctx.strokeStyle = alfa(C.coralD, a); ctx.lineWidth = 1.6; ctx.strokeRect(x0 + 128, y, 100 * T[0][cc], h);
+        }
+        tx(ctx, '$D(\\hat s_y, s_y)$ = ' + n2(D[0]), x0, y0 + bh + 44, { color: alfa(C.navy, a), size: 17, weight: '700' });
+        tx(ctx, 'paper: L2 al cuadrado · código: smooth L1', x0, y0 + bh + 66, { color: alfa(C.grey2, a), size: 12 });
+      }
+      // 2. un bloque: sus parches, cada uno con su distancia
+      if (ap(1) > 0.01) {
+        const a = op(1), c = COL[1], cw = 64, chh = 58, x0 = c.x + 10, y0 = 128;
+        OB.forEach((k, j) => {
+          const x = x0 + (j % 3) * (cw + 6), y = y0 + Math.floor(j / 3) * (chh + 8);
+          parche(ctx, k, x, y, cw, 0.35 * a);
+          caja(ctx, x, y, cw, chh, { r: 5, stroke: alfa(C.coralD, a), lw: j === 0 ? 2.6 : 1.4 });
+          tx(ctx, n2(D[j]), x + cw / 2, y + chh / 2 + 6, { color: alfa(C.navy, a), size: 15, weight: '700', align: 'center' });
+        });
+        tx(ctx, 'promedio de los 6 parches', x0, y0 + 2 * (chh + 8) + 22, { color: alfa(C.grey2, a), size: 13 });
+        tx(ctx, '= ' + n2(mB), x0, y0 + 2 * (chh + 8) + 48, { color: alfa(C.navy, a), size: 17, weight: '700' });
+      }
+      // 3. una imagen: sus bloques objetivo
+      if (ap(2) > 0.01) {
+        const a = op(2), c = COL[2], s = 150, x0 = c.x + 10, y0 = 112;
+        ctx.globalAlpha = a * 0.75; ctx.drawImage(K.escena(), x0, y0, s, s); ctx.globalAlpha = 1;
+        const BB = [[0.55, 0.05, 0.4, 0.3], [0.05, 0.5, 0.3, 0.4], [0.4, 0.45, 0.32, 0.28], [0.12, 0.12, 0.3, 0.26]];
+        BB.forEach(([bx, by, bw, bh], b) => {
+          const x = x0 + bx * s, y = y0 + by * s;
+          caja(ctx, x, y, bw * s, bh * s, { r: 3, fill: alfa(C.coral, 0.25 * a), stroke: alfa(C.coralD, a), lw: b === 0 ? 2.6 : 1.6 });
+          caja(ctx, x + bw * s / 2 - 20, y + bh * s / 2 - 10, 40, 20, { r: 5, fill: alfa('#ffffff', 0.9 * a) });
+          tx(ctx, n2(BLQ[b]), x + bw * s / 2, y + bh * s / 2 + 5, { color: alfa(C.navy, a), size: 13, weight: '700', align: 'center' });
+        });
+        tx(ctx, 'promedio de los 4 bloques', x0, y0 + s + 28, { color: alfa(C.grey2, a), size: 13 });
+        tx(ctx, '= ' + n2(mI), x0, y0 + s + 54, { color: alfa(C.navy, a), size: 17, weight: '700' });
+      }
+      // 4. el lote
+      if (ap(3) > 0.01) {
+        const a = op(3), c = COL[3], s = 52, x0 = c.x + 10, y0 = 106;
+        LOTE.forEach((v, b) => {
+          const x = x0 + (b % 4) * (s + 6), y = y0 + Math.floor(b / 4) * (s + 6);
+          ctx.globalAlpha = a * 0.45; ctx.drawImage(K.escena(), x, y, s, s); ctx.globalAlpha = 1;
+          caja(ctx, x, y, s, s, { r: 4, stroke: alfa(b === 0 ? C.coralD : C.grid, a), lw: b === 0 ? 2.4 : 1.2 });
+          tx(ctx, n2(v), x + s / 2, y + s / 2 + 5, { color: alfa(C.navy, a), size: 13, weight: '700', align: 'center' });
+        });
+        tx(ctx, '… una imagen por ejemplo del lote', x0, y0 + 3 * (s + 6) + 16, { color: alfa(C.grey2, a), size: 12.5 });
+        caja(ctx, x0 - 4, y0 + 3 * (s + 6) + 30, 236, 40, { r: 10, fill: alfa(C.navy, a) });
+        tx(ctx, 'pérdida  L = ' + n2(mL), x0 + 114, y0 + 3 * (s + 6) + 56, { color: alfa('#ffffff', a), size: 17, weight: '700', align: 'center' });
+      }
+      tx(ctx, n < 3 ? 'Como el código arma bloques del mismo tamaño en todo el lote, equivale a promediar todos los parches objetivo.'
+        : 'Un solo número por lote. Su gradiente llega al predictor y al encoder de contexto; $s_y$ no recibe gradiente.', 24, H - 12, { color: C.grey2, size: 13.5 });
     };
-    K.pasos(root, [0, 1], draw, { ms: 6000 });
+    K.pasos(root, [0, 1, 2, 3], draw, { ms: 1800, max: 1800 });
   });
 
   // ============================================================ 6. el promedio móvil (EMA)

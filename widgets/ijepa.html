@@ -351,7 +351,8 @@
       'La pérdida compara predicción y objetivo en el espacio de representaciones',
       'El gradiente actualiza contexto y predictor; el encoder objetivo sigue al de contexto por EMA'];
     const NP = PASOS.length - 1;
-    let paso = +(root.dataset.paso || 0), al = PASOS.map((_, k) => (k <= paso ? 1 : 0)), fase = 0;
+    let paso = +(root.dataset.paso || 0), al = PASOS.map((_, k) => (k <= paso ? 1 : 0)), en = PASOS.map((_, k) => (k === paso ? 1 : 0)), fase = 0;
+    const vis = k => al[k] * (0.42 + 0.58 * en[k]);   // lo de pasos anteriores queda atenuado
     const conFragments = () => { const sec = root.closest('.reveal .slides section'); return sec && sec.querySelector('.fragment.paso') ? sec : null; };
     const N = 6, IM = { x: 24, y: 131, s: 168 }, q = IM.s / N;
     const OBJ = [{ top: 0, left: 3, h: 2, w: 3 }, { top: 3, left: 0, h: 3, w: 2 }], CTX = { top: 1, left: 0, h: 5, w: 5 };
@@ -366,8 +367,9 @@
       for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++)
         caja(ctx, x + j * 13, y + i * 13, 10, 10, { r: 2.5, fill: hueco ? alfa('#ffffff', a) : alfa(color, a), stroke: hueco ? alfa(color, a) : null, lw: 1.6, dash: hueco === 'punteado' ? [3, 2] : [] });
     }
-    function red(x, y, w, h, titulo, simbolo, color, a, barra) {
-      caja(ctx, x, y, w, h, { r: 12, fill: alfa('#ffffff', a), stroke: alfa(color, a), lw: 2.5 });
+    function red(x, y, w, h, titulo, simbolo, color, a, e = 0) {
+      if (e > 0.02) caja(ctx, x - 6, y - 6, w + 12, h + 12, { r: 16, fill: alfa(color, 0.1 * e) });
+      caja(ctx, x, y, w, h, { r: 12, fill: e > 0.02 ? alfa(color, 0.12 * e) : alfa('#ffffff', a), stroke: alfa(color, a), lw: 2.5 + 1.5 * e });
       text(ctx, titulo, x + w / 2, y + 30, { color: alfa(color, a), size: 16, weight: '600', align: 'center' });
       K.rich(ctx, simbolo, x + w / 2, y + 54, { color: alfa(C.navy, a), size: 18, align: 'center' });
     }
@@ -399,45 +401,46 @@
       if (al[1] > 0.5) { text(ctx, 'gris: ni contexto ni objetivo', IM.x + IM.s / 2, IM.y + IM.s + 22, { color: C.grey2, size: 13, align: 'center' }); }
       else text(ctx, 'imagen en parches', IM.x + IM.s / 2, IM.y + IM.s + 22, { color: C.grey2, size: 14, align: 'center' });
       // rama de contexto
-      let a = al[2];
-      flecha(ctx, F.ctx, alfa(C.teal, a), { t: a }); mini(222, 94, 52, true, C.teal, a); flecha(ctx, F.ctx2, alfa(C.teal, a), { t: a });
+      let a = vis(2), tA = al[2];
+      flecha(ctx, F.ctx, alfa(C.teal, a), { t: tA }); mini(222, 94, 52, true, C.teal, a); flecha(ctx, F.ctx2, alfa(C.teal, a), { t: tA });
       text(ctx, 'verde sin rojo', 248, 84, { color: alfa(C.teal, a), size: 13, weight: '600', align: 'center' });
-      red(300, 85, 190, 70, 'Encoder de contexto', '$f_\\theta$', C.teal, a);
-      flecha(ctx, F.sx, alfa(C.teal, a), { t: a }); tokens(527, 101, 7, 3, C.teal, a);
+      red(300, 85, 190, 70, 'Encoder de contexto', '$f_\\theta$', C.teal, a, en[2]);
+      flecha(ctx, F.sx, alfa(C.teal, a), { t: tA }); tokens(527, 101, 7, 3, C.teal, a);
       if (a > 0.02) K.rich(ctx, '$s_x$', 572, 164, { color: alfa(C.teal, a), size: 19, align: 'center' });
       viaja(F.ctx, C.teal, paso === 2); viaja(F.ctx2, C.teal, paso === 2);
       // rama objetivo
-      a = al[3];
-      flecha(ctx, F.obj, alfa(C.navy, a), { t: a }); mini(222, 304, 52, false, C.navy, a); flecha(ctx, F.obj2, alfa(C.navy, a), { t: a });
+      a = vis(3); tA = al[3];
+      flecha(ctx, F.obj, alfa(C.navy, a), { t: tA }); mini(222, 304, 52, false, C.navy, a); flecha(ctx, F.obj2, alfa(C.navy, a), { t: tA });
       text(ctx, 'imagen completa', 248, 376, { color: alfa(C.navy, a), size: 13, weight: '600', align: 'center' });
-      red(300, 295, 190, 70, 'Encoder objetivo', '$f_{\\bar\\theta}$', C.navy, a);
-      flecha(ctx, F.sy, alfa(C.coralD, a), { t: a });
+      red(300, 295, 190, 70, 'Encoder objetivo', '$f_{\\bar\\theta}$', C.navy, a, en[3]);
+      flecha(ctx, F.sy, alfa(C.coralD, a), { t: tA });
       text(ctx, 'se recortan los bloques objetivo', 695, 318, { color: alfa(C.grey2, a), size: 13.5, align: 'center' });
       tokens(912, 311, 3, 2, C.coral, a); tokens(968, 304, 2, 3, C.coral, a);
       if (a > 0.02) K.rich(ctx, '$s_y$', 1030, 338, { color: alfa(C.coralD, a), size: 19, align: 'center' });
       viaja(F.obj, C.navy, paso === 3); viaja(F.obj2, C.navy, paso === 3); viaja(F.sy, C.coralD, paso === 3, 0.25);
       // predictor
-      a = al[4];
-      flecha(ctx, F.pred, alfa(C.blue, a), { t: a });
-      red(670, 85, 170, 70, 'Predictor', '$g_\\phi$', C.blue, a);
-      tokens(675, 200, 4, 1, C.blue, a, 'punteado'); flecha(ctx, F.mask, alfa(C.blue, a), { t: a, lw: 2 });
+      a = vis(4); tA = al[4];
+      flecha(ctx, F.pred, alfa(C.blue, a), { t: tA });
+      red(670, 85, 170, 70, 'Predictor', '$g_\\phi$', C.blue, a, en[4]);
+      tokens(675, 200, 4, 1, C.blue, a, 'punteado'); flecha(ctx, F.mask, alfa(C.blue, a), { t: tA, lw: 2 });
       text(ctx, 'tokens de máscara', 700, 234, { color: alfa(C.blue, a), size: 13.5, weight: '600', align: 'center' });
       text(ctx, '+ posición del objetivo', 700, 252, { color: alfa(C.blue, a), size: 13.5, align: 'center' });
-      flecha(ctx, F.sh, alfa(C.blue, a), { t: a });
+      flecha(ctx, F.sh, alfa(C.blue, a), { t: tA });
       tokens(912, 108, 3, 2, C.blue, a, 'lleno'); tokens(968, 101, 2, 3, C.blue, a, 'lleno');
       if (a > 0.02) K.rich(ctx, '$\\hat s_y$', 1030, 128, { color: alfa(C.blue, a), size: 19, align: 'center' });
       viaja(F.pred, C.blue, paso === 4); viaja(F.sh, C.blue, paso === 4, 0.3);
       // pérdida
-      a = al[5];
-      flecha(ctx, [[950, 204], [950, 152]], alfa(C.navy, a), { t: a, lw: 2 }); flecha(ctx, [[950, 252], [950, 296]], alfa(C.navy, a), { t: a, lw: 2 });
+      a = vis(5); tA = al[5];
+      flecha(ctx, [[950, 204], [950, 152]], alfa(C.navy, a), { t: tA, lw: 2 }); flecha(ctx, [[950, 252], [950, 296]], alfa(C.navy, a), { t: tA, lw: 2 });
+      if (en[5] > 0.02) caja(ctx, 878, 200, 206, 56, { r: 28, fill: alfa(C.navy, 0.14 * en[5]) });
       caja(ctx, 886, 208, 190, 40, { r: 20, fill: alfa(C.navy, a) });
       K.rich(ctx, 'distancia  $D(\\hat s_y, s_y)$', 981, 236, { color: alfa('#ffffff', a), size: 15, weight: '600', align: 'center' });
       // gradiente y EMA
-      a = al[6];
-      flecha(ctx, F.g1, alfa(C.navy, a), { t: a, dash: [6, 5], lw: 2 }); flecha(ctx, F.g2, alfa(C.navy, a), { t: a, dash: [6, 5], lw: 2 });
+      a = vis(6); tA = al[6];
+      flecha(ctx, F.g1, alfa(C.navy, a), { t: tA, dash: [6, 5], lw: 2 }); flecha(ctx, F.g2, alfa(C.navy, a), { t: tA, dash: [6, 5], lw: 2 });
       text(ctx, 'gradiente', 843, 221, { color: alfa(C.navy, a), size: 13.5, weight: '600', align: 'center' });
       K.rich(ctx, 'gradiente: se actualizan $\\theta$ y $\\phi$', 575, 76, { color: alfa(C.navy, a), size: 13.5, weight: '600', align: 'center' });
-      flecha(ctx, F.ema, alfa(C.teal, a), { t: a, dash: [2, 6], lw: 3 });
+      flecha(ctx, F.ema, alfa(C.teal, a), { t: tA, dash: [2, 6], lw: 3 });
       text(ctx, 'promedio móvil (EMA)', 408, 218, { color: alfa(C.teal, a), size: 13.5, weight: '600' });
       text(ctx, 'de los pesos del contexto', 408, 236, { color: alfa(C.teal, a), size: 13.5 });
       text(ctx, 'sin gradiente por esta rama', 695, 352, { color: alfa(C.coralD, a), size: 13.5, weight: '600', align: 'center' });
@@ -454,7 +457,7 @@
     root._paso = va;
     K.frame(root, (now, dt) => {
       fase = (fase + dt / 1600) % 1;
-      for (let k = 0; k <= NP; k++) al[k] = clamp(al[k] + (k <= paso ? 1 : -1) * dt / 450, 0, 1);
+      for (let k = 0; k <= NP; k++) { al[k] = clamp(al[k] + (k <= paso ? 1 : -1) * dt / 450, 0, 1); en[k] = clamp(en[k] + (k === paso ? 1 : -1) * dt / 450, 0, 1); }
       draw();
     });
     draw();
@@ -578,13 +581,81 @@
     K.pasos(root, [0, 1, 2, 3], draw, { ms: 2600, max: 2600 });
   });
 
+  // ============================================================ por qué no colapsa (stop-gradient + EMA), por pasos
+  // Esquema: cinco imágenes; punto = predicción, anillo = objetivo. Cada escenario se anima al avanzar.
+  K.register('noColapsa', root => {
+    const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
+    const NI = 5, COL = [C.blue, C.teal, C.coralD, '#c9a227', '#7b5ea7'];
+    const CEN = [...Array(NI)].map((_, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / NI; return [0.66 * Math.cos(a), 0.66 * Math.sin(a)]; });
+    const OFF = [[0.32, 0.1], [-0.2, 0.28], [0.25, -0.26], [-0.3, -0.12], [0.12, 0.33]];
+    const DR = [[0.12, 0.1], [0.1, 0.14], [-0.04, 0.16], [-0.14, 0.06], [0.02, -0.12]];
+    const LN = [0.89, 0.45];                       // dirección a la que se aplasta sin EMA
+    const proy = p => { const d = p[0] * LN[0] + p[1] * LN[1]; return [d * LN[0], d * LN[1]]; };
+    const lerp2 = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+    const P = { x: 40, y: 66, s: 282 };
+    const mx = v => P.x + P.s / 2 + v * P.s * 0.42, my = v => P.y + P.s / 2 - v * P.s * 0.42;
+    function estado(n, u) {                        // escenario n (1..4) en avance u
+      u = ease(clamp(u, 0, 1));
+      return CEN.map((c, i) => {
+        const p0 = [c[0] + OFF[i][0], c[1] + OFF[i][1]];
+        if (n === 0) return { p: p0, o: c, tr: null };
+        if (n === 1) { const k = 1 - 0.97 * u; return { p: lerp2(p0, c, u).map(v => v * k), o: c.map(v => v * k), tr: null }; }
+        if (n === 2) return { p: lerp2(p0, c, u), o: c, tr: null };
+        if (n === 3) { const o = [c[0] + DR[i][0] * u, c[1] + DR[i][1] * u]; return { p: lerp2(p0, o, u), o, tr: c }; }
+        const o = lerp2(c, proy(c), u); return { p: lerp2(p0, o, Math.min(1, u * 1.3)), o, tr: null };
+      });
+    }
+    const TIT = ['Dos salidas por imagen: la predicción y el objetivo',
+      'Si el gradiente pasara por las dos ramas, ambas se juntan en un punto',
+      'Con stop-gradient, la pérdida no puede mover el objetivo',
+      'Con EMA, el objetivo sigue al encoder de contexto, despacio',
+      'Sin EMA (m = 0), el objetivo cambia con cada paso y la nube se aplasta'];
+    const NOTA = ['La pérdida sólo pide que cada predicción caiga sobre su objetivo.',
+      'Mover las dos salidas hacia la misma constante es el camino más corto a pérdida cero: colapso.',
+      'El objetivo queda fijo durante el paso; para bajar la pérdida, la única salida es predecir bien.',
+      'Los objetivos se desplazan, pero siguen separados: vienen de un encoder que todavía distingue las imágenes.',
+      'Sin el promedio lento, predicción y objetivo se mueven juntos y la representación pierde dimensiones.'];
+    const draw = t => {
+      ctx.clearRect(0, 0, W, H);
+      const n = Math.round(t), k = Math.max(1, Math.ceil(t - 1e-6)), u = t - (k - 1);
+      const st = t < 1e-6 ? estado(0, 0) : estado(k, u);
+      text(ctx, TIT[n], 24, 34, { color: n === 1 || n === 4 ? C.coralD : n === 0 ? C.navy : C.teal, size: 19, weight: '600' });
+      caja(ctx, P.x, P.y, P.s, P.s, { r: 8, fill: '#fafafc', stroke: C.grid, lw: 1.2 });
+      text(ctx, 'espacio de representaciones', P.x + P.s / 2, P.y - 8, { color: C.grey2, size: 13, align: 'center' });
+      if (k === 4 && t > 3) { ctx.strokeStyle = alfa(C.coralD, 0.35 * clamp(u, 0, 1)); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(mx(-LN[0]), my(-LN[1])); ctx.lineTo(mx(LN[0]), my(LN[1])); ctx.stroke(); ctx.setLineDash([]); }
+      st.forEach((e, i) => {
+        if (e.tr) { ctx.strokeStyle = alfa(COL[i], 0.4); ctx.lineWidth = 2; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(mx(e.tr[0]), my(e.tr[1])); ctx.lineTo(mx(e.o[0]), my(e.o[1])); ctx.stroke(); ctx.setLineDash([]); }
+        ctx.strokeStyle = alfa(C.grey2, 0.6); ctx.lineWidth = 1.2; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(mx(e.p[0]), my(e.p[1])); ctx.lineTo(mx(e.o[0]), my(e.o[1])); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = '#ffffff'; ctx.strokeStyle = COL[i]; ctx.lineWidth = 2.8; ctx.beginPath(); ctx.arc(mx(e.o[0]), my(e.o[1]), 8, 0, 7); ctx.fill(); ctx.stroke();
+        dot(ctx, mx(e.p[0]), my(e.p[1]), COL[i], 6);
+      });
+      dot(ctx, P.x + 12, P.y + P.s + 22, C.grey2, 5.5); K.rich(ctx, 'predicción $\\hat s_y$', P.x + 24, P.y + P.s + 27, { color: C.grey2, size: 14, align: 'left' });
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = C.grey2; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(P.x + 172, P.y + P.s + 22, 6, 0, 7); ctx.fill(); ctx.stroke();
+      K.rich(ctx, 'objetivo $s_y$', P.x + 184, P.y + P.s + 27, { color: C.grey2, size: 14, align: 'left' });
+      // lecturas
+      const perd = st.reduce((a, e) => a + Math.hypot(e.p[0] - e.o[0], e.p[1] - e.o[1]), 0) / NI;
+      const mu = [0, 1].map(d => st.reduce((a, e) => a + e.o[d], 0) / NI);
+      const cxx = st.reduce((a, e) => a + (e.o[0] - mu[0]) ** 2, 0) / NI, cyy = st.reduce((a, e) => a + (e.o[1] - mu[1]) ** 2, 0) / NI, cxy = st.reduce((a, e) => a + (e.o[0] - mu[0]) * (e.o[1] - mu[1]), 0) / NI;
+      const tr = cxx + cyy, det = cxx * cyy - cxy * cxy, l2 = Math.max(0, tr / 2 - Math.sqrt(Math.max(0, tr * tr / 4 - det)));
+      const RX = 420;
+      const fila = (y, et, val, col) => { text(ctx, et, RX, y, { color: C.grey2, size: 14 }); text(ctx, val, RX, y + 28, { color: col, size: 22, weight: '700' }); };
+      fila(96, 'pérdida (distancia predicción–objetivo)', num(perd, 2), perd < 0.12 ? C.teal : C.navy);
+      fila(166, 'dispersión de los objetivos', num(Math.sqrt(tr), 2), tr < 0.05 ? C.coralD : C.teal);
+      fila(236, 'ancho en la dirección más angosta', num(Math.sqrt(l2), 2), l2 < 0.01 ? C.coralD : C.teal);
+      K.parrafo(ctx, NOTA[n], RX, 320, 620, { color: C.navy, size: 15.5, lh: 22 });
+      text(ctx, 'Esquema. La solución trivial sigue existiendo: lo que la evita es la dinámica del entrenamiento, sin garantía.', 24, H - 12, { color: C.grey2, size: 13.5 });
+    };
+    K.pasos(root, [0, 1, 2, 3, 4], draw, { ms: 2600, max: 2600 });
+  });
+
   // ============================================================ mapa vertical de I-JEPA
   // dibujarMapa: diagrama de 300 × 500 (unidades lógicas) en (ox, oy); act[elemento] = 0..1 lo prende.
   const MAPA = (() => {
     const XL = 72, XR = 228, S = 92, H0 = 500, TY = H0 - S - 34;
     const yE = TY - 56, yS = yE - 64, yP = yS - 62, yH = yP - 62, yD = yH - 58, XM = (XL + XR) / 2;
-    const RA = [{ r: 1, c: 3, h: 2, w: 2 }, { r: 3, c: 1, h: 2, w: 2 }];
-    const CB = { r: 0, c: 0, h: 5, w: 5 };
+    const RA = [{ r: 0, c: 3, h: 2, w: 3 }, { r: 3, c: 0, h: 3, w: 2 }];   // mismas máscaras que widgets/pasos.html
+    const CB = { r: 1, c: 0, h: 5, w: 5 };
     const dentro = (b, r, c) => r >= b.r && r < b.r + b.h && c >= b.c && c < b.c + b.w;
     const BASE = 0.38, al = v => BASE + (1 - BASE) * (v || 0);
     return { XL, XR, S, TY, yE, yS, yP, yH, yD, XM, dibujar };

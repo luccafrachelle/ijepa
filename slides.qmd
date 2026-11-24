@@ -249,7 +249,7 @@ La energía $F(x, y)$ tiene que quedar baja sobre los datos y alta en el resto.
 ```
 
 ::: {.leyenda}
-Paper: $\frac{1}{M}\sum_{i}\sum_{j\in B_i}\lVert \hat s_{y_j} - s_{y_j}\rVert_2^2$. Código: smooth L1 promediada, contra objetivos con layer norm.
+Paper: $\frac{1}{M}\sum_{i}\sum_{j\in B_i}\lVert \hat s_{y_j} - s_{y_j}\rVert_2^2$ (suma sobre parches, promedio sobre bloques). Código, como en la animación: smooth L1 promediada sobre todo, contra objetivos con layer norm.
 :::
 
 ## Paso 7: La actualización por EMA
@@ -263,6 +263,15 @@ Paper: $\frac{1}{M}\sum_{i}\sum_{j\in B_i}\lVert \hat s_{y_j} - s_{y_j}\rVert_2^
 ::: {.leyenda}
 Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA.
 :::
+
+## Por qué no colapsa
+
+```{=html}
+<div class="ot-widget" data-widget="noColapsa" data-alt="Cinco imágenes con su predicción y su objetivo: con gradiente por las dos ramas se juntan en un punto; con stop-gradient el objetivo queda fijo; con EMA se mueve despacio y sigue separado; sin EMA la nube se aplasta">
+  <canvas width="1100" height="430"></canvas>
+</div>
+<p class="leyenda">Tian et al. (2021) analizan esta dinámica en redes lineales. En el experimento del apéndice, I-JEPA sin EMA colapsó en parte: rango efectivo final 28, contra 102 con EMA.</p>
+```
 
 ## Una pasada completa
 
@@ -290,7 +299,7 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 <p class="leyenda"><strong>El fuerte es el costo</strong>: ViT-H/14 en menos de 72 h con 16 A100; una sola vista frente a iBOT, ~5× menos iteraciones que MAE.</p>
 ```
 
-## Problemas y que fue despues
+## Problemas y qué fue después
 
 ::: {.columns}
 ::: {.column width="48%"}
@@ -312,7 +321,20 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 :::
 :::
 
-## Experimentos de juguete {.section-break background-color="#0f3460"}
+## Referencias
+
+::: {#refs .refs-col}
+:::
+
+<p class="credito"><strong>Declaración de uso de IA.</strong> Usé un asistente de IA (Claude, de Anthropic) para programar las animaciones, autocompletar algunas fórmulas y otras tareas de apoyo. Los experimentos y su código también los hizo en su mayoría el asistente. Todo tuvo intervención humana: yo guié el proceso y revisé y corregí cada resultado.</p>
+
+## Gracias por su atención {.section-break background-color="#0f3460"}
+
+<p class="sub">¿Preguntas?</p>
+
+## Apéndice: experimentos de juguete {.section-break background-color="#0f3460"}
+
+<p class="sub">Material de respaldo, por si sobra tiempo</p>
 
 
 ## La pregunta
@@ -365,11 +387,3 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 <p class="leyenda">Con regularizador, el rango sube rápido pero se estanca en 57–69; C1 llega a ~102 y C2 se queda en ~28.</p>
 <p class="credito">Límites: escala chica, λ elegido sin EMA y un control que colapsó sólo en parte.</p>
 ```
-
-
-## Referencias
-
-::: {#refs .refs-col}
-:::
-
-<p class="credito"><strong>Declaración de uso de IA.</strong> Usé un asistente de IA (Claude, de Anthropic) para programar las animaciones, autocompletar algunas fórmulas y otras tareas de apoyo. Los experimentos y su código también los hizo en su mayoría el asistente. Todo tuvo intervención humana: yo guié el proceso y revisé y corregí cada resultado.</p>
