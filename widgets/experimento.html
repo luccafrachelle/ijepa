@@ -148,7 +148,8 @@
           const x = G.x + 92 + jj * (G.cw + 8), y = G.y + i * (G.ch + 8);
           caja(ctx, x, y, G.cw, G.ch, { r: 10, fill: alfa(colReg(reg), 0.08 + 0.1 * o), stroke: alfa(colReg(reg), 0.25 + 0.75 * o), lw: id === 'C1' ? 2.6 : 1.4 });
           text(ctx, id, x + 10, y + 22, { color: alfa(C.navy, 0.35 + 0.65 * o), size: 14, weight: '700' });
-          text(ctx, coma(c[met][0]), x + G.cw - 10, y + 50, { color: alfa(colReg(reg), 0.35 + 0.65 * o), size: 21, weight: '700', align: 'right' });
+          text(ctx, coma(c.lin[0]), x + G.cw - 10, y + 42, { color: alfa(colReg(reg), 0.35 + 0.65 * o), size: 20, weight: '700', align: 'right' });
+          text(ctx, 'k-NN ' + coma(c.knn[0]), x + G.cw - 10, y + 61, { color: alfa(C.grey2, 0.35 + 0.65 * o), size: 12.5, weight: '600', align: 'right' });
         });
       });
       text(ctx, 'C1 = I-JEPA tal cual · C2 = control', G.x, G.y + 3 * (G.ch + 8) + 14, { color: C.grey2, size: 12.5 });
@@ -161,17 +162,21 @@
         const y = yv(v); ctx.beginPath(); ctx.moveTo(B.x, y); ctx.lineTo(B.x + B.w, y); ctx.stroke();
         text(ctx, String(v), B.x - 8, y + 4, { color: C.grey2, size: 12, align: 'right' });
       }
-      text(ctx, met === 'lin' ? 'top-1 lineal (%)' : 'top-1 k-NN (%)', B.x + B.w, 30, { color: C.grey2, size: 12.5, align: 'right' });
+      caja(ctx, B.x + B.w - 150, 20, 12, 12, { r: 2, fill: C.blue }); text(ctx, 'lineal', B.x + B.w - 133, 31, { color: C.grey2, size: 12.5 });
+      caja(ctx, B.x + B.w - 82, 20, 12, 12, { r: 2, fill: alfa(C.blue, 0.3) }); text(ctx, 'k-NN (%)', B.x + B.w, 31, { color: C.grey2, size: 12.5, align: 'right' });
       ORD.forEach((id, k) => {
-        const c = CEL[id], v = c[met][0] * alt[id], sd = c[met][1], x = xb(k), o = op[id], bw = 50;
-        caja(ctx, x, yv(v), bw, B.y + B.h - yv(v), { r: 4, fill: alfa(colReg(c.reg), 0.2 + 0.7 * o) });
-        if (sd && alt[id] > 0.98) {
-          ctx.strokeStyle = alfa(C.navy, o); ctx.lineWidth = 1.6; ctx.beginPath();
-          ctx.moveTo(x + bw / 2, yv(v + sd)); ctx.lineTo(x + bw / 2, yv(v - sd));
-          ctx.moveTo(x + bw / 2 - 6, yv(v + sd)); ctx.lineTo(x + bw / 2 + 6, yv(v + sd));
-          ctx.moveTo(x + bw / 2 - 6, yv(v - sd)); ctx.lineTo(x + bw / 2 + 6, yv(v - sd)); ctx.stroke();
-        }
-        text(ctx, coma(c[met][0]), x + bw / 2, yv(v) - (sd ? 12 : 6) - 2, { color: alfa(C.navy, 0.3 + 0.7 * o), size: 13, weight: '600', align: 'center' });
+        const c = CEL[id], x = xb(k), o = op[id], bw = 50;
+        [['lin', x, 30, 0.2 + 0.7 * o, 12.5, C.navy], ['knn', x + 32, 20, 0.1 + 0.25 * o, 11, C.grey2]].forEach(([m, x0, w, fa, fs, fc]) => {
+          const v = c[m][0] * alt[id], sd = c[m][1];
+          caja(ctx, x0, yv(v), w, B.y + B.h - yv(v), { r: 3, fill: alfa(colReg(c.reg), fa) });
+          if (sd && alt[id] > 0.98) {
+            ctx.strokeStyle = alfa(C.navy, 0.8 * o); ctx.lineWidth = 1.3; ctx.beginPath();
+            ctx.moveTo(x0 + w / 2, yv(v + sd)); ctx.lineTo(x0 + w / 2, yv(v - sd));
+            ctx.moveTo(x0 + w / 2 - 4, yv(v + sd)); ctx.lineTo(x0 + w / 2 + 4, yv(v + sd));
+            ctx.moveTo(x0 + w / 2 - 4, yv(v - sd)); ctx.lineTo(x0 + w / 2 + 4, yv(v - sd)); ctx.stroke();
+          }
+          text(ctx, coma(c[m][0]), x0 + w / 2, yv(v) - (sd ? 10 : 5) - 3, { color: alfa(fc, 0.3 + 0.7 * o), size: fs, weight: '600', align: 'center' });
+        });
         text(ctx, id, x + bw / 2, B.y + B.h + 18, { color: alfa(C.navy, 0.35 + 0.65 * o), size: 13.5, weight: '700', align: 'center' });
         text(ctx, c.reg === '—' ? 'sin reg.' : c.reg, x + bw / 2, B.y + B.h + 34, { color: alfa(colReg(c.reg), 0.35 + 0.65 * o), size: 11.5, align: 'center' });
       });
@@ -193,7 +198,6 @@
     };
     const b = K.bar(root);
     const setP = K.opciones(b, PREG.map((p, i) => [String(i), p.id === 'todo' ? 'todas' : p.id.toUpperCase()]), '0', v => { pi = +v; comp = 0; });
-    K.opciones(b, [['lin', 'lineal'], ['knn', 'k-NN']], met, v => { met = v; ORD.forEach(c => { alt[c] = 0.75; }); comp = 0; });
     const conFragments = () => { const sec = root.closest('section'); return sec && sec.querySelector('.fragment.paso') ? sec : null; };
     root._sync = () => { const sec = conFragments(); if (sec) { pi = Math.min(PREG.length - 1, sec.querySelectorAll('.fragment.paso.visible').length); setP(String(pi)); comp = 0; } };
     root._entrar = () => { ORD.forEach(c => { alt[c] = 0; }); comp = 0; };

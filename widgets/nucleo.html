@@ -265,7 +265,7 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
       if (!P.dur) P.t = P.to;
       pinta();
     }
-    P.va = va;
+    P.va = va; root._pasos = P;
     P.setStops = (st) => { P.stops = st; va(Math.min(P.i, st.length - 1), true); };
     root._sync = () => { if (sec) va(Math.min(P.stops.length - 1, sec.querySelectorAll('.fragment.paso.visible').length), !sec.classList.contains('present')); };
     frame(root, now => {

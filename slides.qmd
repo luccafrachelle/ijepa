@@ -174,44 +174,69 @@ La energía $F(x, y)$ tiene que quedar baja sobre los datos y alta en el resto.
 ## Paso 1: De la imagen a los tokens
 
 ```{=html}
+<div class="con-mapa"><div class="paso-main">
 <div class="ot-widget" data-widget="parches" data-alt="La imagen se corta en parches, cada parche se proyecta a un vector y se le suma su posición">
   <canvas width="1100" height="430"></canvas>
 </div>
+</div><div class="paso-mapa">
+<div class="ot-widget" data-widget="mapaJepa" data-paso="1" data-alt="Diagrama de I-JEPA con el paso 1 resaltado"><canvas width="300" height="500"></canvas></div>
+</div></div>
+
 <p class="leyenda">Como en cualquier ViT. Cada token lleva su posición, así que el encoder puede procesar <strong>sólo algunos</strong>.</p>
 ```
 
 ## Paso 2: El enmascarado multi-bloque
 
 ```{=html}
+<div class="con-mapa"><div class="paso-main">
 <div class="ot-widget" data-widget="mascaras" data-alt="Muestreo de bloques de contexto y objetivo">
   <canvas width="1100" height="430"></canvas>
-</div><p class="leyenda">El objetivo <strong>no</strong> es el complemento del contexto. Lo gris no es ni uno ni otro: sólo lo ve el encoder objetivo.</p>
+</div>
+</div><div class="paso-mapa">
+<div class="ot-widget" data-widget="mapaJepa" data-paso="2" data-alt="Diagrama de I-JEPA con el paso 2 resaltado"><canvas width="300" height="500"></canvas></div>
+</div></div>
+<p class="leyenda">El objetivo <strong>no</strong> es el complemento del contexto. Lo gris no es ni uno ni otro: sólo lo ve el encoder objetivo.</p>
 ```
 
 ## Paso 3: El encoder de contexto
 
 ```{=html}
+<div class="con-mapa"><div class="paso-main">
 <div class="ot-widget" data-widget="contexto" data-alt="Los tokens que no son contexto se descartan y el encoder de contexto procesa sólo los visibles">
   <canvas width="1100" height="430"></canvas>
 </div>
+</div><div class="paso-mapa">
+<div class="ot-widget" data-widget="mapaJepa" data-paso="3" data-alt="Diagrama de I-JEPA con el paso 3 resaltado"><canvas width="300" height="500"></canvas></div>
+</div></div>
+
 <p class="leyenda">Procesa sólo los tokens de contexto; los objetivos nunca entran por esta rama.</p>
 ```
 
 ## Paso 4: El encoder objetivo
 
 ```{=html}
+<div class="con-mapa"><div class="paso-main">
 <div class="ot-widget" data-widget="objetivo" data-alt="El encoder objetivo procesa la imagen completa y recién a la salida se recortan los bloques objetivo">
   <canvas width="1100" height="430"></canvas>
 </div>
+</div><div class="paso-mapa">
+<div class="ot-widget" data-widget="mapaJepa" data-paso="4" data-alt="Diagrama de I-JEPA con el paso 4 resaltado"><canvas width="300" height="500"></canvas></div>
+</div></div>
+
 <p class="leyenda">Procesa la imagen entera y recorta los bloques <strong>a la salida</strong>: cada objetivo ya trae información de la escena.</p>
 ```
 
 ## Paso 5: El predictor
 
 ```{=html}
+<div class="con-mapa"><div class="paso-main">
 <div class="ot-widget" data-widget="predictor" data-alt="El predictor recibe el contexto y tokens de máscara con la posición de cada parche objetivo, y devuelve la predicción">
   <canvas width="1100" height="430"></canvas>
 </div>
+</div><div class="paso-mapa">
+<div class="ot-widget" data-widget="mapaJepa" data-paso="5" data-alt="Diagrama de I-JEPA con el paso 5 resaltado"><canvas width="300" height="500"></canvas></div>
+</div></div>
+
 <p class="leyenda">Angosto a propósito: con ancho 1024 en vez de 384, el ajuste fino con 1 % de etiquetas baja de 70,7 a 68,4.</p>
 ```
 

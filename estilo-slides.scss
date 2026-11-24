@@ -165,3 +165,9 @@ $presentation-heading-text-transform: none;
 .reveal .ot-pasos { display: none; }
 .reveal .ot-widget[data-widget="arquitectura"] .ot-controls { display: none; }
 .reveal .ot-widget[data-widget="grilla"] .ot-controls { display: none; }
+
+// pasos 1–5: animación al 75 % y mapa vertical de I-JEPA al 25 %
+.reveal .con-mapa { display: flex; gap: 14px; align-items: center; }
+.reveal .con-mapa .paso-main { flex: 0 0 75%; min-width: 0; }
+.reveal .con-mapa .paso-mapa { flex: 1 1 25%; min-width: 0; }
+.reveal .con-mapa .paso-mapa .ot-widget { margin: 0; }

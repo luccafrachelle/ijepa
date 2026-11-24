@@ -578,6 +578,80 @@
     K.pasos(root, [0, 1, 2, 3], draw, { ms: 2600, max: 2600 });
   });
 
+  // ============================================================ mapa vertical de I-JEPA (al costado de cada paso)
+  // data-paso: 1 tokens · 2 máscaras · 3 encoder de contexto · 4 encoder objetivo · 5 predictor
+  K.register('mapaJepa', root => {
+    const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
+    const paso = +root.dataset.paso || 0;
+    const XL = 72, XR = 228, S = 92, TY = H - S - 34;
+    const RA = [{ r: 1, c: 3, h: 2, w: 2 }, { r: 3, c: 1, h: 2, w: 2 }];   // bloques objetivo (grilla 6×6)
+    const CB = { r: 0, c: 0, h: 5, w: 5 };                                  // bloque de contexto
+    const dentro = (b, r, c) => r >= b.r && r < b.r + b.h && c >= b.c && c < b.c + b.w;
+    const BASE = 0.42;
+    let hl = 0;                                   // resaltado: aparece cuando termina la animación del paso
+    const terminado = () => {
+      const main = root.closest('.con-mapa') && root.closest('.con-mapa').querySelector('.paso-main .ot-widget');
+      const P = main && main._pasos;
+      return !P || (P.i >= P.stops.length - 1 && !P.dur);
+    };
+    const al = v => BASE + (1 - BASE) * v;        // v: activación 0..1
+    function miniatura(x, y, lado, v) {
+      const q = S / 6;
+      ctx.save(); ctx.globalAlpha = al(v);
+      ctx.drawImage(escena(), x, y, S, S);
+      if (paso !== 1) {
+        if (lado === 'ctx') {
+          ctx.fillStyle = '#eceef3';
+          for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++)
+            if (!dentro(CB, r, c) || RA.some(b => dentro(b, r, c))) ctx.fillRect(x + c * q, y + r * q, q + 0.5, q + 0.5);
+          ctx.setLineDash([4, 3]); ctx.strokeStyle = C.teal; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, CB.w * q - 2, CB.h * q - 2); ctx.setLineDash([]);
+        } else {
+          RA.forEach(b => { ctx.fillStyle = alfa(C.coral, 0.35); ctx.fillRect(x + b.c * q, y + b.r * q, b.w * q, b.h * q);
+            ctx.strokeStyle = C.coralD; ctx.lineWidth = 2; ctx.strokeRect(x + b.c * q, y + b.r * q, b.w * q, b.h * q); });
+        }
+      } else {
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1;
+        for (let k = 1; k < 6; k++) { ctx.beginPath(); ctx.moveTo(x + k * q, y); ctx.lineTo(x + k * q, y + S); ctx.moveTo(x, y + k * q); ctx.lineTo(x + S, y + k * q); ctx.stroke(); }
+      }
+      ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.strokeRect(x, y, S, S);
+      ctx.restore();
+    }
+    function bloque(x, y, l1, sim, color, v) {
+      const a = al(v), w = 120, h = 52;
+      caja(ctx, x - w / 2, y - h / 2, w, h, { r: 9, fill: v > 0 ? alfa(color, 0.12 * v) : '#ffffff', stroke: alfa(color, a), lw: 1.8 + 1.4 * v });
+      text(ctx, l1, x, y - 4, { color: alfa(color, a), size: 12.5, weight: '600', align: 'center' });
+      K.rich(ctx, sim, x, y + 17, { color: alfa(color, a), size: 15, align: 'center' });
+    }
+    const lin = pts => flecha(ctx, pts, alfa(C.grey, BASE), { lw: 1.8, cabeza: 6 });
+    const simb = (x, y, s, color, v) => K.rich(ctx, s, x, y + 6, { color: alfa(color, al(v)), size: 18, align: 'center' });
+    K.frame(root, () => {
+      hl += ((terminado() ? 1 : 0) - hl) * 0.12; if (Math.abs(hl - Math.round(hl)) < 0.01) hl = Math.round(hl);
+      const v = k => (paso === k ? hl : 0);
+      ctx.clearRect(0, 0, W, H);
+      const vT = Math.max(v(1), v(2));
+      miniatura(XL - S / 2, TY, 'ctx', vT); miniatura(XR - S / 2, TY, 'obj', vT);
+      text(ctx, paso === 1 ? 'parches + posición' : 'contexto', XL, TY + S + 20, { color: alfa(paso === 1 ? C.navy : C.teal, al(vT)), size: 12, weight: '600', align: 'center' });
+      text(ctx, paso === 1 ? 'parches + posición' : 'imagen completa', XR, TY + S + 20, { color: alfa(paso === 1 ? C.navy : C.coralD, al(vT)), size: 12, weight: '600', align: 'center' });
+      if (vT > 0.02) caja(ctx, 14, TY - 10, W - 28, S + 42, { r: 12, stroke: alfa(C.blue, vT), lw: 2.5 });
+      const yE = TY - 56, yS = yE - 64, yP = yS - 62, yH = yP - 62;
+      lin([[XL, TY - 4], [XL, yE + 28]]); bloque(XL, yE, 'encoder contexto', '$f_\\theta$', C.teal, v(3));
+      lin([[XL, yE - 28], [XL, yS + 14]]); simb(XL, yS, '$s_x$', C.teal, Math.max(v(3), v(5)));
+      lin([[XL, yS - 14], [XL, yP + 28]]); bloque(XL, yP, 'predictor', '$g_\\phi$', C.blue, v(5));
+      lin([[XL, yP - 28], [XL, yH + 14]]); simb(XL, yH, '$\\hat s_y$', C.blue, v(5));
+      lin([[XR, TY - 4], [XR, yE + 28]]); bloque(XR, yE, 'encoder objetivo', '$f_{\\bar\\theta}$', C.navy, v(4));
+      lin([[XR, yE - 28], [XR, yH + 14]]); simb(XR, yH, '$s_y$', C.coralD, v(4));
+      ctx.setLineDash([5, 4]); flecha(ctx, [[XL + 62, yE], [XR - 62, yE]], alfa(C.grey2, BASE), { lw: 1.6, cabeza: 6 }); ctx.setLineDash([]);
+      text(ctx, 'EMA', (XL + XR) / 2, yE - 7, { color: alfa(C.grey2, BASE), size: 12, weight: '600', align: 'center' });
+      flecha(ctx, [[XR - 18, yP], [XL + 62, yP]], alfa(C.coralD, al(v(5))), { lw: 1.6, cabeza: 6 });
+      text(ctx, 'posiciones', (XL + XR) / 2 + 26, yP - 8, { color: alfa(C.coralD, al(v(5))), size: 12, align: 'center' });
+      const yD = yH - 58;
+      lin([[XL, yH - 14], [XL, yD], [(XL + XR) / 2 - 20, yD]]); lin([[XR, yH - 14], [XR, yD], [(XL + XR) / 2 + 20, yD]]);
+      ctx.fillStyle = '#ffffff'; ctx.strokeStyle = alfa(C.coralD, BASE); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc((XL + XR) / 2, yD, 18, 0, 7); ctx.fill(); ctx.stroke();
+      text(ctx, 'D', (XL + XR) / 2, yD + 6, { color: alfa(C.coralD, BASE), size: 16, weight: '700', align: 'center' });
+      text(ctx, 'I-JEPA', 16, 22, { color: C.grey2, size: 13, weight: '600' });
+    });
+  });
+
   // ============================================================ las tres arquitecturas
   K.register('tres', root => {
     const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
