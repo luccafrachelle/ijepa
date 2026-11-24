@@ -356,7 +356,7 @@
     const draw = t => {
       ctx.clearRect(0, 0, W, H);
       encabezado(ctx, 6, t < 0.01 ? 'Al principio, la predicción de cada parche no se parece al objetivo'
-        : t < 0.31 ? 'El gradiente acerca la predicción al objetivo, parche por parche'
+        : t < 0.999 ? 'El gradiente acerca la predicción al objetivo, parche por parche'
         : 'Al final quedan diferencias: no todo se puede predecir');
       // leyenda de colores
       caja(ctx, BX, 62, 14, 14, { r: 3, fill: alfa(C.blue, 0.75) }); tx(ctx, 'predicción $\\hat s_y$', BX + 22, 74, { color: C.blue, size: 14, weight: '600' });
@@ -390,7 +390,7 @@
       tx(ctx, 'el gradiente llega al predictor y al encoder', R2.x, R2.y + R2.h + 72, { color: C.blue, size: 13.5, weight: '600' });
       tx(ctx, 'de contexto; $s_y$ no recibe gradiente', R2.x, R2.y + R2.h + 92, { color: C.blue, size: 13.5, weight: '600' });
     };
-    K.pasos(root, [0, 0.3, 1], draw, { ms: 4000 });
+    K.pasos(root, [0, 1], draw, { ms: 6000 });
   });
 
   // ============================================================ 6. el promedio móvil (EMA)
@@ -461,7 +461,7 @@
       const a = fase(t, 0.03, 0.18), b = fase(t, 0.2, 0.38), c = fase(t, 0.4, 0.54), d = fase(t, 0.56, 0.72), e = fase(t, 0.74, 0.84), f = fase(t, 0.86, 0.98);
       encabezado(ctx, '✓', t < 0.19 ? 'Al terminar el preentrenamiento, el encoder de contexto y el predictor se descartan'
         : t < 0.55 ? 'Se usa el encoder objetivo, congelado: una imagen nueva da un vector por parche'
-        : t < 0.73 ? 'Los vectores de todos los parches se promedian en uno solo'
+        : t < 0.73 ? 'Average pooling: los vectores de todos los parches se promedian en uno solo'
         : 'Encima se entrena sólo un clasificador lineal: la evaluación lineal');
       // las tres redes entrenadas
       const top = [['Encoder de contexto', C.teal, true], ['Predictor', C.blue, true], ['Encoder objetivo', C.coralD, false]];
@@ -498,7 +498,7 @@
         flecha(ctx, [[G.x + 6 * G.dx + 2, G.y + 3 * G.dy + 6], [POOL.x - 10, G.y + 3 * G.dy + 6]], alfa(C.navy, d), { t: d });
         const prom = [...Array(8)].map((_, ci) => VAL2.reduce((s, v) => s + v[ci], 0) / NT);
         vec(ctx, POOL.x - 4, POOL.y - 20, 20, lerp(18, 70, d), 0, C.navy, d, { vals: prom.map(v => clamp((v - 0.35) * 2.5, 0, 1)) });
-        tx(ctx, 'promedio', POOL.x + 6, POOL.y + 72, { color: alfa(C.navy, d), size: 13.5, weight: '600', align: 'center' });
+        tx(ctx, 'average pooling', POOL.x + 6, POOL.y + 72, { color: alfa(C.navy, d), size: 13.5, weight: '600', align: 'center' });
       }
       if (e > 0) {
         flecha(ctx, [[POOL.x + 22, POOL.y + 14], [LIN.x - 4, POOL.y + 14]], alfa(C.navy, e), { t: e });

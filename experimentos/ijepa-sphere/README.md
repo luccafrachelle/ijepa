@@ -2,7 +2,7 @@
 
 I-JEPA evita el colapso con una asimetría: el encoder objetivo es un promedio móvil (EMA) del encoder de contexto y no recibe gradiente. LeJEPA (SIGReg, gaussiana isótropa) y SPHERE-JEPA (SUSReg, uniforme en la esfera) proponen en cambio un regularizador explícito sobre la distribución de los embeddings, pero lo prueban con vistas aumentadas y no con las máscaras de I-JEPA. Este experimento mete los dos regularizadores dentro de I-JEPA y cruza la presencia del EMA con el tipo de regularizador.
 
-El detalle completo está en [`PLAN.md`](PLAN.md) (diseño, fijado antes de correr) y en [`report/informe.qmd`](report/informe.qmd) / [`report/informe.pdf`](report/informe.pdf) (resultados y discusión). La versión de divulgación está en la sección 9 del blog (`../../blog.qmd`).
+El detalle completo está en [`PLAN.md`](PLAN.md) (diseño, fijado antes de correr) y en [`report/informe.qmd`](report/informe.qmd) / [`report/informe.pdf`](report/informe.pdf) (resultados y discusión). La versión de divulgación está en la sección 11 del blog (`../../blog.qmd`).
 
 ## Diseño
 

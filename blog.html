@@ -2257,9 +2257,9 @@ window.Quarto = {
   <li><a href="#sec-mascaras" id="toc-sec-mascaras" class="nav-link" data-scroll-target="#sec-mascaras"><span class="header-section-number">6</span> El enmascarado multi-bloque</a></li>
   <li><a href="#sec-perdida" id="toc-sec-perdida" class="nav-link" data-scroll-target="#sec-perdida"><span class="header-section-number">7</span> La pérdida y la actualización del encoder objetivo</a></li>
   <li><a href="#sec-resultados" id="toc-sec-resultados" class="nav-link" data-scroll-target="#sec-resultados"><span class="header-section-number">8</span> Qué muestran los resultados</a></li>
-  <li><a href="#sec-experimentos" id="toc-sec-experimentos" class="nav-link" data-scroll-target="#sec-experimentos"><span class="header-section-number">9</span> Un experimento propio: ¿se puede reemplazar el EMA?</a></li>
-  <li><a href="#sec-critica" id="toc-sec-critica" class="nav-link" data-scroll-target="#sec-critica"><span class="header-section-number">10</span> Crítica y limitaciones</a></li>
-  <li><a href="#sec-despues" id="toc-sec-despues" class="nav-link" data-scroll-target="#sec-despues"><span class="header-section-number">11</span> Qué vino después</a></li>
+  <li><a href="#sec-critica" id="toc-sec-critica" class="nav-link" data-scroll-target="#sec-critica"><span class="header-section-number">9</span> Crítica y limitaciones</a></li>
+  <li><a href="#sec-despues" id="toc-sec-despues" class="nav-link" data-scroll-target="#sec-despues"><span class="header-section-number">10</span> Qué vino después</a></li>
+  <li><a href="#sec-experimentos" id="toc-sec-experimentos" class="nav-link" data-scroll-target="#sec-experimentos"><span class="header-section-number">11</span> Un experimento propio: ¿se puede reemplazar el EMA?</a></li>
   <li><a href="#sec-resumen" id="toc-sec-resumen" class="nav-link" data-scroll-target="#sec-resumen"><span class="header-section-number">12</span> Resumen en seis ideas</a></li>
   <li><a href="#referencias" id="toc-referencias" class="nav-link" data-scroll-target="#referencias">Referencias</a></li>
   </ul>
@@ -2319,10 +2319,10 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 </div>
 <section id="sec-pregunta" class="level2" data-number="1">
 <h2 data-number="1" class="anchored" data-anchor-id="sec-pregunta"><span class="header-section-number">1</span> La pregunta de fondo</h2>
-<p>Un clasificador supervisado aprende sólo lo necesario para separar las categorías que se le mostraron, y cada imagen le aporta una única palabra de información. LeCun contrasta esto con el aprendizaje humano: un adolescente aprende a manejar en unas veinte horas de práctica porque llega con un modelo previo de cómo funciona el mundo (los objetos no desaparecen, lo que se suelta cae), adquirido casi por completo <strong>observando</strong> <span class="citation" data-cites="lecun2022path">(<a href="#ref-lecun2022path" role="doc-biblioref">LeCun 2022</a>)</span>.</p>
+<p>Un clasificador supervisado aprende sólo lo necesario para separar las categorías que se le mostraron, y cada imagen le aporta una única palabra de información. LeCun contrasta esto con el aprendizaje humano: un adolescente aprende a manejar en unas veinte horas de práctica porque llega con un modelo previo de cómo funciona el mundo (los objetos no desaparecen, lo que se suelta cae), adquirido casi por completo observando <span class="citation" data-cites="lecun2022path">(<a href="#ref-lecun2022path" role="doc-biblioref">LeCun 2022</a>)</span>.</p>
 <p>El aprendizaje auto-supervisado busca algo parecido: esconder o alterar parte de un dato sin etiquetar y entrenar a la red para relacionar lo visible con lo oculto. La supervisión sale del propio dato, y las representaciones aprendidas se reutilizan después en tareas con pocas etiquetas.</p>
 <div class="caja idea">
-<p><span class="tag">Idea</span> Lo que distingue a un método auto-supervisado de otro es <strong>qué se le pide predecir</strong> y <strong>dónde se mide el error</strong>. El resto del texto gira en torno a esa elección.</p>
+<p><span class="tag">Idea</span> Lo que distingue a un método auto-supervisado de otro es qué se le pide predecir y dónde se mide el error. El resto del texto gira en torno a esa elección.</p>
 </div>
 </section>
 <section id="sec-lecun" class="level2 page-columns page-full" data-number="2">
@@ -2334,15 +2334,15 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 </div>
 <p class="leyenda">Los seis módulos de la arquitectura de LeCun (2022), redibujados. La figura recorre uno por vez; las líneas punteadas indican que el configurador ajusta a los demás.</p>
 </div>
-<p>El módulo central, y el que LeCun considera más difícil, es el <strong>modelo del mundo</strong>: completa la información que falta sobre el estado actual y predice estados futuros plausibles, lo que permite al agente evaluar las consecuencias de una acción antes de ejecutarla. La dificultad está en entrenarlo. De una misma situación pueden seguir muchas cosas, y la mayoría de los detalles (el dibujo exacto de las hojas, la textura del asfalto) no son predecibles ni relevantes. De ahí la tesis del texto:</p>
+<p>El módulo central, y el que LeCun considera más difícil, es el modelo del mundo: completa la información que falta sobre el estado actual y predice estados futuros plausibles, lo que permite al agente evaluar las consecuencias de una acción antes de ejecutarla. La dificultad está en entrenarlo. De una misma situación pueden seguir muchas cosas, y la mayoría de los detalles (el dibujo exacto de las hojas, la textura del asfalto) no son predecibles ni relevantes. De ahí la tesis del texto:</p>
 <div class="caja idea">
-<p><span class="tag">La tesis</span> Un modelo del mundo tiene que predecir en un <strong>espacio de representaciones abstractas</strong>, no en el de los datos crudos, para poder ignorar lo irrelevante o impredecible.</p>
+<p><span class="tag">La tesis</span> Un modelo del mundo tiene que predecir en un espacio de representaciones abstractas, no en el de los datos crudos, para poder ignorar lo irrelevante o impredecible.</p>
 </div>
-<p>La arquitectura que LeCun propone para eso es <strong>JEPA</strong> (<em>Joint-Embedding Predictive Architecture</em>), e I-JEPA la lleva a imágenes <span class="citation" data-cites="assran2023ijepa">(<a href="#ref-assran2023ijepa" role="doc-biblioref">Assran et al. 2023</a>)</span>. No es el primer método de imágenes que predice en el espacio de representaciones (data2vec y CAE ya lo hacían), pero sí el que se formula explícitamente dentro de ese programa. El salto de escala es grande: el texto de 2022 habla de agentes, planificación y video; I-JEPA toma una sola pieza, aprender representaciones prediciendo en un espacio abstracto, y la prueba sobre las imágenes estáticas de ImageNet. No hay actor, costo ni dimensión temporal.</p>
+<p>La arquitectura que LeCun propone para eso es JEPA (<em>Joint-Embedding Predictive Architecture</em>), e I-JEPA la lleva a imágenes <span class="citation" data-cites="assran2023ijepa">(<a href="#ref-assran2023ijepa" role="doc-biblioref">Assran et al. 2023</a>)</span>. No es el primer método de imágenes que predice en el espacio de representaciones (data2vec y CAE ya lo hacían), pero sí el que se formula explícitamente dentro de ese programa. El salto de escala es grande: el texto de 2022 habla de agentes, planificación y video; I-JEPA toma una sola pieza, aprender representaciones prediciendo en un espacio abstracto, y la prueba sobre las imágenes estáticas de ImageNet. No hay actor, costo ni dimensión temporal.</p>
 </section>
 <section id="sec-pixeles" class="level2 page-columns page-full" data-number="3">
 <h2 data-number="3" class="anchored" data-anchor-id="sec-pixeles"><span class="header-section-number">3</span> Predecir píxeles o predecir representaciones</h2>
-<p>La vía directa para predecir lo que falta es generarlo píxel por píxel y medir el error cuadrático. Es la familia <strong>generativa</strong> o de reconstrucción, cuyo representante en imágenes es MAE <span class="citation" data-cites="he2022mae">(<a href="#ref-he2022mae" role="doc-biblioref">He et al. 2022</a>)</span>: tapa la mayoría de los parches y reconstruye sus píxeles.</p>
+<p>La vía directa para predecir lo que falta es generarlo píxel por píxel y medir el error cuadrático. Es la familia generativa o de reconstrucción, cuyo representante en imágenes es MAE <span class="citation" data-cites="he2022mae">(<a href="#ref-he2022mae" role="doc-biblioref">He et al. 2022</a>)</span>: tapa la mayoría de los parches y reconstruye sus píxeles.</p>
 <p>El problema aparece cuando lo que falta no está determinado por lo que se ve. La figura plantea un caso mínimo: una pelota que sale siempre del mismo punto, en una dirección que no se puede anticipar, sobre un fondo de textura aleatoria. Dado el punto de partida (el contexto), hay muchos futuros posibles igual de probables.</p>
 <div class="column-page-right">
 <div class="ot-widget" data-widget="pixlat" data-alt="Tres paneles: a la izquierda, un futuro posible de una pelota que va cambiando; en el centro, la predicción que minimiza el error cuadrático en píxeles, una mancha borrosa; a la derecha, una tabla con la representación de ese futuro y la predicción, que coinciden">
@@ -2350,17 +2350,17 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 </div>
 <p class="leyenda">Izquierda: futuros sorteados, uno por vez. Centro: la imagen que minimiza el error cuadrático esperado, calculada como el promedio de 240 futuros. Derecha: una representación elegida a mano que conserva sólo lo que no depende del azar; no es un modelo entrenado. El deslizador fija cuánta incertidumbre hay en la dirección y en el fondo.</p>
 </div>
-<p><strong>Panel central: predecir píxeles.</strong> La predicción que minimiza el error cuadrático esperado es la media condicional <span class="math inline">\mathbb{E}[y \mid x]</span>, el promedio de todos los futuros posibles. Con una sola dirección posible ese promedio es nítido; a medida que crece la incertidumbre se vuelve una mancha: la pelota repartida sobre todas sus posiciones y el fondo gris liso. Es la respuesta óptima para esa pérdida, pero no se parece a ningún futuro real. Además, para bajar el error la red tiene que dedicar capacidad a la textura del fondo, que ocupa casi todos los píxeles y no dice nada sobre la escena. El paper de I-JEPA lo resume así: las representaciones de los métodos generativos suelen ser de <strong>menor nivel semántico</strong>, y predecir en un espacio abstracto permite eliminar detalles de píxel innecesarios <span class="citation" data-cites="assran2023ijepa">(<a href="#ref-assran2023ijepa" role="doc-biblioref">Assran et al. 2023</a>)</span>.</p>
-<p><strong>Panel derecho: predecir una representación.</strong> Ahora el objetivo no es la imagen futura sino una descripción de ella, <span class="math inline">s_y</span>, producida por un encoder. Si ese encoder conserva que hay una pelota, su tamaño y cuánto se alejó, y descarta la dirección exacta y la textura, entonces <strong>todos los futuros posibles tienen la misma representación</strong>. El objetivo deja de ser aleatorio y el predictor puede acertarlo exactamente: la tabla muestra el mismo valor en las dos columnas, futuro tras futuro, mientras el panel izquierdo cambia. Si se baja la incertidumbre a cero, la dirección también pasa a ser predecible y la representación puede incluirla.</p>
+<p><strong>Panel central: predecir píxeles.</strong> La predicción que minimiza el error cuadrático esperado es la media condicional <span class="math inline">\mathbb{E}[y \mid x]</span>, el promedio de todos los futuros posibles. Con una sola dirección posible ese promedio es nítido; a medida que crece la incertidumbre se vuelve una mancha: la pelota repartida sobre todas sus posiciones y el fondo gris liso. Es la respuesta óptima para esa pérdida, pero no se parece a ningún futuro real. Además, para bajar el error la red tiene que dedicar capacidad a la textura del fondo, que ocupa casi todos los píxeles y no dice nada sobre la escena. El paper de I-JEPA lo resume así: las representaciones de los métodos generativos suelen ser de menor nivel semántico, y predecir en un espacio abstracto permite eliminar detalles de píxel innecesarios <span class="citation" data-cites="assran2023ijepa">(<a href="#ref-assran2023ijepa" role="doc-biblioref">Assran et al. 2023</a>)</span>.</p>
+<p><strong>Panel derecho: predecir una representación.</strong> Ahora el objetivo no es la imagen futura sino una descripción de ella, <span class="math inline">s_y</span>, producida por un encoder. Si ese encoder conserva que hay una pelota, su tamaño y cuánto se alejó, y descarta la dirección exacta y la textura, entonces todos los futuros posibles tienen la misma representación. El objetivo deja de ser aleatorio y el predictor puede acertarlo exactamente: la tabla muestra el mismo valor en las dos columnas, futuro tras futuro, mientras el panel izquierdo cambia. Si se baja la incertidumbre a cero, la dirección también pasa a ser predecible y la representación puede incluirla.</p>
 <p>En la figura el encoder está elegido a mano. En JEPA se aprende junto con el predictor, y eso es lo que le permite descartar lo impredecible: es el propio entrenamiento el que decide qué conservar.</p>
 <div class="caja idea">
-<p><span class="tag">Idea</span> Predecir en representaciones le permite a la red <strong>no predecir</strong> lo impredecible, porque el encoder puede asignar la misma representación a todos los desenlaces compatibles.</p>
+<p><span class="tag">Idea</span> Predecir en representaciones le permite a la red no predecir lo impredecible, porque el encoder puede asignar la misma representación a todos los desenlaces compatibles.</p>
 </div>
 <p>El costo es que, si el encoder puede descartar información, nada le impide descartarla toda: una representación constante también es perfectamente predecible.</p>
 </section>
 <section id="sec-energia" class="level2 page-columns page-full" data-number="4">
 <h2 data-number="4" class="anchored" data-anchor-id="sec-energia"><span class="header-section-number">4</span> Energía y colapso</h2>
-<p>LeCun formula estas arquitecturas como <strong>modelos basados en energía</strong>: una función <span class="math inline">F(x, y)</span> que debe ser baja cuando <span class="math inline">x</span> e <span class="math inline">y</span> son compatibles (dos partes de la misma imagen) y alta cuando no lo son. Entrenar es darle forma a ese paisaje. Con esa lente, el paper distingue tres familias <span class="citation" data-cites="assran2023ijepa">(<a href="#ref-assran2023ijepa" role="doc-biblioref">Assran et al. 2023</a>)</span>:</p>
+<p>LeCun formula estas arquitecturas como modelos basados en energía: una función <span class="math inline">F(x, y)</span> que debe ser baja cuando <span class="math inline">x</span> e <span class="math inline">y</span> son compatibles (dos partes de la misma imagen) y alta cuando no lo son. Entrenar es darle forma a ese paisaje. Con esa lente, el paper distingue tres familias <span class="citation" data-cites="assran2023ijepa">(<a href="#ref-assran2023ijepa" role="doc-biblioref">Assran et al. 2023</a>)</span>:</p>
 <div class="column-page-right">
 <div class="ot-widget" data-widget="tres" data-alt="Tres diagramas: arquitectura joint-embedding, arquitectura generativa y arquitectura JEPA, cada una con su punto de comparación">
   <canvas width="1100" height="400"></canvas>
@@ -2368,13 +2368,13 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 <p class="leyenda">Las tres familias, redibujadas a partir de la figura 2 del paper. El círculo D marca dónde se mide la distancia. La variable z condiciona la predicción; en I-JEPA es la posición del bloque a predecir.</p>
 </div>
 <ul>
-<li><strong>Joint-embedding.</strong> Dos encoders producen <span class="math inline">s_x</span> y <span class="math inline">s_y</span> y se entrena para que coincidan cuando <span class="math inline">x</span> e <span class="math inline">y</span> son dos vistas de la misma imagen (SimCLR, DINO, iBOT). Logran representaciones muy semánticas, pero dependen de <strong>aumentos de vista diseñados a mano</strong>, que fijan de antemano qué debe ser invariante.</li>
+<li><strong>Joint-embedding.</strong> Dos encoders producen <span class="math inline">s_x</span> y <span class="math inline">s_y</span> y se entrena para que coincidan cuando <span class="math inline">x</span> e <span class="math inline">y</span> son dos vistas de la misma imagen (SimCLR, DINO, iBOT). Logran representaciones muy semánticas, pero dependen de aumentos de vista diseñados a mano, que fijan de antemano qué debe ser invariante.</li>
 <li><strong>Generativa.</strong> Un decoder reconstruye <span class="math inline">y</span> a partir de <span class="math inline">x</span> y la comparación se hace en el espacio de entrada. No requiere esos aumentos, pero paga el costo descrito en la sección anterior.</li>
-<li><strong>JEPA.</strong> Como la generativa, tiene un <strong>predictor</strong> que va de <span class="math inline">x</span> hacia <span class="math inline">y</span>; como joint-embedding, compara representaciones: predice <span class="math inline">s_y</span> a partir de <span class="math inline">s_x</span>.</li>
+<li><strong>JEPA.</strong> Como la generativa, tiene un predictor que va de <span class="math inline">x</span> hacia <span class="math inline">y</span>; como joint-embedding, compara representaciones: predice <span class="math inline">s_y</span> a partir de <span class="math inline">s_x</span>.</li>
 </ul>
 <section id="el-riesgo-una-solución-trivial" class="level3 page-columns page-full" data-number="4.1">
 <h3 data-number="4.1" class="anchored" data-anchor-id="el-riesgo-una-solución-trivial"><span class="header-section-number">4.1</span> El riesgo: una solución trivial</h3>
-<p>Cuando se comparan representaciones, un encoder que devuelve <strong>el mismo vector para cualquier entrada</strong> lleva la pérdida a su mínimo sin aprender nada. Es el <strong>colapso de representaciones</strong>; en términos de energía, un paisaje plano.</p>
+<p>Cuando se comparan representaciones, un encoder que devuelve el mismo vector para cualquier entrada lleva la pérdida a su mínimo sin aprender nada. Es el colapso de representaciones; en términos de energía, un paisaje plano.</p>
 <div class="column-page-right">
 <div class="ot-widget" data-widget="energia" data-param="de bien formada a colapsada" data-alt="Curva de energía con mínimos sobre los datos que se va aplanando hasta quedar en cero en todos lados">
   <canvas width="1100" height="360"></canvas>
@@ -2402,19 +2402,19 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 </tr>
 </tbody>
 </table>
-<p>I-JEPA usa el último: una <strong>arquitectura asimétrica</strong> entre el encoder de <span class="math inline">x</span> y el de <span class="math inline">y</span> <span class="citation" data-cites="assran2023ijepa grill2020byol">(<a href="#ref-assran2023ijepa" role="doc-biblioref">Assran et al. 2023</a>; <a href="#ref-grill2020byol" role="doc-biblioref">Grill et al. 2020</a>)</span>, que se detalla en la sección 7.</p>
+<p>I-JEPA usa el último: una arquitectura asimétrica entre el encoder de <span class="math inline">x</span> y el de <span class="math inline">y</span> <span class="citation" data-cites="assran2023ijepa grill2020byol">(<a href="#ref-assran2023ijepa" role="doc-biblioref">Assran et al. 2023</a>; <a href="#ref-grill2020byol" role="doc-biblioref">Grill et al. 2020</a>)</span>, que se detalla en la sección 7.</p>
 </section>
 </section>
 <section id="sec-ijepa" class="level2 page-columns page-full" data-number="5">
 <h2 data-number="5" class="anchored" data-anchor-id="sec-ijepa"><span class="header-section-number">5</span> I-JEPA, paso a paso</h2>
-<p>I-JEPA predice, a partir de un <strong>bloque de contexto</strong> de la imagen, las representaciones de varios <strong>bloques objetivo</strong> de la misma imagen. Usa tres Vision Transformers (ViT): un <strong>encoder de contexto</strong>, un <strong>encoder objetivo</strong> y un <strong>predictor</strong>. El recorrido completo de un paso de entrenamiento:</p>
+<p>I-JEPA predice, a partir de un bloque de contexto de la imagen, las representaciones de varios bloques objetivo de la misma imagen. Usa tres Vision Transformers (ViT): un encoder de contexto, un encoder objetivo y un predictor. El recorrido completo de un paso de entrenamiento:</p>
 <div class="column-page-right">
 <div class="ot-widget" data-widget="arquitectura" data-alt="Diagrama animado de I-JEPA en siete pasos: imagen en parches, bloques de contexto y objetivo, encoder de contexto, encoder objetivo, predictor, pérdida y actualización">
   <canvas width="1100" height="430"></canvas>
 </div>
 <p class="leyenda">Un paso de entrenamiento, redibujado a partir de la figura 3 del paper, con la grilla reducida a 6 × 6 parches.</p>
 </div>
-<p>Cada paso tiene abajo su propia animación con el mismo código de colores: <strong>verde</strong> para el contexto, <strong>coral</strong> para los objetivos, <strong>azul</strong> para el predictor y <strong>gris</strong> para los parches que no son ni contexto ni objetivo.</p>
+<p>Cada paso tiene abajo su propia animación con el mismo código de colores: verde para el contexto, coral para los objetivos, azul para el predictor y gris para los parches que no son ni contexto ni objetivo.</p>
 <section id="paso-1-de-la-imagen-a-una-secuencia-de-tokens" class="level3 page-columns page-full" data-number="5.1">
 <h3 data-number="5.1" class="anchored" data-anchor-id="paso-1-de-la-imagen-a-una-secuencia-de-tokens"><span class="header-section-number">5.1</span> Paso 1: de la imagen a una secuencia de tokens</h3>
 <p>Como en todo ViT <span class="citation" data-cites="dosovitskiy2021vit">(<a href="#ref-dosovitskiy2021vit" role="doc-biblioref">Dosovitskiy et al. 2021</a>)</span>, la imagen se corta en parches de 16 × 16 que no se superponen y cada uno pasa por una misma proyección lineal. A 224 × 224 píxeles eso da una grilla de 14 × 14, es decir 196 tokens de 768 dimensiones en un ViT-B/16, el modelo de las ablaciones; el ViT-H/14 principal trabaja con 16 × 16 = 256 parches.</p>
@@ -2422,9 +2422,9 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 <div class="ot-widget" data-widget="parches" data-alt="Animación: la imagen se corta en parches, los parches se ponen en fila, cada uno se proyecta a un vector y se le suma un vector de posición">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Paso 1, con 6 × 6 parches. Los colores del vector de posición son una ayuda visual; en el modelo es un vector numérico más.</p>
+<p class="leyenda">Paso 1: ejemplo con 6 × 6 parches. Los colores del vector de posición son una ayuda visual; en el modelo es un vector numérico más.</p>
 </div>
-<p>A cada token se le suma un embedding posicional 2D (senos y cosenos, fijo, no entrenado). En I-JEPA esa suma ocurre <strong>antes</strong> de cualquier máscara, de modo que cada token lleva su posición consigo y el ViT puede operar sobre un subconjunto arbitrario de parches: los ausentes simplemente no están en la secuencia.</p>
+<p>A cada token se le suma un embedding posicional 2D (senos y cosenos, fijo, no entrenado). En I-JEPA esa suma ocurre antes de cualquier máscara, de modo que cada token lleva su posición consigo y el ViT puede operar sobre un subconjunto arbitrario de parches: los ausentes simplemente no están en la secuencia.</p>
 </section>
 <section id="paso-2-sortear-los-bloques" class="level3" data-number="5.2">
 <h3 data-number="5.2" class="anchored" data-anchor-id="paso-2-sortear-los-bloques"><span class="header-section-number">5.2</span> Paso 2: sortear los bloques</h3>
@@ -2438,23 +2438,23 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 </section>
 <section id="paso-3-el-encoder-de-contexto" class="level3 page-columns page-full" data-number="5.3">
 <h3 data-number="5.3" class="anchored" data-anchor-id="paso-3-el-encoder-de-contexto"><span class="header-section-number">5.3</span> Paso 3: el encoder de contexto</h3>
-<p>El encoder de contexto, <span class="math inline">f_\theta</span>, es un ViT estándar que recibe <strong>únicamente</strong> los tokens del contexto. Sus salidas, las <strong>representaciones de contexto</strong> <span class="math inline">s_x</span>, son un vector por token visible, cada uno ya mezclado por atención con el resto de lo visible.</p>
+<p>El encoder de contexto, <span class="math inline">f_\theta</span>, es un ViT estándar que recibe únicamente los tokens del contexto. Sus salidas, las representaciones de contexto <span class="math inline">s_x</span>, son un vector por token visible, cada uno ya mezclado por atención con el resto de lo visible.</p>
 <div class="column-page-right">
 <div class="ot-widget" data-widget="contexto" data-alt="Animación: los tokens se clasifican en contexto, objetivo y ninguno; sólo los de contexto entran al encoder de contexto">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Paso 3. El encoder de contexto nunca ve los parches que tiene que predecir.</p>
+<p class="leyenda">Paso 3: El encoder de contexto nunca ve los parches que tiene que predecir.</p>
 </div>
 <p>Como los parches objetivo no están en su entrada, no hay forma de filtrar la respuesta. Que procese sólo una fracción de los tokens no es, de por sí, una ventaja frente a MAE, que también codifica sólo los parches visibles; la eficiencia de I-JEPA viene de otro lado y se discute en la sección 8.</p>
 </section>
 <section id="paso-4-el-encoder-objetivo" class="level3 page-columns page-full" data-number="5.4">
 <h3 data-number="5.4" class="anchored" data-anchor-id="paso-4-el-encoder-objetivo"><span class="header-section-number">5.4</span> Paso 4: el encoder objetivo</h3>
-<p>El encoder objetivo, <span class="math inline">f_{\bar\theta}</span>, tiene la misma arquitectura que el de contexto pero recibe la <strong>imagen completa</strong> (los 196 tokens en un ViT-B/16) y devuelve un vector por parche. En el código oficial esas salidas se normalizan con <em>layer norm</em> y recién después <strong>se recortan</strong> las que corresponden a cada bloque objetivo: ésos son los objetivos <span class="math inline">s_y</span>. Este encoder no recibe gradiente; su actualización se describe en el paso 7.</p>
+<p>El encoder objetivo, <span class="math inline">f_{\bar\theta}</span>, tiene la misma arquitectura que el de contexto pero recibe la imagen completa (los 196 tokens en un ViT-B/16) y devuelve un vector por parche. En el código oficial esas salidas se normalizan con <em>layer norm</em> y recién después se recortan las que corresponden a cada bloque objetivo: ésos son los objetivos <span class="math inline">s_y</span>. Este encoder no recibe gradiente; su actualización se describe en el paso 7.</p>
 <div class="column-page-right">
 <div class="ot-widget" data-widget="objetivo" data-alt="Animación: el encoder objetivo procesa los 36 tokens, se normalizan las salidas y se recortan las posiciones de los bloques objetivo; un botón muestra la alternativa de recortar a la entrada">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Paso 4. Diseño de I-JEPA (recortar a la salida) frente a la alternativa de la ablación (recortar a la entrada). Números de la tabla 11 del paper.</p>
+<p class="leyenda">Paso 4: Diseño de I-JEPA (recortar a la salida) frente a la alternativa de la ablación (recortar a la entrada). Números de la tabla 11 del paper.</p>
 </div>
 <p>El orden se mide en el paper. Si los bloques se recortaran a la entrada, cada objetivo se codificaría aislado del resto de la escena; recortando a la salida, la representación de cada parche objetivo incorpora información de toda la imagen. Con un ViT-H/16 entrenado 300 épocas y evaluación lineal sobre el 1 % de las etiquetas de ImageNet:</p>
 <table class="datos caption-top table" data-quarto-postprocess="true">
@@ -2481,7 +2481,7 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 <p>El predictor, <span class="math inline">g_\phi</span>, recibe el contexto y tiene que devolver la representación de cada parche de un bloque objetivo. Para indicarle qué región predecir:</p>
 <ol type="1">
 <li>Las salidas del encoder de contexto se proyectan a 384 dimensiones y se les vuelve a sumar su embedding posicional.</li>
-<li>Un único <strong>token de máscara</strong> aprendido se copia una vez por parche del bloque objetivo.</li>
+<li>Un único token de máscara aprendido se copia una vez por parche del bloque objetivo.</li>
 <li>A cada copia se le suma la posición de su parche. Como las copias son idénticas, la posición es lo único que las distingue y funciona como la consulta «¿qué hay acá?».</li>
 <li>Contexto y tokens de máscara entran juntos a un ViT angosto, donde los tokens de máscara toman información del contexto por atención.</li>
 <li>Las salidas en las posiciones de máscara se proyectan de vuelta a la dimensión del encoder y forman la predicción <span class="math inline">\hat s_y</span>; las del contexto se descartan.</li>
@@ -2491,13 +2491,13 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 <div class="ot-widget" data-widget="predictor" data-alt="Animación: el contexto se proyecta a 384 dimensiones, un token de máscara se copia y recibe la posición de cada parche objetivo, el predictor procesa todo junto y devuelve la predicción del bloque; se repite para el segundo bloque">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Paso 5. El predictor se aplica una vez por bloque objetivo: cuatro veces por imagen en el paper, dos en el dibujo.</p>
+<p class="leyenda">Paso 5: El predictor se aplica una vez por bloque objetivo: cuatro veces por imagen en el paper, dos en el dibujo.</p>
 </div>
 <p>El ancho interno del predictor es 384 aunque el encoder sea mucho más ancho (1024 en un ViT-L), y su profundidad es de 12 capas para los encoders grandes (6 para el ViT-B). El paper mide ambas elecciones. Ensanchar el predictor a 1024 baja el resultado con ajuste fino sobre el 1 % de las etiquetas de 70,7 a 68,4 (ViT-L/16, 600 épocas; tabla 14), así que el cuello de botella en el ancho ayuda. La profundidad va en sentido contrario: con evaluación lineal, 12 capas dan 66,9 y 6 capas 64,0 (ViT-L/16, 500 épocas; tabla 12) <span class="citation" data-cites="assran2023ijepa">(<a href="#ref-assran2023ijepa" role="doc-biblioref">Assran et al. 2023</a>)</span>.</p>
 </section>
 <section id="pasos-6-y-7-la-pérdida-y-la-actualización" class="level3" data-number="5.6">
 <h3 data-number="5.6" class="anchored" data-anchor-id="pasos-6-y-7-la-pérdida-y-la-actualización"><span class="header-section-number">5.6</span> Pasos 6 y 7: la pérdida y la actualización</h3>
-<p>La predicción <span class="math inline">\hat s_y</span> se compara con el objetivo <span class="math inline">s_y</span> parche a parche. El paper escribe la pérdida como la distancia L2 al cuadrado promediada sobre los bloques; el código oficial usa en cambio <em>smooth L1</em> contra objetivos normalizados con layer norm. El gradiente actualiza el encoder de contexto y el predictor. El encoder objetivo queda fuera por la detención del gradiente (stop-gradient), implementada con <code>torch.no_grad()</code>; no se usa gradient clipping. Sus pesos siguen a los del encoder de contexto por promedio móvil exponencial, con un momento <span class="math inline">m</span> que sube linealmente de 0,996 a 1 a lo largo del entrenamiento. La <a href="#sec-perdida">sección 7</a> desarrolla las fórmulas. Terminado el preentrenamiento se descartan el predictor y el encoder de contexto, y las tareas posteriores usan el <strong>encoder objetivo</strong> (sección 8).</p>
+<p>La predicción <span class="math inline">\hat s_y</span> se compara con el objetivo <span class="math inline">s_y</span> parche a parche. El paper escribe la pérdida como la distancia L2 al cuadrado promediada sobre los bloques; el código oficial usa en cambio <em>smooth L1</em> contra objetivos normalizados con layer norm. El gradiente actualiza el encoder de contexto y el predictor. El encoder objetivo queda fuera por la detención del gradiente (stop-gradient), implementada con <code>torch.no_grad()</code>; no se usa gradient clipping. Sus pesos siguen a los del encoder de contexto por promedio móvil exponencial, con un momento <span class="math inline">m</span> que sube linealmente de 0,996 a 1 a lo largo del entrenamiento. La <a href="#sec-perdida">sección 7</a> desarrolla las fórmulas. Terminado el preentrenamiento se descartan el predictor y el encoder de contexto, y las tareas posteriores usan el encoder objetivo (sección 8).</p>
 </section>
 </section>
 <section id="sec-mascaras" class="level2 page-columns page-full" data-number="6">
@@ -2517,7 +2517,7 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 </div>
 <p>El paper justifica las dos condiciones así:</p>
 <div class="caja idea">
-<p><span class="tag">Idea</span> Los objetivos tienen que ser <strong>suficientemente grandes</strong> para contener algo con significado (medio pájaro, no una pluma), y el contexto tiene que ser <strong>suficientemente informativo</strong> y estar espacialmente repartido para que la predicción sea posible.</p>
+<p><span class="tag">Idea</span> Los objetivos tienen que ser suficientemente grandes para contener algo con significado (medio pájaro, no una pluma), y el contexto tiene que ser suficientemente informativo y estar espacialmente repartido para que la predicción sea posible.</p>
 </div>
 <p>Las estrategias alternativas rinden mucho peor. En <em>rasterizado</em> la imagen se parte en cuadrantes y con uno se predicen los otros tres (15,5); en <em>un bloque</em> hay un único objetivo de escala 0,6 y el contexto es el complemento (20,2); en <em>aleatorio</em> el objetivo es el 60 % de los parches, sueltos, como en MAE (17,6). Multi-bloque llega a 54,2.</p>
 <p>Dentro de multi-bloque, los objetivos más chicos vuelven la tarea local, casi de textura: con escala (0,075; 0,2) el resultado cae a 19,2. Los más grandes le quitan demasiado al contexto: con (0,2; 0,3) queda en 33,6. Y reducir la cantidad de objetivos también perjudica: 9,0 con uno, 22,0 con dos, 48,5 con tres.</p>
@@ -2536,7 +2536,7 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 <div class="ot-widget" data-widget="perdida" data-alt="Animación: para cada parche del bloque, barras de la predicción y del objetivo que se van acercando durante el entrenamiento, con la distancia de cada parche y la curva de la pérdida">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Paso 6. Ilustración con vectores de 8 números; en el modelo tienen cientos. Durante el entrenamiento las barras azules (predicción) se acercan a los contornos coral (objetivo).</p>
+<p class="leyenda">Paso 6: Ilustración con vectores de 8 números; en el modelo tienen cientos. Durante el entrenamiento las barras azules (predicción) se acercan a los contornos coral (objetivo).</p>
 </div>
 <p>La pérdida no llega a cero, y no tiene por qué: parte de lo que hay en un bloque no se puede deducir del contexto.</p>
 <p>Los parámetros del encoder de contexto, <span class="math inline">\theta</span>, y del predictor, <span class="math inline">\phi</span>, se optimizan por descenso de gradiente sobre <span class="math inline">\mathcal{L}</span>. Los del encoder objetivo, <span class="math inline">\bar\theta</span>, no reciben gradiente: hay una detención del gradiente (<em>stop-gradient</em>), que en el código se implementa calculando los objetivos dentro de <code>torch.no_grad()</code> y con <code>requires_grad=False</code> en esos pesos. Arrancan como una copia de <span class="math inline">\theta</span> y después de cada paso se actualizan con un promedio móvil exponencial (EMA) de los pesos del encoder de contexto:</p>
@@ -2550,7 +2550,7 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 <div class="ot-widget" data-widget="ema" data-alt="Simulación: trayectoria ruidosa de los pesos del encoder de contexto y trayectoria suave y retrasada del encoder objetivo, con un control para el momentum">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Paso 7. Esquema: cada punto representa todos los pesos de una red, reducidos a dos dimensiones. Los pesos del encoder de contexto se mueven por gradiente, con ruido; los del encoder objetivo son su promedio móvil.</p>
+<p class="leyenda">Paso 7: cada punto representa todos los pesos de una red, reducidos a dos dimensiones. Los pesos del encoder de contexto se mueven por gradiente, con ruido; los del encoder objetivo son su promedio móvil.</p>
 </div>
 <p>Con <span class="math inline">m = 0</span> el encoder objetivo es una copia del de contexto en cada paso. A medida que <span class="math inline">m</span> se acerca a 1 la trayectoria verde se vuelve más suave y más atrasada: con <span class="math inline">m = 0{,}99</span> promedia aproximadamente los últimos 100 pasos; con <span class="math inline">m = 0{,}996</span>, los últimos 250. Los objetivos <span class="math inline">s_y</span> cambian despacio y el predictor no persigue un blanco que salta en cada paso.</p>
 <section id="por-qué-esto-evita-el-colapso" class="level3 page-columns page-full" data-number="7.1">
@@ -2565,7 +2565,7 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 </div>
 <p>Sin <em>stop-gradient</em> hay un solo encoder y el gradiente pasa por las dos ramas: la pérdida cae enseguida a cero y la nube se contrae a un punto. El encoder aprendió a devolver siempre lo mismo; la pérdida es mínima y la representación, inútil. La curva de pérdida por sí sola no delata el colapso: lo delata la varianza. Con <em>stop-gradient</em> y EMA la pérdida se estabiliza por encima de cero (las dos vistas tienen ruido distinto) y los tres grupos se mantienen separados. En este modelo de juguete incluso <span class="math inline">m = 0</span>, un encoder objetivo que es copia del de contexto pero sin gradiente, alcanza para no colapsar; en modelos grandes el promedio lento importa además para que los objetivos sean estables.</p>
 <div class="caja prueba">
-<p><span class="tag">Cuidado</span> En un método de este tipo, que la pérdida baje <strong>no</strong> indica que el entrenamiento vaya bien. Hay que vigilar alguna medida de la diversidad de las representaciones.</p>
+<p><span class="tag">Cuidado</span> En un método de este tipo, que la pérdida baje no indica que el entrenamiento vaya bien. Hay que vigilar alguna medida de la diversidad de las representaciones.</p>
 </div>
 </section>
 </section>
@@ -2604,22 +2604,70 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 <p>Lo que se repite entre muestras es lo que la predicción contiene; lo que varía, lo que no contiene. El predictor acierta la parte del objeto y su pose (el lomo del pájaro, el techo del auto) y deja libres los detalles finos y el fondo. Según los autores, capta así la incertidumbre posicional del bloque objetivo. Lo que el modelo no tiene es una variable latente que le permita representar varios desenlaces posibles: produce una única predicción por bloque.</p>
 </section>
 </section>
-<section id="sec-experimentos" class="level2 page-columns page-full" data-number="9">
-<h2 data-number="9" class="anchored" data-anchor-id="sec-experimentos"><span class="header-section-number">9</span> Un experimento propio: ¿se puede reemplazar el EMA?</h2>
-<p>La sección 7 cerró con una incomodidad: I-JEPA evita el colapso con una combinación de recursos (predictor en una sola rama, detención del gradiente, encoder objetivo por EMA) que funciona sin una justificación teórica. Dos trabajos recientes proponen otra salida, LeJEPA <span class="citation" data-cites="balestriero2025lejepa">(<a href="#ref-balestriero2025lejepa" role="doc-biblioref">Balestriero y LeCun 2025</a>)</span> de Balestriero y LeCun (2025) y SPHERE-JEPA <span class="citation" data-cites="nicollier2026spherejepa">(<a href="#ref-nicollier2026spherejepa" role="doc-biblioref">Nicollier et al. 2026</a>)</span> de Nicollier y otros, entre ellos Pablo Musé (2026): en lugar de una asimetría entre ramas, un término de la pérdida que fija la forma de la distribución de los embeddings. Si ese término basta para evitar el colapso, el EMA sería prescindible.</p>
-<p>Que eso valga para I-JEPA es una pregunta abierta por dos motivos. Ambos trabajos se evaluaron con <strong>vistas aumentadas</strong>, dentro del marco de invariancia de la sección 4, y ninguno con las máscaras de I-JEPA. Y aun en ese marco el EMA no sobra: en la tabla 3 de SPHERE-JEPA (ViT-B/14, ImageNet-1K, 100 épocas), quitarlo le cuesta entre 8 y 12 puntos a cada método, con el regularizador presente. Los autores lo atribuyen, sin aislarlo, a que el EMA da objetivos que cambian despacio, algo que un término sobre la distribución del lote no controla.</p>
-<section id="los-regularizadores-por-arriba" class="level3 page-columns page-full" data-number="9.1">
-<h3 data-number="9.1" class="anchored" data-anchor-id="los-regularizadores-por-arriba"><span class="header-section-number">9.1</span> Los regularizadores, por arriba</h3>
+<section id="sec-critica" class="level2" data-number="9">
+<h2 data-number="9" class="anchored" data-anchor-id="sec-critica"><span class="header-section-number">9</span> Crítica y limitaciones</h2>
+<p>Separo lo que surge de los números del propio paper de lo que es lectura mía.</p>
+<p><strong>Lo que muestran los datos del paper.</strong></p>
+<ul>
+<li><em>Sensibilidad a la máscara.</em> Las ablaciones de la sección 6 muestran saltos de decenas de puntos por cambios chicos en la escala o la cantidad de bloques: el método depende de una configuración afinada.</li>
+<li><em>No gana en todo.</em> En iNaturalist queda detrás de DINO; en conteo, detrás de MAE; con ajuste fino completo en ImageNet obtiene 87,1 contra 87,8 de MAE, aunque con 5,3 veces menos épocas.</li>
+<li><em>Comparaciones no controladas.</em> Las tablas enfrentan arquitecturas, resoluciones y cantidades de épocas distintas. Es lo habitual en el área, pero no aísla el efecto del método.</li>
+<li><em>Sin garantía contra el colapso.</em> Se evita por diseño empírico; el paper remite a análisis en escenarios simplificados.</li>
+</ul>
+<p><strong>Lectura propia.</strong></p>
+<ul>
+<li><em>El sesgo inductivo cambia de lugar.</em> El paper presenta como ventaja no depender de aumentos de vista diseñados a mano, pero la estrategia de enmascarado también es un diseño a mano, con hiperparámetros tan influyentes como los de un aumento. Es un supuesto más débil y más general (no dice qué debe ser invariante), pero sigue siendo un supuesto.</li>
+<li><em>Lejos del programa original.</em> I-JEPA trabaja con imágenes estáticas, sin tiempo, acciones ni planificación: predice otra región de la misma imagen, no una consecuencia. Llamarlo modelo del mundo es generoso; los propios autores, en su comunicación, hablan de un modelo del mundo primitivo y restringido.</li>
+<li><em>Una sola predicción por posición.</em> El paper muestra que el predictor capta incertidumbre posicional (figura 6), pero devuelve una única predicción para cada parche objetivo. Falta la variable latente que, en la propuesta de LeCun, permitía representar varios desenlaces posibles.</li>
+</ul>
+</section>
+<section id="sec-despues" class="level2" data-number="10">
+<h2 data-number="10" class="anchored" data-anchor-id="sec-despues"><span class="header-section-number">10</span> Qué vino después</h2>
+<p>La línea continuó en dos direcciones: hacia el video y las acciones, y hacia una justificación de cómo evitar el colapso.</p>
+<table class="ruta caption-top table" data-quarto-postprocess="true">
+<tbody>
+<tr class="odd">
+<td>2024 · IWM</td>
+<td><em>Image World Models</em> generaliza la tarea de I-JEPA: además de regiones enmascaradas, el predictor aprende el efecto de transformaciones fotométricas globales, y se estudia cuándo las representaciones resultan invariantes o equivariantes.</td>
+</tr>
+<tr class="even">
+<td>2024 · V-JEPA</td>
+<td>Lleva la predicción de representaciones a video.</td>
+</tr>
+<tr class="odd">
+<td>2025 · V-JEPA 2</td>
+<td>Escala el preentrenamiento en video y agrega un modelo del mundo condicionado por acciones, usado para planificar tareas de manipulación con robots.</td>
+</tr>
+<tr class="even">
+<td>2025 · LeJEPA</td>
+<td>Balestriero y LeCun proponen SIGReg, que lleva los embeddings hacia una gaussiana isótropa y, según los autores, permite prescindir de la detención del gradiente y del esquema maestro-alumno.</td>
+</tr>
+<tr class="odd">
+<td>2026 · SPHERE-JEPA</td>
+<td>Nicollier y otros cuestionan la geometría de LeJEPA y proponen SUSReg, que lleva los embeddings hacia la uniforme sobre la esfera.</td>
+</tr>
+</tbody>
+</table>
+
+<p class="credito">Resúmenes a partir de los resúmenes publicados de cada trabajo [@garrido2024iwm; @bardes2024vjepa; @assran2025vjepa2; @balestriero2025lejepa; @nicollier2026spherejepa].</p>
+<p>V-JEPA 2 incorpora tiempo y acciones, lo que faltaba para acercarse al modelo del mundo de 2022; LeJEPA y SPHERE-JEPA buscan reemplazar las heurísticas contra el colapso por un criterio con fundamento. Ninguno de los dos se probó con las máscaras de I-JEPA. La sección siguiente pone a prueba ese reemplazo dentro de I-JEPA.</p>
+</section>
+<section id="sec-experimentos" class="level2 page-columns page-full" data-number="11">
+<h2 data-number="11" class="anchored" data-anchor-id="sec-experimentos"><span class="header-section-number">11</span> Un experimento propio: ¿se puede reemplazar el EMA?</h2>
+<p>I-JEPA evita el colapso con una combinación de recursos (predictor en una sola rama, detención del gradiente, encoder objetivo por EMA) que funciona sin una justificación teórica (sección 7). LeJEPA <span class="citation" data-cites="balestriero2025lejepa">(<a href="#ref-balestriero2025lejepa" role="doc-biblioref">Balestriero y LeCun 2025</a>)</span> de Balestriero y LeCun (2025) y SPHERE-JEPA <span class="citation" data-cites="nicollier2026spherejepa">(<a href="#ref-nicollier2026spherejepa" role="doc-biblioref">Nicollier et al. 2026</a>)</span> de Nicollier y otros, entre ellos Pablo Musé (2026), proponen otra salida: en lugar de una asimetría entre ramas, un término de la pérdida que fija la forma de la distribución de los embeddings. Si ese término basta para evitar el colapso, el EMA sería prescindible.</p>
+<p>Que eso valga para I-JEPA es una pregunta abierta por dos motivos. Ambos trabajos se evaluaron con vistas aumentadas, dentro del marco de invariancia de la sección 4, y ninguno con las máscaras de I-JEPA. Y aun en ese marco el EMA no sobra: en la tabla 3 de SPHERE-JEPA (ViT-B/14, ImageNet-1K, 100 épocas), quitarlo le cuesta entre 8 y 12 puntos a cada método, con el regularizador presente. Los autores lo atribuyen, sin aislarlo, a que el EMA da objetivos que cambian despacio, algo que un término sobre la distribución del lote no controla.</p>
+<section id="los-regularizadores-por-arriba" class="level3 page-columns page-full" data-number="11.1">
+<h3 data-number="11.1" class="anchored" data-anchor-id="los-regularizadores-por-arriba"><span class="header-section-number">11.1</span> Los regularizadores, por arriba</h3>
 <p>Los dos regularizadores miran el lote entero, no cada imagen por separado. Toman los embeddings de las imágenes del lote, los tratan como una muestra de una distribución y penalizan que esa distribución se aleje de una forma fijada de antemano. Si esa forma ocupa todas las dimensiones, el lote no puede concentrarse en un punto ni en un subespacio chico, que es justamente el colapso.</p>
 <ul>
-<li><strong>SIGReg</strong> (LeJEPA) usa como forma una <strong>gaussiana isótropa</strong>: una nube redonda, igual de ancha en todas las direcciones.</li>
-<li><strong>SUSReg</strong> (SPHERE-JEPA) primero normaliza cada embedding, de modo que todos quedan sobre una esfera, y usa como forma la <strong>distribución uniforme</strong> sobre esa esfera. Los autores la justifican con un argumento de peor caso: la uniforme sobre la variedad es óptima para k-NN, y la uniforme sobre la esfera, para regresión ridge con kernel.</li>
+<li><strong>SIGReg</strong> (LeJEPA) usa como forma una gaussiana isótropa: una nube redonda, igual de ancha en todas las direcciones.</li>
+<li><strong>SUSReg</strong> (SPHERE-JEPA) primero normaliza cada embedding, de modo que todos quedan sobre una esfera, y usa como forma la distribución uniforme sobre esa esfera. Los autores la justifican con un argumento de peor caso: la uniforme sobre la variedad es óptima para k-NN, y la uniforme sobre la esfera, para regresión ridge con kernel.</li>
 </ul>
 <p>La figura de abajo recorre el mecanismo en cuatro pasos, en dos dimensiones para poder dibujarlo.</p>
 <ol type="1">
 <li><strong>El lote.</strong> Cada punto es el embedding de una imagen. Los tres paneles arrancan del mismo lote, alargado y casi apoyado sobre una recta.</li>
 <li><strong>Qué hace cada término.</strong> Sin regularizador, nada impide que el lote termine sobre una recta: usa una sola de las dos dimensiones (colapso dimensional). Con SIGReg toma forma de gaussiana redonda; con SUSReg queda sobre el círculo y repartido parejo.</li>
-<li><strong>Cómo se mide la forma.</strong> Comparar una nube de 256 dimensiones con una distribución de referencia no es práctico. Lo que sí se puede comparar es una <strong>proyección</strong>: se elige una dirección al azar, se proyecta cada punto sobre ella (su «sombra» sobre la recta punteada) y se obtiene una distribución en una sola dimensión. Esa sombra se compara con la sombra que tendría la forma buscada: una campana para la gaussiana y, para el círculo en dos dimensiones, una distribución que se acumula en los bordes.</li>
+<li><strong>Cómo se mide la forma.</strong> Comparar una nube de 256 dimensiones con una distribución de referencia no es práctico. Lo que sí se puede comparar es una proyección: se elige una dirección al azar, se proyecta cada punto sobre ella (su «sombra» sobre la recta punteada) y se obtiene una distribución en una sola dimensión. Esa sombra se compara con la sombra que tendría la forma buscada: una campana para la gaussiana y, para el círculo en dos dimensiones, una distribución que se acumula en los bordes.</li>
 <li><strong>Muchas direcciones.</strong> Una sola sombra no alcanza: una nube aplastada puede tener una sombra correcta en alguna dirección. Por el teorema de Cramér–Wold, una distribución queda determinada por todas sus proyecciones unidimensionales, así que se repite con muchas direcciones: 1024 por paso, sorteadas de nuevo cada vez. La penalización es el promedio sobre todas.</li>
 </ol>
 <p>En la figura las sombras se dibujan como histogramas para que se vean. En el código, cada comparación la hace el estadístico de Epps–Pulley, que mide la distancia entre la función característica empírica de la proyección y la de la referencia en una grilla de frecuencias. En el experimento usé las implementaciones oficiales de SPHERE-JEPA sin modificar.</p>
@@ -2630,15 +2678,15 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 <p class="leyenda">Esquema en dos dimensiones; en el experimento los embeddings tienen 256. En 256 dimensiones, la sombra de una esfera uniforme ya no se acumula en los bordes y se parece mucho a una campana.</p>
 </div>
 </section>
-<section id="cómo-entran-en-i-jepa" class="level3" data-number="9.2">
-<h3 data-number="9.2" class="anchored" data-anchor-id="cómo-entran-en-i-jepa"><span class="header-section-number">9.2</span> Cómo entran en I-JEPA</h3>
+<section id="cómo-entran-en-i-jepa" class="level3" data-number="11.2">
+<h3 data-number="11.2" class="anchored" data-anchor-id="cómo-entran-en-i-jepa"><span class="header-section-number">11.2</span> Cómo entran en I-JEPA</h3>
 <p>En cada paso, los tokens visibles que produce el encoder de contexto se promedian en un vector de 192 dimensiones por imagen. Ese vector pasa por una cabeza de proyección, un MLP 192 → 2048 → 2048 → 256 con BatchNorm y GELU, el mismo de SPHERE-JEPA, de unos 5 M de parámetros (del orden del ViT-Tiny entero). El regularizador se calcula sobre las 256 salidas de la cabeza para el lote de 256 imágenes, y la pérdida total es</p>
 <p><span class="math display">L = L_\text{pred} + \lambda\, L_\text{reg},</span></p>
 <p>donde <span class="math inline">L_\text{pred}</span> es la pérdida de I-JEPA sin cambios (<em>smooth L1</em> contra los objetivos normalizados con layer norm). El gradiente de <span class="math inline">L_\text{reg}</span> llega al encoder de contexto a través de la cabeza. La cabeza sólo existe en las celdas con regularizador y no interviene en la evaluación.</p>
 <p>«Sin EMA» significa que el encoder objetivo es el propio encoder de contexto, con los mismos pesos, aplicado a la imagen completa y con detención del gradiente; equivale a <span class="math inline">m = 0</span>. En esas celdas, el encoder que se evalúa es el mismo que se entrena.</p>
 </section>
-<section id="diseño" class="level3" data-number="9.3">
-<h3 data-number="9.3" class="anchored" data-anchor-id="diseño"><span class="header-section-number">9.3</span> Diseño</h3>
+<section id="diseño" class="level3" data-number="11.3">
+<h3 data-number="11.3" class="anchored" data-anchor-id="diseño"><span class="header-section-number">11.3</span> Diseño</h3>
 <p>Crucé dos factores: EMA o no en el encoder objetivo, y qué regularizador se suma a la pérdida.</p>
 <table class="datos caption-top table" data-quarto-postprocess="true">
 <tbody>
@@ -2666,18 +2714,18 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 </table>
 <p>Cada pregunta es una comparación entre celdas:</p>
 <ul>
-<li><strong>P1.</strong> ¿El regularizador puede <strong>reemplazar</strong> al EMA? C4 y C6 contra C1.</li>
-<li><strong>P2.</strong> ¿Importa la <strong>geometría</strong>? C6 contra C4, y C5 contra C3.</li>
-<li><strong>P3.</strong> ¿EMA y regularizador <strong>se suman</strong>? C3 y C5 contra C1.</li>
+<li><strong>P1.</strong> ¿El regularizador puede reemplazar al EMA? C4 y C6 contra C1.</li>
+<li><strong>P2.</strong> ¿Importa la geometría? C6 contra C4, y C5 contra C3.</li>
+<li><strong>P3.</strong> ¿EMA y regularizador se suman? C3 y C5 contra C1.</li>
 </ul>
 <p>C2 es el control: sin EMA ni regularizador, I-JEPA debería colapsar, y C4 y C6 muestran si el regularizador lo impide.</p>
 <p><strong>Configuración.</strong> ViT-Tiny/16 (192 dimensiones, 12 capas, predictor de 6 capas) sobre ImageNet-100 a 224 px, 100 épocas, lote de 256, 3 semillas por celda (C2: 1); es la escala de la tabla 7 de SPHERE-JEPA. Máscaras, optimizador (AdamW con los cronogramas oficiales de I-JEPA) y cronograma del EMA (de 0,996 a 1) son iguales en todas las celdas. La grilla son 16 corridas y unas 40 h de GPU en una RTX 5090 Laptop (24 GB); los barridos llevaron otras ~7 h y la calibración ~32 h.</p>
 <p><strong>Barridos.</strong> Los hiperparámetros salieron de corridas de 30 épocas con semilla 0, evaluadas con k-NN sobre un split interno de 12 669 imágenes apartadas del train, nunca sobre el val oficial. La tasa de aprendizaje se barrió en C1 (<span class="math inline">2{,}5 \times 10^{-4}</span>, <span class="math inline">5 \times 10^{-4}</span>, <span class="math inline">10^{-3}</span>) y ganó <span class="math inline">2{,}5 \times 10^{-4}</span>. <span class="math inline">\lambda</span> se barrió por separado en C4 y C6 (0,01, 0,05 y 0,2) y en los dos casos ganó 0,05, el valor por defecto de LeJEPA; con 0,2 el k-NN cae de ~18 a 10,7 (C4) y 7,4 (C6). Ese <span class="math inline">\lambda</span> se reusó en las celdas con EMA.</p>
-<p><strong>Evaluación.</strong> La del código de SPHERE-JEPA: encoder objetivo congelado, promedio de tokens y, encima, un clasificador lineal (SGD, 90 épocas) o k-NN (coseno, <span class="math inline">k = 20</span>, <span class="math inline">T = 0{,}07</span>), con precisión top-1 sobre el val oficial. Cada celda se reporta como media ± desvío estándar muestral entre semillas. Fijé de antemano que una diferencia es <strong>distinguible</strong> si supera dos desvíos de la celda más variable o si un test t pareado por semilla da <span class="math inline">p &lt; 0{,}05</span>. Contra C2, con una sola semilla, no hay test.</p>
+<p><strong>Evaluación.</strong> La del código de SPHERE-JEPA: encoder objetivo congelado, promedio de tokens y, encima, un clasificador lineal (SGD, 90 épocas) o k-NN (coseno, <span class="math inline">k = 20</span>, <span class="math inline">T = 0{,}07</span>), con precisión top-1 sobre el val oficial. Cada celda se reporta como media ± desvío estándar muestral entre semillas. Fijé de antemano que una diferencia es distinguible si supera dos desvíos de la celda más variable o si un test t pareado por semilla da <span class="math inline">p &lt; 0{,}05</span>. Contra C2, con una sola semilla, no hay test.</p>
 <p><strong>Calibración.</strong> Antes de la grilla corrí el código oficial de SPHERE-JEPA sin modificar sobre los mismos datos: 72,8 en evaluación lineal y 70,6 en k-NN, contra 71,9 y 69,0 publicados, dentro del criterio de ±2 puntos fijado de antemano. Esto valida los datos y la evaluación, no mi implementación del entrenamiento de I-JEPA.</p>
 </section>
-<section id="resultados" class="level3 page-columns page-full" data-number="9.4">
-<h3 data-number="9.4" class="anchored" data-anchor-id="resultados"><span class="header-section-number">9.4</span> Resultados</h3>
+<section id="resultados" class="level3 page-columns page-full" data-number="11.4">
+<h3 data-number="11.4" class="anchored" data-anchor-id="resultados"><span class="header-section-number">11.4</span> Resultados</h3>
 <div class="column-page-right">
 <div class="ot-widget" data-widget="grilla" data-alt="A la izquierda, la tabla 2 por 3 con la precisión de cada celda; a la derecha, barras con media y desvío de cada celda y flechas con la diferencia de cada comparación; botones para elegir la pregunta y la métrica">
   <canvas width="1100" height="430"></canvas>
@@ -2743,9 +2791,9 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 <p><strong>P3: sumados, restan.</strong> Agregar el regularizador a I-JEPA con EMA le quita 15 puntos (SIGReg) o 17 (SUSReg), en las dos métricas y de forma distinguible.</p>
 <p>Leída por columnas, la grilla separa los dos factores. Con regularizador, agregar el EMA suma poco: 3,3 puntos en lineal y 1,4 en k-NN con SIGReg (C3 contra C4), 4,9 y 2,0 con SUSReg (C5 contra C6), bastante menos que los 8 a 12 de la tabla 3 de SPHERE-JEPA. Sin regularizador, el EMA vale unos 24 puntos (C1 contra C2). La distancia de P1 entre C4 y C1, 18,4 puntos en lineal, se descompone así en 15,0 que cuesta agregar el regularizador con EMA y 3,3 que cuesta quitar el EMA con regularizador.</p>
 </section>
-<section id="qué-pasó-con-el-colapso" class="level3 page-columns page-full" data-number="9.5">
-<h3 data-number="9.5" class="anchored" data-anchor-id="qué-pasó-con-el-colapso"><span class="header-section-number">9.5</span> Qué pasó con el colapso</h3>
-<p>Durante el entrenamiento medí, cada 5 épocas y sobre 10 000 imágenes fijas del train, dos indicadores sobre la representación que se evalúa (el promedio de tokens del encoder objetivo, de 192 dimensiones), no sobre la salida de la cabeza en la que actúa el regularizador. El <strong>rango efectivo</strong> <span class="citation" data-cites="roy2007erank">(<a href="#ref-roy2007erank" role="doc-biblioref">Roy y Vetterli 2007</a>)</span> es la exponencial de la entropía de los valores singulares normalizados de la matriz de embeddings: vale 1 si todos los vectores son iguales y se acerca a 192 si ocupan todas las dimensiones por igual. La <strong>uniformidad</strong> <span class="citation" data-cites="wang2020uniformity">(<a href="#ref-wang2020uniformity" role="doc-biblioref">Wang y Isola 2020</a>)</span> es <span class="math inline">\log \mathbb{E}\, e^{-2\lVert z_i - z_j \rVert^2}</span> sobre embeddings normalizados; cuanto más negativa, más repartidos están sobre la esfera.</p>
+<section id="qué-pasó-con-el-colapso" class="level3 page-columns page-full" data-number="11.5">
+<h3 data-number="11.5" class="anchored" data-anchor-id="qué-pasó-con-el-colapso"><span class="header-section-number">11.5</span> Qué pasó con el colapso</h3>
+<p>Durante el entrenamiento medí, cada 5 épocas y sobre 10 000 imágenes fijas del train, dos indicadores sobre la representación que se evalúa (el promedio de tokens del encoder objetivo, de 192 dimensiones), no sobre la salida de la cabeza en la que actúa el regularizador. El rango efectivo <span class="citation" data-cites="roy2007erank">(<a href="#ref-roy2007erank" role="doc-biblioref">Roy y Vetterli 2007</a>)</span> es la exponencial de la entropía de los valores singulares normalizados de la matriz de embeddings: vale 1 si todos los vectores son iguales y se acerca a 192 si ocupan todas las dimensiones por igual. La uniformidad <span class="citation" data-cites="wang2020uniformity">(<a href="#ref-wang2020uniformity" role="doc-biblioref">Wang y Isola 2020</a>)</span> es <span class="math inline">\log \mathbb{E}\, e^{-2\lVert z_i - z_j \rVert^2}</span> sobre embeddings normalizados; cuanto más negativa, más repartidos están sobre la esfera.</p>
 <div class="column-page-right">
 <div class="ot-widget" data-widget="rango" data-alt="Curvas del rango efectivo por época para las seis celdas: C1 sube hasta cerca de 100, las celdas con regularizador arrancan altas y se estancan entre 57 y 69, y C2 queda cerca de 28">
   <canvas width="1100" height="430"></canvas>
@@ -2759,61 +2807,13 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 </ul>
 <p>La pérdida de predicción termina en el mismo nivel en C1 y en las celdas con regularizador (0,21 a 0,23), así que el regularizador no impide aprender a predecir: cambia qué representación se aprende.</p>
 </section>
-<section id="interpretación" class="level3" data-number="9.6">
-<h3 data-number="9.6" class="anchored" data-anchor-id="interpretación"><span class="header-section-number">9.6</span> Interpretación</h3>
+<section id="interpretación" class="level3" data-number="11.6">
+<h3 data-number="11.6" class="anchored" data-anchor-id="interpretación"><span class="header-section-number">11.6</span> Interpretación</h3>
 <p>Los regularizadores evitan el colapso dimensional que sufre I-JEPA sin EMA, pero eso no alcanza, y una representación más uniforme no resulta más útil. Una lectura posible, que SPHERE-JEPA también sugiere, es que el EMA cumple dos funciones: evitar el colapso, que el regularizador también logra, y dar a la predicción un objetivo que cambia despacio, que el regularizador no aporta. La grilla la apoya sólo en parte. El EMA sigue sumando con regularizador, pero poco; lo que más pesa en la distancia a C1 es el propio regularizador. Mi interpretación es que, con este <span class="math inline">\lambda</span>, empujar la cabeza hacia una distribución fija lleva al encoder a una solución peor que la que encuentra I-JEPA sola, aunque la predicción siga aprendiéndose igual de bien. Una hipótesis que no probé para P2: SUSReg restringe sólo la dirección de los embeddings, y SPHERE-JEPA lo combina con una pérdida L2 al cuadrado entre embeddings normalizados a la esfera y su prototipo, casi una similitud coseno; la pérdida de I-JEPA, en cambio, es una regresión sobre objetivos normalizados con layer norm, con la que la geometría esférica puede encajar peor.</p>
 <div class="caja prueba">
-<p><span class="tag">Límites del experimento</span> Escala chica (ViT-Tiny, ImageNet-100, 100 épocas), lejos del régimen en el que I-JEPA rinde: a esta escala queda muy por debajo de LeJEPA y SPHERE-JEPA con vistas aumentadas, así que los resultados se comparan <strong>entre celdas</strong>, no contra los papers. <span class="math inline">\lambda</span> se eligió sin EMA y se reusó con EMA: el experimento no distingue «el regularizador estorba» de «este <span class="math inline">\lambda</span> es demasiado grande cuando ya hay EMA», y eso afecta sobre todo a P3 y a la descomposición anterior. C2 tiene una sola semilla y colapsó sólo en parte, así que «evita el colapso» se apoya en un control más débil de lo previsto. El regularizador se aplicó en un solo lugar (la cabeza sobre el promedio de tokens de contexto) y con la pérdida de I-JEPA. Los pasos siguientes son barrer <span class="math inline">\lambda</span> con EMA y probar SUSReg con una pérdida esférica.</p>
+<p><span class="tag">Límites del experimento</span> Escala chica (ViT-Tiny, ImageNet-100, 100 épocas), lejos del régimen en el que I-JEPA rinde: a esta escala queda muy por debajo de LeJEPA y SPHERE-JEPA con vistas aumentadas, así que los resultados se comparan entre celdas, no contra los papers. <span class="math inline">\lambda</span> se eligió sin EMA y se reusó con EMA: el experimento no distingue «el regularizador estorba» de «este <span class="math inline">\lambda</span> es demasiado grande cuando ya hay EMA», y eso afecta sobre todo a P3 y a la descomposición anterior. C2 tiene una sola semilla y colapsó sólo en parte, así que «evita el colapso» se apoya en un control más débil de lo previsto. El regularizador se aplicó en un solo lugar (la cabeza sobre el promedio de tokens de contexto) y con la pérdida de I-JEPA. Los pasos siguientes son barrer <span class="math inline">\lambda</span> con EMA y probar SUSReg con una pérdida esférica.</p>
 </div>
 </section>
-</section>
-<section id="sec-critica" class="level2" data-number="10">
-<h2 data-number="10" class="anchored" data-anchor-id="sec-critica"><span class="header-section-number">10</span> Crítica y limitaciones</h2>
-<p>Separo lo que surge de los números del propio paper de lo que es lectura mía.</p>
-<p><strong>Lo que muestran los datos del paper.</strong></p>
-<ul>
-<li><em>Sensibilidad a la máscara.</em> Las ablaciones de la sección 6 muestran saltos de decenas de puntos por cambios chicos en la escala o la cantidad de bloques: el método depende de una configuración afinada.</li>
-<li><em>No gana en todo.</em> En iNaturalist queda detrás de DINO; en conteo, detrás de MAE; con ajuste fino completo en ImageNet obtiene 87,1 contra 87,8 de MAE, aunque con 5,3 veces menos épocas.</li>
-<li><em>Comparaciones no controladas.</em> Las tablas enfrentan arquitecturas, resoluciones y cantidades de épocas distintas. Es lo habitual en el área, pero no aísla el efecto del método.</li>
-<li><em>Sin garantía contra el colapso.</em> Se evita por diseño empírico; el paper remite a análisis en escenarios simplificados.</li>
-</ul>
-<p><strong>Lectura propia.</strong></p>
-<ul>
-<li><em>El sesgo inductivo cambia de lugar.</em> El paper presenta como ventaja no depender de aumentos de vista diseñados a mano, pero la estrategia de enmascarado también es un diseño a mano, con hiperparámetros tan influyentes como los de un aumento. Es un supuesto más débil y más general (no dice qué debe ser invariante), pero sigue siendo un supuesto.</li>
-<li><em>Lejos del programa original.</em> I-JEPA trabaja con imágenes estáticas, sin tiempo, acciones ni planificación: predice otra región de la misma imagen, no una consecuencia. Llamarlo modelo del mundo es generoso; los propios autores, en su comunicación, hablan de un modelo del mundo primitivo y restringido.</li>
-<li><em>Una sola predicción por posición.</em> El paper muestra que el predictor capta incertidumbre posicional (figura 6), pero devuelve una única predicción para cada parche objetivo. Falta la variable latente que, en la propuesta de LeCun, permitía representar varios desenlaces posibles.</li>
-</ul>
-</section>
-<section id="sec-despues" class="level2" data-number="11">
-<h2 data-number="11" class="anchored" data-anchor-id="sec-despues"><span class="header-section-number">11</span> Qué vino después</h2>
-<p>La línea continuó en dos direcciones: hacia el video y las acciones, y hacia una justificación de cómo evitar el colapso.</p>
-<table class="ruta caption-top table" data-quarto-postprocess="true">
-<tbody>
-<tr class="odd">
-<td>2024 · IWM</td>
-<td><em>Image World Models</em> generaliza la tarea de I-JEPA: además de regiones enmascaradas, el predictor aprende el efecto de transformaciones fotométricas globales, y se estudia cuándo las representaciones resultan invariantes o equivariantes.</td>
-</tr>
-<tr class="even">
-<td>2024 · V-JEPA</td>
-<td>Lleva la predicción de representaciones a video.</td>
-</tr>
-<tr class="odd">
-<td>2025 · V-JEPA 2</td>
-<td>Escala el preentrenamiento en video y agrega un modelo del mundo condicionado por acciones, usado para planificar tareas de manipulación con robots.</td>
-</tr>
-<tr class="even">
-<td>2025 · LeJEPA</td>
-<td>Balestriero y LeCun proponen SIGReg, que lleva los embeddings hacia una gaussiana isótropa y, según los autores, permite prescindir de la detención del gradiente y del esquema maestro-alumno.</td>
-</tr>
-<tr class="odd">
-<td>2026 · SPHERE-JEPA</td>
-<td>Nicollier y otros cuestionan la geometría de LeJEPA y proponen SUSReg, que lleva los embeddings hacia la uniforme sobre la esfera.</td>
-</tr>
-</tbody>
-</table>
-
-<p class="credito">Resúmenes a partir de los resúmenes publicados de cada trabajo [@garrido2024iwm; @bardes2024vjepa; @assran2025vjepa2; @balestriero2025lejepa; @nicollier2026spherejepa].</p>
-<p>V-JEPA 2 incorpora tiempo y acciones, lo que faltaba para acercarse al modelo del mundo de 2022; LeJEPA y SPHERE-JEPA buscan reemplazar las heurísticas contra el colapso por un criterio con fundamento. El experimento de la sección anterior sugiere que, dentro de I-JEPA y a escala chica, ese reemplazo no es directo.</p>
 </section>
 <section id="sec-resumen" class="level2" data-number="12">
 <h2 data-number="12" class="anchored" data-anchor-id="sec-resumen"><span class="header-section-number">12</span> Resumen en seis ideas</h2>
@@ -2861,7 +2861,10 @@ Wang, Tongzhou, y Phillip Isola. 2020. <span>«Understanding Contrastive Represe
 </div>
 </div>
 <p class="pie">
-Proyecto final de Redes Neuronales para Visión Artificial. Los diagramas y las animaciones son propios, salvo la figura 6 del paper, reproducida con crédito. Los números del paper provienen de Assran et al. (2023); los de la sección 9 son de corridas propias.
+<strong>Declaración de uso de IA.</strong> Usé un asistente de IA (Claude, de Anthropic) para programar las animaciones, autocompletar algunas fórmulas y otras tareas de apoyo. Todo tuvo intervención humana: yo guié el proceso y revisé y corregí cada resultado.
+</p>
+<p class="pie">
+Proyecto final de Redes Neuronales para Visión Artificial. Los diagramas y las animaciones son propios, salvo la figura 6 del paper, reproducida con crédito. Los números del paper provienen de Assran et al. (2023); los de la sección 11 son de corridas propias.
 </p>
 </section>
 
@@ -4176,7 +4179,7 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
     const draw = t => {
       ctx.clearRect(0, 0, W, H);
       encabezado(ctx, 6, t < 0.01 ? 'Al principio, la predicción de cada parche no se parece al objetivo'
-        : t < 0.31 ? 'El gradiente acerca la predicción al objetivo, parche por parche'
+        : t < 0.999 ? 'El gradiente acerca la predicción al objetivo, parche por parche'
         : 'Al final quedan diferencias: no todo se puede predecir');
       // leyenda de colores
       caja(ctx, BX, 62, 14, 14, { r: 3, fill: alfa(C.blue, 0.75) }); tx(ctx, 'predicción $\\hat s_y$', BX + 22, 74, { color: C.blue, size: 14, weight: '600' });
@@ -4210,7 +4213,7 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
       tx(ctx, 'el gradiente llega al predictor y al encoder', R2.x, R2.y + R2.h + 72, { color: C.blue, size: 13.5, weight: '600' });
       tx(ctx, 'de contexto; $s_y$ no recibe gradiente', R2.x, R2.y + R2.h + 92, { color: C.blue, size: 13.5, weight: '600' });
     };
-    K.pasos(root, [0, 0.3, 1], draw, { ms: 4000 });
+    K.pasos(root, [0, 1], draw, { ms: 6000 });
   });
 
   // ============================================================ 6. el promedio móvil (EMA)
@@ -4281,7 +4284,7 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
       const a = fase(t, 0.03, 0.18), b = fase(t, 0.2, 0.38), c = fase(t, 0.4, 0.54), d = fase(t, 0.56, 0.72), e = fase(t, 0.74, 0.84), f = fase(t, 0.86, 0.98);
       encabezado(ctx, '✓', t < 0.19 ? 'Al terminar el preentrenamiento, el encoder de contexto y el predictor se descartan'
         : t < 0.55 ? 'Se usa el encoder objetivo, congelado: una imagen nueva da un vector por parche'
-        : t < 0.73 ? 'Los vectores de todos los parches se promedian en uno solo'
+        : t < 0.73 ? 'Average pooling: los vectores de todos los parches se promedian en uno solo'
         : 'Encima se entrena sólo un clasificador lineal: la evaluación lineal');
       // las tres redes entrenadas
       const top = [['Encoder de contexto', C.teal, true], ['Predictor', C.blue, true], ['Encoder objetivo', C.coralD, false]];
@@ -4318,7 +4321,7 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
         flecha(ctx, [[G.x + 6 * G.dx + 2, G.y + 3 * G.dy + 6], [POOL.x - 10, G.y + 3 * G.dy + 6]], alfa(C.navy, d), { t: d });
         const prom = [...Array(8)].map((_, ci) => VAL2.reduce((s, v) => s + v[ci], 0) / NT);
         vec(ctx, POOL.x - 4, POOL.y - 20, 20, lerp(18, 70, d), 0, C.navy, d, { vals: prom.map(v => clamp((v - 0.35) * 2.5, 0, 1)) });
-        tx(ctx, 'promedio', POOL.x + 6, POOL.y + 72, { color: alfa(C.navy, d), size: 13.5, weight: '600', align: 'center' });
+        tx(ctx, 'average pooling', POOL.x + 6, POOL.y + 72, { color: alfa(C.navy, d), size: 13.5, weight: '600', align: 'center' });
       }
       if (e > 0) {
         flecha(ctx, [[POOL.x + 22, POOL.y + 14], [LIN.x - 4, POOL.y + 14]], alfa(C.navy, e), { t: e });
