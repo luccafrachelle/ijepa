@@ -44,7 +44,7 @@
       ['DINO', 'ViT-B/8', 53.4, 1, 'conteo 86,6'], ['iBOT', 'ViT-L/16', 62.8, 1, 'conteo 85,7']] } };
 
   K.register('resultados', root => {
-    const S = A.svg(root, 1100, 440);
+    const S = A.svg(root, 1100, 448);
     A.cuandoFuentes(() => resultados(root, S));
   });
 
@@ -63,8 +63,8 @@
         el('line', { x1: fmt(X(v)), x2: fmt(X(v)), y1: Y0 - 2, y2: yEje - 8, stroke: C.grid, 'stroke-width': 1 }, g);
         A.texto(g, String(v), X(v), yEje + 12, { size: 16, color: C.grey, anchor: 'middle' });
       }
-      A.texto(g, 'números de las tablas 1, 2 y 4 del paper', 20, yEje + 12, { size: 16, color: C.grey });
-      A.texto(g, 'el eje no empieza en cero', 1100, yEje + 12, { size: 16, color: C.grey, anchor: 'end' });
+      A.texto(g, 'números de las tablas 1, 2 y 4 del paper', 20, yEje + 36, { size: 16, color: C.grey });
+      A.texto(g, 'el eje no empieza en cero', 1100, yEje + 36, { size: 16, color: C.grey, anchor: 'end' });
       const grupos = [{ cab: null, etq: [], filas: [] }, { cab: null, etq: [], filas: [] }];
       let y = Y0, grupo = -1;
       for (const f of D.filas) {
@@ -161,7 +161,7 @@
       const x0 = 8 + j * 366, cx = x0 + 172, hx = x0 + 22;
       const G = el('g', {}, S);
       A.texto(G, pan.titulo, x0 + 8, 26, { size: 19, weight: '600', color: pan.col });
-      const sub = A.rotulos(G, ['el mismo lote de embeddings', pan.sub], { x: x0 + 8, y: 50, size: 16, color: C.grey2 }); sub.set(0);
+      const sub = A.rotulos(G, ['el mismo lote de embeddings', pan.sub], { x: x0 + 8, y: 50, size: 15, color: C.grey2 }); sub.set(0);
       const clip = S.uid('clip');
       el('rect', { x: x0 + 6, y: 60, width: 340, height: 200 }, el('clipPath', { id: clip }, S.defs));
       const Z = el('g', { 'clip-path': `url(#${clip})` }, G);

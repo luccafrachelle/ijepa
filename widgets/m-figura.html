@@ -130,7 +130,7 @@
       const g = el('g', {}, padre);
       const halo = el('rect', { x: x - 7, y: y - 7, width: w + 14, height: h + 14, rx: 18, fill: color, 'fill-opacity': 0.1 }, g);
       const rect = el('rect', { x, y, width: w, height: h, rx: 13, fill: BLANCO, stroke: color, 'stroke-width': 2.5 }, g);
-      A.texto(g, titulo, x + w / 2, y + 32, { size: 19, weight: '600', color, anchor: 'middle' });
+      A.texto(g, titulo, x + w / 2, y + 32, { size: 18, weight: '600', color, anchor: 'middle' });
       A.texto(g, sim, x + w / 2, y + 62, { size: 22, color: C.navy, anchor: 'middle' });
       halo.style.opacity = 0; g.style.opacity = 0;
       return { g, halo, rect, color };
@@ -162,9 +162,9 @@
     const fCtx = flecha(g2, [[186, 205], [205, 205], [205, CY], [221, CY]], C.teal);
     const mCtx = mini(g2, true, C.teal);
     const lCtx = oculto(A.texto(g2, 'verde sin rojo', MX + MS / 2, CY - 42, { size: 16, weight: '600', color: C.teal, anchor: 'middle' }));
-    const fCtx2 = flecha(g2, [[MX + MS + 4, CY], [313, CY]], C.teal);
-    const RC = red(g2, 318, CY - 40, 200, 80, 'Encoder de contexto', '$f_\\theta$', C.teal);
-    const fSx = flecha(g2, [[522, CY], [550, CY]], C.teal);
+    const fCtx2 = flecha(g2, [[MX + MS + 4, CY], [305, CY]], C.teal);
+    const RC = red(g2, 310, CY - 40, 216, 80, 'Encoder de contexto', '$f_\\theta$', C.teal);
+    const fSx = flecha(g2, [[530, CY], [551, CY]], C.teal);
     const tSx = tokens(g2, 556, CY - 21, 7, 3, C.teal);
     const lSx = oculto(A.texto(g2, '$s_x$', 607, CY + 50, { size: 21, color: C.teal, anchor: 'middle' }));
 
@@ -173,9 +173,9 @@
     const fObj = flecha(g3, [[186, 300], [205, 300], [205, OY], [221, OY]], C.navy);
     const mObj = mini(g3, false, C.navy);
     const lObj = oculto(A.texto(g3, 'imagen completa', MX + MS / 2, OY + 52, { size: 16, weight: '600', color: C.navy, anchor: 'middle' }));
-    const fObj2 = flecha(g3, [[MX + MS + 4, OY], [313, OY]], C.navy);
-    const RO = red(g3, 318, OY - 40, 200, 80, 'Encoder objetivo', '$f_{\\bar\\theta}$', C.navy);
-    const fSy = flecha(g3, [[522, OY], [926, OY]], C.coralD);
+    const fObj2 = flecha(g3, [[MX + MS + 4, OY], [305, OY]], C.navy);
+    const RO = red(g3, 310, OY - 40, 216, 80, 'Encoder objetivo', '$f_{\\bar\\theta}$', C.navy);
+    const fSy = flecha(g3, [[530, OY], [926, OY]], C.coralD);
     const lRec = oculto(A.texto(g3, 'se recortan los bloques objetivo', 724, OY - 13, { size: 17, color: C.grey2, anchor: 'middle' }));
     const tSy = [tokens(g3, 936, OY - 14, 3, 2, C.coral), tokens(g3, 990, OY - 21, 2, 3, C.coral)];
     const lSy = oculto(A.texto(g3, '$s_y$', 1068, OY + 7, { size: 21, color: C.coralD, anchor: 'middle' }));
@@ -272,7 +272,7 @@
     senal(tl, puntos, [[MX + MS + 4, OY], [330, OY]], C.navy, at + 2.1, 0.45, 1);
     traza(tl, fSy, at + 2.9, 1.0);
     aparece(tl, lRec, at + 3.0);
-    senal(tl, puntos, [[522, OY], [926, OY]], C.coralD, at + 2.9, 1.0, 1);
+    senal(tl, puntos, [[530, OY], [926, OY]], C.coralD, at + 2.9, 1.0, 1);
     viajaTok(tSy, 380, at + 2.9, 1.1);
     aparece(tl, lSy, at + 3.9, 0.4);
     at = tl.duration(); tl.addLabel('s3', at);
@@ -302,7 +302,7 @@
     at = tl.duration(); tl.addLabel('s5', at);
 
     // s6: el gradiente vuelve a θ y φ; la rama objetivo no recibe; después, EMA de los pesos (≈ 4,4 s)
-    cabeza(6); atenua(5);
+    cabeza(6);
     tl.to(pHalo, { opacity: 0, duration: 0.6 }, at + 0.2).to(pRect, { attr: { fill: BLANCO }, duration: 0.6 }, at + 0.2);
     trazaRayada(tl, fG1, at + 0.5, 0.8);
     senal(tl, puntos, [[PC.x - PC.w / 2 - 3, PC.y], [866, PC.y], [866, CY + 45]], C.navy, at + 0.5, 0.8, 1, 4.5);
@@ -416,8 +416,8 @@
     // gradiente (sólo prendido, en la pasada completa)
     { capas('grad'); const on = D.on.grad, xg = XL - bw / 2 - 16;
       const p1 = [[XM - 18, yD - 6], [xg, yD - 6], [xg, yP], [XL - bw / 2 - 3, yP]], p2 = [[xg, yP], [xg, yE], [XL - bw / 2 - 3, yE]];
-      A.flecha(on, p1, C.coralD, { lw: 2.4, dash: '6 4' }); A.flecha(on, p2, C.coralD, { lw: 2.4, dash: '6 4' });
-      A.texto(on, 'gradiente', xg, yD - 14, { size: 13 * fs, weight: '600', color: C.coralD });
+      A.flecha(on, p1, C.navy, { lw: 2.4, dash: '6 4' }); A.flecha(on, p2, C.navy, { lw: 2.4, dash: '6 4' });
+      A.texto(on, 'gradiente', xg, yD - 14, { size: 13 * fs, weight: '600', color: C.navy });
       const xs = XR + 26 * fs, ys = yH;
       el('path', { d: `M${xs - 7},${ys - 7}L${xs + 7},${ys + 7}M${xs + 7},${ys - 7}L${xs - 7},${ys + 7}`, stroke: C.coralD, 'stroke-width': 2.4, 'stroke-linecap': 'round' }, on);
       D.paths.grad = [p1.slice(0, 3).concat([[XL - bw / 2 - 3, yP]]), [[xg, yD - 6], [xg, yE], [XL - bw / 2 - 3, yE]]]; }
@@ -507,7 +507,7 @@
     let at = 0;
     const SEN = {
       2: [[['aC', 'aSx'], C.teal]], 3: [[['aT', 'aSy'], C.navy]], 4: [[['pos'], C.coralD], [['aP', 'aH'], C.blue]],
-      5: [[['dL'], C.coralD]], 6: [[['grad'], C.coralD]], 7: [[['ema'], C.navy]] };
+      5: [[['dL'], C.coralD]], 6: [[['grad'], C.navy]], 7: [[['ema'], C.navy]] };
     const D2 = D.paths;
     for (let n = 1; n < NS; n++) {
       // la lista: la descripción anterior se va, los ítems se reacomodan, el nuevo se marca

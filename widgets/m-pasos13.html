@@ -64,7 +64,7 @@
     capPos.style.opacity = 0;
     const coords = el('g', {}, S); coords.style.opacity = 0;
     for (let k = 0; k < NT; k++) {
-      const t = el('text', { x: cx(k) + q / 2, y: cy(k) + q / 2 + 6, 'text-anchor': 'middle', 'font-size': 19, 'font-weight': 600, fill: VIO }, coords);
+      const t = el('text', { x: cx(k) + q / 2, y: cy(k) + q / 2 + 6, 'text-anchor': 'middle', 'font-size': 17, 'font-weight': 600, fill: VIO }, coords);
       t.textContent = Math.floor(k / N) + ',' + (k % N);
     }
 
@@ -163,6 +163,7 @@
     tl.to(labTok, { opacity: 0, duration: 0.35 }, at)
       .to(capImg, { opacity: 0, duration: 0.35 }, at + 0.3)
       .to(capPos, { opacity: 1, duration: 0.5 }, at + 0.5)
+      .to(M.celdas, { attr: { 'fill-opacity': 0.95 }, duration: 0.6 }, at + 0.4)
       .to(coords, { opacity: 1, duration: 0.6 }, at + 0.5);
     T.forEach((t, k) => {
       const t0 = at + 1.1 + 0.03 * k;

@@ -43,7 +43,7 @@
     const LOTE = [mI, ...[...Array(11)].map(() => 0.16 + 0.22 * r())], mL = prom(LOTE);
 
     // ---------------------------------------------------------------- geometría
-    const CX = [20, 340, 660, 960];            // borde izquierdo de cada columna
+    const CX = [20, 340, 660, 985];            // borde izquierdo de cada columna
     const YR = 380;                            // línea de base de los resultados de cada nivel
     const head = A.encabezado(S, 6, [
       'Por parche: el vector predicho $\\hat s_y$ y su objetivo $s_y$, de 8 números cada uno',
@@ -66,9 +66,10 @@
       const t = el('text', { x: x + 14, y: 90, 'text-anchor': 'middle', 'font-size': 18, 'font-weight': 600, fill: '#fff' }, cols[k]); t.textContent = k + 1;
       A.texto(cols[k], TIT[k], x + 40, 91, { size: 21, weight: '600', color: C.navy });
     });
-    const flechas = [[296, 334], [600, 650], [866, 948]].map(([a, b]) => {
+    const flechas = [[296, 334], [600, 650], [866, 966]].map(([a, b]) => {
       const f = A.flecha(S, [[a, 214], [b, 214]], C.grey, { lw: 2.2 });
       f.setAttribute('stroke-dasharray', '1 1'); f.setAttribute('stroke-dashoffset', 1);
+      f._punta = f.getAttribute('marker-end'); f.setAttribute('marker-end', 'none');   // la punta aparece al final del trazo
       return f;
     });
 
@@ -155,9 +156,11 @@
     const cajas = [caja(BX[0].x, BX[0].y, BW, BHh, 'Encoder de contexto $f_\\theta$', C.teal), caja(BX[1].x, BX[1].y, BW, BHh, 'Predictor $g_\\phi$', C.blue),
       caja(BX[2].x, BX[2].y, BW, BHh, 'Encoder objetivo $f_{\\bar\\theta}$', C.navy), caja(BX[3].x, BX[3].y, BW, BHh, 'objetivos $s_y$', C.coralD)];
     const ida = [A.flecha(gGr, [[372, 150], [466, 150]], C.grey, { lw: 2 }), A.flecha(gGr, [[372, 294], [466, 294]], C.grey, { lw: 2 }),
-      A.flecha(gGr, 'M802,150 C880,150 900,372 948,374', C.grey, { lw: 2 }), A.flecha(gGr, 'M802,294 C870,294 900,386 948,388', C.grey, { lw: 2 })];
-    const grad = [A.flecha(gGr, 'M952,362 C900,300 880,178 806,176', C.navy, { lw: 3.2 }), A.flecha(gGr, [[468, 176], [376, 176]], C.navy, { lw: 3.2 })];
-    [...ida, ...grad].forEach(f => { f.setAttribute('stroke-dasharray', '1 1'); f.setAttribute('stroke-dashoffset', 1); });
+      A.flecha(gGr, 'M802,150 C880,150 900,372 973,374', C.grey, { lw: 2 }), A.flecha(gGr, 'M802,294 C870,294 900,386 973,388', C.grey, { lw: 2 })];
+    const grad = [A.flecha(gGr, 'M977,362 C910,300 880,178 806,176', C.navy, { lw: 3.2 }), A.flecha(gGr, [[468, 176], [376, 176]], C.navy, { lw: 3.2 })];
+    [...ida, ...grad].forEach(f => { f.setAttribute('stroke-dasharray', '1 1'); f.setAttribute('stroke-dashoffset', 1);
+      f._punta = f.getAttribute('marker-end'); f.setAttribute('marker-end', 'none'); });
+    const trazaP = (tl, f, t, d) => { A.trazar(tl, f, t, d); tl.set(f, { attr: { 'marker-end': f._punta } }, t + d * 0.85); };
     const nab = [A.texto(gGr, '$\\nabla L$', 902, 250, { size: 22, color: C.navy }), A.texto(gGr, '$\\nabla L$', 422, 208, { size: 22, color: C.navy, anchor: 'middle' })];
     const cruz = el('g', {}, gGr);
     el('path', { d: 'M870,316 l20,20 M890,316 l-20,20', stroke: C.coralD, 'stroke-width': 4, 'stroke-linecap': 'round' }, cruz);
@@ -216,6 +219,7 @@
       tl.to(cols[k - 1], { opacity: 0.5, duration: 0.6 }, at + 0.3)
         .to(cols[k], { opacity: 1, duration: 0.6 }, at + 0.3);
       A.trazar(tl, flechas[k - 1], at + 0.4, 0.6);
+      tl.set(flechas[k - 1], { attr: { 'marker-end': flechas[k - 1]._punta } }, at + 0.9);
       viaja(tl, de, items[0].n, at + 0.8, 1.4);
       items.slice(1).forEach((it, i) => tl.fromTo(it.g, { opacity: 0 }, { opacity: 1, duration: 0.45, immediateRender: false }, at + 2.4 + 0.12 * i));
     }
@@ -255,9 +259,9 @@
       .to(cap4, { opacity: 0.4, duration: 0.6 }, at + 0.3)
       .to(gGr, { opacity: 1, duration: 0.01 }, at + 0.8)
       .to(cajas, { opacity: 1, duration: 0.5, stagger: 0.12 }, at + 0.8);
-    ida.forEach((f, i) => A.trazar(tl, f, at + 1.3 + 0.1 * i, 0.6));
-    A.trazar(tl, grad[0], at + 2.2, 0.9); tl.to(nab[0], { opacity: 1, duration: 0.4 }, at + 2.6);
-    A.trazar(tl, grad[1], at + 3.1, 0.6); tl.to(nab[1], { opacity: 1, duration: 0.4 }, at + 3.3);
+    ida.forEach((f, i) => trazaP(tl, f, at + 1.3 + 0.1 * i, 0.6));
+    trazaP(tl, grad[0], at + 2.2, 0.9); tl.to(nab[0], { opacity: 1, duration: 0.4 }, at + 2.6);
+    trazaP(tl, grad[1], at + 3.1, 0.6); tl.to(nab[1], { opacity: 1, duration: 0.4 }, at + 3.3);
     tl.fromTo(cruz, { opacity: 0 }, { opacity: 1, duration: 0.5, immediateRender: false }, at + 3.8);
     at = tl.duration(); tl.addLabel('s8', at);
 
@@ -281,7 +285,8 @@
     // ---------------------------------------------------------------- geometría
     const P = { x: 24, y: 64, s: 292 }, Q = { x: 420, y: 92, w: 836, h: 206 }, MS = { x: 1000, y: 372, w: 240, h: 64 };
     const PX = v => P.x + P.s / 2 + v * P.s * 0.42, PY = v => P.y + P.s / 2 - v * P.s * 0.42;
-    const QX = k => Q.x + Q.w * k / (T - 1), QY = v => Q.y + Q.h / 2 - v * Q.h * 0.62;
+    const QLO = Math.min(...th.map(p => p[0])), QHI = Math.max(...th.map(p => p[0]));   // la coordenada entra entera en el gráfico
+    const QX = k => Q.x + Q.w * k / (T - 1), QY = v => Q.y + 10 + (QHI - v) / (QHI - QLO) * (Q.h - 20);
     const f1 = v => Math.round(v * 10) / 10;
 
     const head = A.encabezado(S, 7, [

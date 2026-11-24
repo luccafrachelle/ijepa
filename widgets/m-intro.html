@@ -168,7 +168,7 @@
     el('line', { x1: X3, y1: y0 + 14 + 5 * DY, x2: X3 + 360, y2: y0 + 14 + 5 * DY, stroke: C.grid, 'stroke-width': 1.2 }, filaTex);
     oculto(filaTex);
     const nota3 = [A.texto(S, 'la textura, irrelevante, se descarta', X3, PY + PS + 32, { size: 19, weight: '600', color: C.teal }),
-                   A.texto(S, 'la dirección importa y es incierta: falta $z$', X3, PY + PS + 58, { size: 19, color: C.coralD })];
+                   A.texto(S, 'la dirección importa y es incierta: falta $z$', X3, PY + PS + 58, { size: 17, color: C.coralD })];
     oculto(...nota3);
 
     // -------------------------------------------------- línea de tiempo
@@ -405,12 +405,12 @@
   function mundo(root, S) {
     const el = A.el, tr = A.tr;
     const M = [
-      { n: 'Percepción', x: 30, y: 150, w: 220, h: 76, rol: 'Estima el estado actual del mundo a partir de los sensores.' },
-      { n: 'Modelo del mundo', x: 440, y: 140, w: 220, h: 96, rol: 'Completa lo que no se observa y predice estados futuros, incluidos los que resultan de una acción.' },
-      { n: 'Costo', x: 850, y: 150, w: 220, h: 76, s: 'intrínseco + crítico', rol: 'Mide el «malestar» en un número: un costo intrínseco fijo y un crítico entrenable que lo anticipa.' },
-      { n: 'Actor', x: 850, y: 280, w: 220, h: 60, rol: 'Propone secuencias de acciones que minimizan el costo futuro estimado.' },
-      { n: 'Memoria de corto plazo', x: 390, y: 296, w: 250, h: 56, rol: 'Guarda el estado actual y los predichos, junto con sus costos.' },
-      { n: 'Configurador', x: 410, y: 20, w: 280, h: 56, rol: 'Control ejecutivo: prepara a los demás módulos para la tarea que toca.' }];
+      { n: 'Percepción', x: 20, y: 150, w: 200, h: 76, rol: 'Estima el estado actual del mundo a partir de los sensores.' },
+      { n: 'Modelo del mundo', x: 400, y: 140, w: 240, h: 96, rol: 'Completa lo que no se observa y predice estados futuros, incluidos los que resultan de una acción.' },
+      { n: 'Costo', x: 860, y: 150, w: 210, h: 76, s: 'intrínseco + crítico', rol: 'Mide el «malestar» en un número: un costo intrínseco fijo y un crítico entrenable que lo anticipa.' },
+      { n: 'Actor', x: 860, y: 280, w: 210, h: 60, rol: 'Propone secuencias de acciones que minimizan el costo futuro estimado.' },
+      { n: 'Memoria de corto plazo', x: 360, y: 296, w: 280, h: 56, rol: 'Guarda el estado actual y los predichos, junto con sus costos.' },
+      { n: 'Configurador', x: 380, y: 20, w: 280, h: 56, rol: 'Control ejecutivo: prepara a los demás módulos para la tarea que toca.' }];
     const MUNDO = 1;
 
     // flechas de cada módulo (aparecen con él) y sus etiquetas
@@ -419,14 +419,14 @@
     const capaF = el('g', {}, S);
     // sensores → percepción (visible desde el principio)
     const sens = el('g', {}, S);
-    A.flecha(sens, [[140, 268], [140, 232]], C.grey, { lw: 2.2 });
-    lab(sens, 'sensores', 140, 292);
-    fl[MUNDO].push(A.flecha(capaF, [[250, 188], [434, 188]], C.navy)); labs[MUNDO].push(lab(S, 'estado', 342, 178));
-    fl[2].push(A.flecha(capaF, [[660, 182], [844, 182]], C.navy)); labs[2].push(lab(S, 'estados predichos', 752, 172));
-    fl[3].push(A.flecha(capaF, [[960, 226], [960, 274]], C.navy)); labs[3].push(lab(S, 'costo', 972, 257, 'start'));
-    fl[3].push(A.flecha(capaF, [[850, 310], [750, 310], [750, 218], [666, 218]], C.navy)); labs[3].push(lab(S, 'acciones propuestas', 842, 336, 'end'));
-    fl[4].push(A.flecha(capaF, [[560, 292], [560, 242]], C.navy, { lw: 2.2 }), A.flecha(capaF, [[536, 242], [536, 292]], C.navy, { lw: 2.2 }));
-    const punt = [[[410, 48], [140, 48], [140, 144]], [[550, 76], [550, 134]], [[690, 48], [960, 48], [960, 144]], [[960, 48], [1088, 48], [1088, 310], [1076, 310]]]
+    A.flecha(sens, [[120, 268], [120, 232]], C.grey, { lw: 2.2 });
+    lab(sens, 'sensores', 120, 292);
+    fl[MUNDO].push(A.flecha(capaF, [[220, 188], [394, 188]], C.navy)); labs[MUNDO].push(lab(S, 'estado', 307, 178));
+    fl[2].push(A.flecha(capaF, [[640, 182], [854, 182]], C.navy)); labs[2].push(lab(S, 'estados predichos', 747, 172));
+    fl[3].push(A.flecha(capaF, [[965, 226], [965, 274]], C.navy)); labs[3].push(lab(S, 'costo', 977, 257, 'start'));
+    fl[3].push(A.flecha(capaF, [[860, 310], [750, 310], [750, 218], [646, 218]], C.navy)); labs[3].push(lab(S, 'acciones propuestas', 852, 338, 'end'));
+    fl[4].push(A.flecha(capaF, [[532, 292], [532, 242]], C.navy, { lw: 2.2 }), A.flecha(capaF, [[508, 242], [508, 292]], C.navy, { lw: 2.2 }));
+    const punt = [[[380, 48], [120, 48], [120, 144]], [[520, 76], [520, 134]], [[660, 48], [965, 48], [965, 144]], [[965, 48], [1088, 48], [1088, 310], [1076, 310]]]
       .map(p => A.flecha(capaF, p, C.grey, { lw: 1.8, dash: '4 5' }));
     fl.forEach(a => a.forEach(p => { p.style.opacity = 0; }));
     punt.forEach(p => { p.style.opacity = 0; });

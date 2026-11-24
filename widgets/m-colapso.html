@@ -113,7 +113,7 @@
         et.push([fl([[xl, NY - 16], [xl, EY + 24]]), caja(g, xl, EY, 'encoder', col), fl([[xr, NY - 16], [xr, EY + 24]]), caja(g, xr, EY, 'encoder', col)]);
         et.push([fl([[xl, EY - 22], [xl, 282]]), nodo(g, xl, 266, '$s_x$', col), fl([[xr, EY - 22], [xr, 250]]), nodo(g, xr, 234, '$s_y$', col)]);
         const z = nodo(g, xl - 92, 218, '$z$', C.grey2);
-        const pos = oculto(el('g', {}, g)); A.texto(pos, 'posición', xl - 92, 248, { size: 18, color: C.grey2, anchor: 'middle' });
+        const pos = oculto(el('g', {}, g)); A.texto(pos, 'posición', xl - 64, 250, { size: 18, color: C.grey2, anchor: 'end' });
         et.push([fl([[xl, 250], [xl, 242]]), caja(g, xl, 218, 'predictor', C.blue), z, pos, fl([[xl - 80, 218], [xl - 58, 218]])]);
         et.push([fl([[xl, 196], [xl, 182]]), nodo(g, xl, 166, '$\\hat s_y$', C.blue)]);
         et.push([aD(xl, 148, -1), aD(xr, 216, 1)]);
@@ -195,11 +195,11 @@
       else el('circle', { cx, cy, r: 11 }, h);
     }
     ROWS.forEach((y, i) => { miniatura(20, y - TS / 2, i, -4); miniatura(72, y - TS / 2, i, 5);
-      A.flecha(S, [[124, y], [172, y]], C.grey, { lw: 1.8 }); });
-    el('rect', { x: 186, y: 100, width: 120, height: 244, rx: 12, fill: '#fff', stroke: C.blue, 'stroke-width': 2.4 }, S);
+      A.flecha(S, [[124, y], [168, y]], C.grey, { lw: 1.8 }); });
+    el('rect', { x: 176, y: 100, width: 140, height: 244, rx: 12, fill: '#fff', stroke: C.blue, 'stroke-width': 2.4 }, S);
     A.texto(S, 'encoder', 246, 218, { size: 19, weight: '600', color: C.blue, anchor: 'middle' });
-    A.texto(S, '(compartido)', 246, 242, { size: 18, color: C.grey2, anchor: 'middle' });
-    A.flecha(S, [[314, 222], [444, 222]], C.grey, { lw: 2 });
+    A.texto(S, '(compartido)', 246, 242, { size: 17, color: C.grey2, anchor: 'middle' });
+    A.flecha(S, [[322, 222], [444, 222]], C.grey, { lw: 2 });
     A.texto(S, 'un punto', 379, 190, { size: 18, color: C.grey2, anchor: 'middle' });
     A.texto(S, 'por vista', 379, 210, { size: 18, color: C.grey2, anchor: 'middle' });
 
@@ -304,7 +304,7 @@
 
   // ================================================================ noColapsa: stop-gradient y EMA
   K.register('noColapsa', root => {
-    const S = A.svg(root, 1100, 440);
+    const S = A.svg(root, 1100, 452);
     A.cuandoFuentes(() => noColapsa(root, S));
   });
   function noColapsa(root, S) {
@@ -372,7 +372,7 @@
       'Sin el promedio lento, predicción y objetivo se mueven juntos y la representación pierde dimensiones.'
     ].map(s => parrafo(S, s, RX, 324, 660, { size: 19, lh: 26, color: C.navy })));
     NOTA.set(0);
-    A.texto(S, 'Esquema. La solución trivial sigue existiendo: lo que la evita es la dinámica del entrenamiento, sin garantía.', 0, 432, { size: 18, color: C.grey2 });
+    A.texto(S, 'Esquema. La solución trivial sigue existiendo: lo que la evita es la dinámica del entrenamiento, sin garantía.', 0, 446, { size: 18, color: C.grey2 });
 
     const pon = (e, a, b) => { e.setAttribute('x1', a[0]); e.setAttribute('y1', a[1]); e.setAttribute('x2', b[0]); e.setAttribute('y2', b[1]); };
     const dibuja = v => {
@@ -460,7 +460,7 @@
 
   K.register('colapso', root => {
     root._sim = cfg => { const R = simular(!!cfg.sg, cfg.m); return { varianza: R.varianza, perdida: R.perdida }; };  // para las pruebas
-    const S = A.svg(root, 1100, 465);
+    const S = A.svg(root, 1100, 470);
     A.cuandoFuentes(() => colapso(root, S));
   });
   function colapso(root, S) {
@@ -468,7 +468,7 @@
       .map(c => ({ ...c, ...simular(c.sg, c.m, true) }));
     const COLG = [C.blue, C.teal, C.coral];
     const L = { x: 20, y: 84, s: 330 }, lcx = L.x + L.s / 2, lcy = L.y + L.s / 2, sc = L.s / 7;
-    const R = { x: 480, y: 84, w: 500, h: 290 }, YM = 4, T = SIM.T;
+    const R = { x: 480, y: 84, w: 450, h: 290 }, YM = 4, T = SIM.T;
     const X = v => R.x + v / T * R.w, Y = v => R.y + R.h - A.clamp(v, 0, YM) / YM * R.h;
 
     const head = titulos(S, [
@@ -488,7 +488,9 @@
     const nube = el('g', { 'clip-path': `url(#${cid})` }, S);
     const PTS = RUNS[0].grupo.map(k => el('circle', { r: 4.6, fill: COLG[k], 'fill-opacity': 0.9 }, nube));
     const estB = A.texto(S, 'tres grupos de datos, tres colores', L.x, L.y + L.s + 30, { size: 18, color: C.grey2 });
-    const estM = A.texto(S, 'colapso: todas las entradas dan el mismo vector', L.x, L.y + L.s + 30, { size: 18, weight: '600', color: C.coralD });
+    const estM = el('g', {}, S);   // en dos líneas, para no pisar la lectura de la derecha
+    A.texto(estM, 'colapso: todas las entradas', L.x, L.y + L.s + 28, { size: 18, weight: '600', color: C.coralD });
+    A.texto(estM, 'dan el mismo vector', L.x, L.y + L.s + 51, { size: 18, weight: '600', color: C.coralD });
     estM.style.opacity = 0;
 
     // derecha: varianza y pérdida
@@ -514,8 +516,8 @@
       run.tL = A.texto(run.cab, 'pérdida', 0, 0, { size: 18, weight: '600', color: C.coralD });
       run.cab.style.opacity = 0;
       const fin = run.hist[run.hist.length - 1];
-      run.fin = A.texto(run.g, run.et, R.x + R.w - 4, 0, { size: 18, weight: '600', color: C.teal, anchor: 'end' });
-      run.finY = Y(fin[1]) - 10; run.fin.style.opacity = 0;
+      run.fin = A.texto(run.g, run.et, R.x + R.w + 12, 0, { size: 18, weight: '600', color: C.teal });
+      run.finY = Y(fin[1]) + 6; run.fin.style.opacity = 0;
     });
     // rótulos finales sin encimarse
     { const o = RUNS.slice().sort((a, b) => b.finY - a.finY); for (let i = 1; i < o.length; i++) o[i].finY = Math.min(o[i].finY, o[i - 1].finY - 22);

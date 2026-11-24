@@ -248,7 +248,7 @@
 
   // ================================================================ después de entrenar: la evaluación
   K.register('evaluacion', root => {
-    const W = 1100, H = 450;
+    const W = 1100, H = 466;
     const S = A.svg(root, W, H);
     A.cuandoFuentes(() => evaluacion(root, S, W, H));
   });
@@ -257,7 +257,7 @@
     const IM = { x: 16, y: 200, s: 150 }, ENC = { x: 220, y: 205, w: 210, h: 140 }, CY = ENC.y + ENC.h / 2;
     const GR = { x: 482, y: 196, dx: 24, dy: 28, w: 14, h: 22 };
     const POOL = { x: 680, w: 22, h: 72 }, LIN = { x: 774, y: CY - 48, w: 150, h: 96 };
-    const CL = { x: 958, xb: 1046, esc: 80 };
+    const CL = { x: 958, xb: 1058, esc: 66 };
     const CLASES = [['casa', 0.62], ['granja', 0.21], ['lago', 0.1], ['montaña', 0.07]];
     const q = IM.s / N;
     const gx = k => GR.x + (k % N) * GR.dx, gy = k => GR.y + Math.floor(k / N) * GR.dy;
@@ -277,16 +277,16 @@
 
     // las tres redes entrenadas
     const TOP = [['Encoder de contexto', C.teal], ['Predictor', C.blue], ['Encoder objetivo', C.navy]].map(([n, col], i) => {
-      const x = 230 + i * 250, y = 56, g = el('g', {}, S);
-      const rect = el('rect', { x, y, width: 220, height: 50, rx: 12, fill: '#fff', stroke: col, 'stroke-width': 2.4 }, g);
-      const t = A.texto(g, n, x + 110, y + 32, { size: 20, weight: '600', color: col, anchor: 'middle' });
+      const x = 200 + i * 262, y = 56, g = el('g', {}, S);
+      const rect = el('rect', { x, y, width: 244, height: 50, rx: 12, fill: '#fff', stroke: col, 'stroke-width': 2.4 }, g);
+      const t = A.texto(g, n, x + 122, y + 32, { size: 20, weight: '600', color: col, anchor: 'middle' });
       t.setAttribute('transform', tr(0, 0));
       return { g, rect, t, x, y };
     });
     const tachas = TOP.slice(0, 2).map(T => {
       const g = el('g', {}, S);
-      const l = el('path', { d: `M${T.x + 12},${T.y + 8} L${T.x + 208},${T.y + 42}`, stroke: C.coralD, 'stroke-width': 3, 'stroke-linecap': 'round', fill: 'none', pathLength: 1, 'stroke-dasharray': '1 1', 'stroke-dashoffset': 1 }, g);
-      const s = A.texto(g, 'se descarta', T.x + 110, T.y + 78, { size: 19, color: C.coralD, anchor: 'middle' }); s.style.opacity = 0;
+      const l = el('path', { d: `M${T.x + 12},${T.y + 8} L${T.x + 232},${T.y + 42}`, stroke: C.coralD, 'stroke-width': 3, 'stroke-linecap': 'round', fill: 'none', pathLength: 1, 'stroke-dasharray': '1 1', 'stroke-dashoffset': 1 }, g);
+      const s = A.texto(g, 'se descarta', T.x + 122, T.y + 78, { size: 19, color: C.coralD, anchor: 'middle' }); s.style.opacity = 0;
       return { l, s };
     });
 
@@ -328,7 +328,9 @@
     // average pooling
     const pool = A.vector(S, PROM, { w: POOL.w, h: POOL.h, color: C.navy });
     pool.g.setAttribute('transform', tr(POOL.x, CY - 4, 1, 0.1)); pool.g.style.opacity = 0;
-    const poolTxt = A.texto(S, 'average pooling', POOL.x + POOL.w / 2, CY + POOL.h / 2 + 30, { size: 19, weight: '600', color: C.navy, anchor: 'middle' });
+    const poolTxt = el('g', {}, S);   // en dos líneas, para no pisar la grilla de vectores
+    A.texto(poolTxt, 'average', POOL.x + POOL.w / 2, CY + POOL.h / 2 + 28, { size: 19, weight: '600', color: C.navy, anchor: 'middle' });
+    A.texto(poolTxt, 'pooling', POOL.x + POOL.w / 2, CY + POOL.h / 2 + 52, { size: 19, weight: '600', color: C.navy, anchor: 'middle' });
     poolTxt.style.opacity = 0;
 
     // clasificador lineal
@@ -349,8 +351,8 @@
 
     // nota final
     const nota = el('g', {}, S); nota.style.opacity = 0;
-    A.texto(nota, 'Si una capa lineal alcanza para clasificar bien,', W / 2, 408, { size: 20, color: C.navy, anchor: 'middle' });
-    A.texto(nota, 'la representación ya tenía la información ordenada.', W / 2, 436, { size: 20, color: C.navy, anchor: 'middle' });
+    A.texto(nota, 'Si una capa lineal alcanza para clasificar bien,', W / 2, 430, { size: 20, color: C.navy, anchor: 'middle' });
+    A.texto(nota, 'la representación ya tenía la información ordenada.', W / 2, 458, { size: 20, color: C.navy, anchor: 'middle' });
 
     // ---------------------------------------------------------------- línea de tiempo
     const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
@@ -372,7 +374,7 @@
     head.a(tl, 2, at);
     const E = TOP[2];
     tl.to(E.rect, { attr: { x: ENC.x, y: ENC.y, width: ENC.w, height: ENC.h, rx: 14, 'stroke-width': 2.5 }, duration: 1.3 }, at + 0.4);
-    tl.to(E.t, { attr: { transform: tr(ENC.x + ENC.w / 2 - (E.x + 110), ENC.y - E.y) }, duration: 1.3 }, at + 0.4);
+    tl.to(E.t, { attr: { transform: tr(ENC.x + ENC.w / 2 - (E.x + 122), ENC.y - E.y) }, duration: 1.3 }, at + 0.4);
     aparece(encDet, at + 1.5);
     at = tl.duration(); tl.addLabel('s2', at);
 
