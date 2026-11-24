@@ -98,3 +98,7 @@ scripts/run_rest.sh                                   # calibración de LeJEPA y
 ```
 
 Una celda suelta: `PYTHONPATH=src .venv/bin/python scripts/train.py --config configs/c1.yaml --seed 0`.
+
+## Uso de IA
+
+El código y las corridas de este experimento los hizo en su mayoría un asistente de IA (Claude, de Anthropic), guiado por mí. Revisé y corregí el diseño, el código y los resultados.

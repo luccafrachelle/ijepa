@@ -1213,7 +1213,7 @@ Assran, Duval, Misra, Bojanowski, Vincent, Rabbat, LeCun y Ballas · CVPR 2023
 <div class="ot-widget" data-widget="evaluacion" data-alt="Se descartan el encoder de contexto y el predictor; el encoder objetivo congelado produce vectores que se promedian y alimentan un clasificador lineal">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Lineal (tabla 1): encoder objetivo congelado, average pooling de los tokens y una capa lineal. Los resultados con 1 % de etiquetas son con ajuste fino.</p>
+
 </section>
 <section id="resultados" class="slide level2">
 <h2>Resultados</h2>
@@ -1369,7 +1369,7 @@ Tian, Yuandong, Xinlei Chen, y Surya Ganguli. 2021. <span>«Understanding Self-S
 </div>
 </div>
 <p class="credito">
-<strong>Declaración de uso de IA.</strong> Usé un asistente de IA (Claude, de Anthropic) para programar las animaciones, autocompletar algunas fórmulas y otras tareas de apoyo. Todo tuvo intervención humana: yo guié el proceso y revisé y corregí cada resultado.
+<strong>Declaración de uso de IA.</strong> Usé un asistente de IA (Claude, de Anthropic) para programar las animaciones, autocompletar algunas fórmulas y otras tareas de apoyo. Los experimentos y su código también los hizo en su mayoría el asistente. Todo tuvo intervención humana: yo guié el proceso y revisé y corregí cada resultado.
 </p>
 
 </section>
@@ -4016,7 +4016,7 @@ window.QuartoSupport = function () {
               caja(ctx, 1004, y + 2, 66 * p * f, 16, { r: 4, fill: i ? alfa(C.grey, 0.7) : C.teal });
             });
           }
-          tx(ctx, 'Si una capa lineal alcanza para clasificar bien, la representación ya tenía la información ordenada. Probabilidades ilustrativas.', 24, H - 12, { color: C.grey2, size: 13.5 });
+          tx(ctx, 'Si una capa lineal alcanza para clasificar bien, la representación ya tenía la información ordenada.', 24, H - 12, { color: C.grey2, size: 13.5 });
         };
         K.pasos(root, [0.185, 0.545, 0.725, 1], draw);
       });

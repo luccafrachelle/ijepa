@@ -47,7 +47,9 @@ format:
 ## Intro
 
 ::: {.grande}
-Un adolescente aprende a manejar en unas 20 horas (a mí me llevó más).
+Un adolescente aprende a manejar en unas 20 horas (a mí me llevó bastante más).
+
+
 Un sistema automático necesita enormes cantidades de datos etiquetados o de ensayos.
 :::
 
@@ -70,7 +72,7 @@ La diferencia es el conocimiento previo de cómo funciona el mundo, y casi todo 
 
 ![](img/lecun-arquitectura.png){style="max-height:460px; width:auto; display:block; margin:0 auto;" fig-alt="Los seis módulos de la arquitectura de LeCun dibujados sobre un cerebro: configurador, percepción, modelo del mundo, costo (intrínseco y crítico), actor y memoria de corto plazo; el actor actúa sobre el mundo y la percepción recibe lo que el mundo devuelve"}
 
-<p class="leyenda">Los módulos de la arquitectura de LeCun (2022). Figura de Dawid y LeCun (2023), notas de Les Houches. Para esta charla importa el modelo del mundo.</p>
+<p class="leyenda">Los módulos de la arquitectura de LeCun (2022). Figura de Dawid y LeCun (2023), notas de Les Houches. </p>
 
 ## El modelo del mundo, en concreto
 
@@ -257,7 +259,7 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 <div class="ot-widget" data-widget="evaluacion" data-alt="Se descartan el encoder de contexto y el predictor; el encoder objetivo congelado produce vectores que se promedian y alimentan un clasificador lineal">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Lineal (tabla 1): encoder objetivo congelado, average pooling de los tokens y una capa lineal. Los resultados con 1 % de etiquetas son con ajuste fino.</p>
+
 ```
 
 ## Resultados
@@ -351,4 +353,4 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 ::: {#refs .refs-col}
 :::
 
-<p class="credito"><strong>Declaración de uso de IA.</strong> Usé un asistente de IA (Claude, de Anthropic) para programar las animaciones, autocompletar algunas fórmulas y otras tareas de apoyo. Todo tuvo intervención humana: yo guié el proceso y revisé y corregí cada resultado.</p>
+<p class="credito"><strong>Declaración de uso de IA.</strong> Usé un asistente de IA (Claude, de Anthropic) para programar las animaciones, autocompletar algunas fórmulas y otras tareas de apoyo. Los experimentos y su código también los hizo en su mayoría el asistente. Todo tuvo intervención humana: yo guié el proceso y revisé y corregí cada resultado.</p>

@@ -590,7 +590,7 @@ Escala chica (ViT-Tiny, ImageNet-100, 100 épocas), lejos del régimen en el que
 ::: {#refs}
 :::
 
-<p class="pie"><strong>Declaración de uso de IA.</strong> Usé un asistente de IA (Claude, de Anthropic) para programar las animaciones, autocompletar algunas fórmulas y otras tareas de apoyo. Todo tuvo intervención humana: yo guié el proceso y revisé y corregí cada resultado.</p>
+<p class="pie"><strong>Declaración de uso de IA.</strong> Usé un asistente de IA (Claude, de Anthropic) para programar las animaciones, autocompletar algunas fórmulas y otras tareas de apoyo. Los experimentos y su código también los hizo en su mayoría el asistente. Todo tuvo intervención humana: yo guié el proceso y revisé y corregí cada resultado.</p>
 
 <p class="pie">Proyecto final de Redes Neuronales para Visión Artificial. Los diagramas y las animaciones son propios, salvo la figura 6 del paper, reproducida con crédito. Los números del paper provienen de Assran et al. (2023); los de la sección 11 son de corridas propias.</p>
 
