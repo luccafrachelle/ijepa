@@ -2414,7 +2414,7 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 </div>
 <p class="leyenda">Un paso de entrenamiento, redibujado a partir de la figura 3 del paper, con la grilla reducida a 6 × 6 parches.</p>
 </div>
-<p>Cada paso tiene abajo su propia animación con el mismo código de colores: verde para el contexto, coral para los objetivos, azul para el predictor y gris para los parches que no son ni contexto ni objetivo.</p>
+<p>Cada paso tiene abajo su propia animación con el mismo código de colores: verde para el contexto, rojo para los objetivos, azul para el predictor y gris para los parches que no son ni contexto ni objetivo.</p>
 <section id="paso-1-de-la-imagen-a-una-secuencia-de-tokens" class="level3 page-columns page-full" data-number="5.1">
 <h3 data-number="5.1" class="anchored" data-anchor-id="paso-1-de-la-imagen-a-una-secuencia-de-tokens"><span class="header-section-number">5.1</span> Paso 1: de la imagen a una secuencia de tokens</h3>
 <p>Como en todo ViT <span class="citation" data-cites="dosovitskiy2021vit">(<a href="#ref-dosovitskiy2021vit" role="doc-biblioref">Dosovitskiy et al. 2021</a>)</span>, la imagen se corta en parches de 16 × 16 que no se superponen y cada uno pasa por una misma proyección lineal. A 224 × 224 píxeles eso da una grilla de 14 × 14, es decir 196 tokens de 768 dimensiones en un ViT-B/16, el modelo de las ablaciones; el ViT-H/14 principal trabaja con 16 × 16 = 256 parches.</p>
@@ -2431,7 +2431,7 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 <p>En cada imagen y en cada paso se sortean cuatro bloques objetivo y un bloque de contexto, al que se le quitan los parches que caen en algún objetivo para que la tarea no se reduzca a copiar. Los criterios de ese sorteo se discuten en la <a href="#sec-mascaras">sección 6</a>. Cada parche queda en uno de tres grupos:</p>
 <ul>
 <li><strong>contexto</strong> (verde): la única entrada del encoder de contexto;</li>
-<li><strong>objetivo</strong> (coral): los parches cuya representación hay que predecir;</li>
+<li><strong>objetivo</strong> (rojo): los parches cuya representación hay que predecir;</li>
 <li><strong>ninguno</strong> (gris): no entran al encoder de contexto ni se predicen, pero sí pasan por el encoder objetivo, que procesa la imagen entera.</li>
 </ul>
 <p>Los objetivos no son, entonces, todo lo que el contexto no ve, sino sólo los bloques sorteados.</p>
@@ -2536,7 +2536,7 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 <div class="ot-widget" data-widget="perdida" data-alt="Animación: para cada parche del bloque, barras de la predicción y del objetivo que se van acercando durante el entrenamiento, con la distancia de cada parche y la curva de la pérdida">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Paso 6: Ilustración con vectores de 8 números; en el modelo tienen cientos. Durante el entrenamiento las barras azules (predicción) se acercan a los contornos coral (objetivo).</p>
+<p class="leyenda">Paso 6: Ilustración con vectores de 8 números; en el modelo tienen cientos. Durante el entrenamiento las barras azules (predicción) se acercan a los contornos rojo (objetivo).</p>
 </div>
 <p>La pérdida no llega a cero, y no tiene por qué: parte de lo que hay en un bloque no se puede deducir del contexto.</p>
 <p>Los parámetros del encoder de contexto, <span class="math inline">\theta</span>, y del predictor, <span class="math inline">\phi</span>, se optimizan por descenso de gradiente sobre <span class="math inline">\mathcal{L}</span>. Los del encoder objetivo, <span class="math inline">\bar\theta</span>, no reciben gradiente: hay una detención del gradiente (<em>stop-gradient</em>), que en el código se implementa calculando los objetivos dentro de <code>torch.no_grad()</code> y con <code>requires_grad=False</code> en esos pesos. Arrancan como una copia de <span class="math inline">\theta</span> y después de cada paso se actualizan con un promedio móvil exponencial (EMA) de los pesos del encoder de contexto:</p>
@@ -2582,7 +2582,7 @@ Una red puede aprender mucho sobre imágenes sin etiquetas si se le tapa una par
 <div class="ot-widget" data-widget="resultados" data-alt="Gráfico de puntos con los resultados reportados de I-JEPA y otros métodos en evaluación lineal, con 1 por ciento de etiquetas y en tareas de bajo nivel">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Números de las tablas 1, 2 y 4 de Assran et al. (2023); los de la tabla 2 (1 % de etiquetas) son con ajuste fino o evaluación lineal según lo que mejor funcione para cada método. En coral, I-JEPA; en azul, otros métodos sin aumentos de vista diseñados a mano; en gris, los que sí los usan. Las arquitecturas y cantidades de épocas difieren, tal como en el paper.</p>
+<p class="leyenda">Números de las tablas 1, 2 y 4 de Assran et al. (2023); los de la tabla 2 (1 % de etiquetas) son con ajuste fino o evaluación lineal según lo que mejor funcione para cada método. En rojo, I-JEPA; en azul, otros métodos sin aumentos de vista diseñados a mano; en gris, los que sí los usan. Las arquitecturas y cantidades de épocas difieren, tal como en el paper.</p>
 </div>
 <p><strong>Evaluación lineal.</strong> Entre los métodos sin aumentos de vista diseñados a mano (I-JEPA sí aplica un recorte aleatorio a su única vista), I-JEPA con ViT-H/14 llega a 79,3 con 300 épocas, por encima de MAE (77,2) y data2vec (77,3), que entrenan 1600. Un ViT-H/16 preentrenado a 448 px alcanza 81,1, a la par de iBOT (81,0), que sí usa aumentos.</p>
 <p><strong>Pocas etiquetas.</strong> Con el 1 % de las etiquetas (12 o 13 imágenes por clase) y ajuste fino, I-JEPA con ViT-H/14 iguala a data2vec con ViT-L/16 (73,3) y supera a MAE (71,5). El ViT-H/16 a 448 px llega a 77,3, por encima de MSN (75,7), el mejor de los métodos con aumentos en esa tabla.</p>
@@ -3541,7 +3541,7 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
     const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
     const PASOS = [
       'Una imagen se parte en parches, igual que en cualquier Vision Transformer',
-      'Se sortean un bloque de contexto (punteado verde) y bloques objetivo (coral); lo gris no es ninguno',
+      'Se sortean un bloque de contexto (punteado verde) y bloques objetivo (rojo); lo gris no es ninguno',
       'El encoder de contexto recibe sólo lo verde: el bloque de contexto sin los parches objetivo',
       'El encoder objetivo ve la imagen completa; los bloques objetivo se recortan recién a la salida',
       'El predictor recibe el contexto y tokens de máscara que indican qué posición predecir',
@@ -3598,7 +3598,7 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
       // rama de contexto
       let a = al[2];
       flecha(ctx, F.ctx, alfa(C.teal, a), { t: a }); mini(222, 94, 52, true, C.teal, a); flecha(ctx, F.ctx2, alfa(C.teal, a), { t: a });
-      text(ctx, 'verde sin coral', 248, 84, { color: alfa(C.teal, a), size: 13, weight: '600', align: 'center' });
+      text(ctx, 'verde sin rojo', 248, 84, { color: alfa(C.teal, a), size: 13, weight: '600', align: 'center' });
       red(300, 85, 190, 70, 'Encoder de contexto', '$f_\\theta$', C.teal, a);
       flecha(ctx, F.sx, alfa(C.teal, a), { t: a }); tokens(527, 101, 7, 3, C.teal, a);
       if (a > 0.02) K.rich(ctx, '$s_x$', 572, 164, { color: alfa(C.teal, a), size: 19, align: 'center' });
@@ -4101,7 +4101,7 @@ window.OTK_TEX = {"D(\\hat s_y, s_y)":{"svg":"<svg xmlns=\"http://www.w3.org/200
     const draw = t => {
       ctx.clearRect(0, 0, W, H);
       const a = fase(t, 0.02, 0.14), b = fase(t, 0.17, 0.35), c = fase(t, 0.37, 0.5), d = fase(t, 0.52, 0.8), e = fase(t, 0.82, 0.96);
-      encabezado(ctx, 3, t < 0.16 ? 'Cada token es contexto (verde), objetivo (coral) o ninguno (gris)'
+      encabezado(ctx, 3, t < 0.16 ? 'Cada token es contexto (verde), objetivo (rojo) o ninguno (gris)'
         : t < 0.36 ? 'Lo que no es contexto se descarta antes de entrar a la red'
         : t < 0.51 ? `Quedan ${CTX.length} de los 36 tokens, cada uno con su posición ya sumada`
         : t < 0.81 ? 'El encoder de contexto, un ViT, mezcla los tokens visibles con atención'

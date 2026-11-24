@@ -140,7 +140,7 @@ Un modelo del mundo tiene que predecir en un espacio de representaciones, porque
 <p class="leyenda">Redibujado de la figura 2 de Assran et al. (2023). D marca dónde se mide la distancia.</p>
 ```
 
-## El precio: el colapso
+## El colapso
 
 ```{=html}
 <div class="ot-widget" data-widget="colapsoPasos" data-alt="Dos vistas de cuatro imágenes pasan por un encoder compartido: sin entrenar los pares están lejos; en la solución buena cada par coincide y las imágenes quedan separadas; en el colapso todas van al mismo punto con pérdida cero; en el colapso dimensional quedan sobre una recta">
@@ -150,24 +150,12 @@ Un modelo del mundo tiene que predecir en un espacio de representaciones, porque
 
 ## Evitar el colapso: contrastivo o regularizado
 
-La energía $F(x, y)$ tiene que quedar baja sobre los datos y alta en el resto. LeCun distingue dos maneras de lograrlo.
+La energía $F(x, y)$ tiene que quedar baja sobre los datos y alta en el resto.
 
-![](img/lecun-contrastivo-regularizado.png){style="max-height:225px; width:auto; display:block; margin:4px auto 0;" fig-alt="Tres paneles: (a) paisaje de energía con la región de baja energía y las muestras de entrenamiento; (b) método contrastivo, con muestras contrastivas fuera de la región; (c) método regularizado, con flechas que comprimen la región de baja energía"}
+![](img/lecun-contrastivo-regularizado.png){style="max-height:500px; width:auto; display:block; margin:4px auto 0;" fig-alt="Tres paneles: (a) paisaje de energía con la región de baja energía y las muestras de entrenamiento; (b) método contrastivo, con muestras contrastivas fuera de la región; (c) método regularizado, con flechas que comprimen la región de baja energía"}
 
 <p class="leyenda">Dawid y LeCun (2023), adaptada de LeCun (2022).</p>
 
-::: {.columns}
-::: {.column width="50%"}
-**Contrastivo**
-
-Baja la energía de los datos y sube la de muestras generadas fuera de ellos. Escala mal con la dimensión: LeCun lo descarta.
-:::
-::: {.column width="50%"}
-**Regularizado**
-
-Limita el volumen de la región de baja energía: en JEPA, maximizar la información de $s_x$ y $s_y$. I‑JEPA, en cambio, usa asimetría y EMA.
-:::
-:::
 
 ## I-JEPA {.section-break background-color="#0f3460"}
 

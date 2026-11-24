@@ -344,7 +344,7 @@
     const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
     const PASOS = [
       'Una imagen se parte en parches, igual que en cualquier Vision Transformer',
-      'Se sortean un bloque de contexto (punteado verde) y bloques objetivo (coral); lo gris no es ninguno',
+      'Se sortean un bloque de contexto (punteado verde) y bloques objetivo (rojo); lo gris no es ninguno',
       'El encoder de contexto recibe sólo lo verde: el bloque de contexto sin los parches objetivo',
       'El encoder objetivo ve la imagen completa; los bloques objetivo se recortan recién a la salida',
       'El predictor recibe el contexto y tokens de máscara que indican qué posición predecir',
@@ -401,7 +401,7 @@
       // rama de contexto
       let a = al[2];
       flecha(ctx, F.ctx, alfa(C.teal, a), { t: a }); mini(222, 94, 52, true, C.teal, a); flecha(ctx, F.ctx2, alfa(C.teal, a), { t: a });
-      text(ctx, 'verde sin coral', 248, 84, { color: alfa(C.teal, a), size: 13, weight: '600', align: 'center' });
+      text(ctx, 'verde sin rojo', 248, 84, { color: alfa(C.teal, a), size: 13, weight: '600', align: 'center' });
       red(300, 85, 190, 70, 'Encoder de contexto', '$f_\\theta$', C.teal, a);
       flecha(ctx, F.sx, alfa(C.teal, a), { t: a }); tokens(527, 101, 7, 3, C.teal, a);
       if (a > 0.02) K.rich(ctx, '$s_x$', 572, 164, { color: alfa(C.teal, a), size: 19, align: 'center' });

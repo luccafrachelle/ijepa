@@ -188,7 +188,7 @@
     const draw = t => {
       ctx.clearRect(0, 0, W, H);
       const a = fase(t, 0.02, 0.14), b = fase(t, 0.17, 0.35), c = fase(t, 0.37, 0.5), d = fase(t, 0.52, 0.8), e = fase(t, 0.82, 0.96);
-      encabezado(ctx, 3, t < 0.16 ? 'Cada token es contexto (verde), objetivo (coral) o ninguno (gris)'
+      encabezado(ctx, 3, t < 0.16 ? 'Cada token es contexto (verde), objetivo (rojo) o ninguno (gris)'
         : t < 0.36 ? 'Lo que no es contexto se descarta antes de entrar a la red'
         : t < 0.51 ? `Quedan ${CTX.length} de los 36 tokens, cada uno con su posición ya sumada`
         : t < 0.81 ? 'El encoder de contexto, un ViT, mezcla los tokens visibles con atención'

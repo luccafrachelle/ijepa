@@ -170,7 +170,7 @@ I-JEPA predice, a partir de un bloque de contexto de la imagen, las representaci
 ```
 :::
 
-Cada paso tiene abajo su propia animación con el mismo código de colores: verde para el contexto, coral para los objetivos, azul para el predictor y gris para los parches que no son ni contexto ni objetivo.
+Cada paso tiene abajo su propia animación con el mismo código de colores: verde para el contexto, rojo para los objetivos, azul para el predictor y gris para los parches que no son ni contexto ni objetivo.
 
 ### Paso 1: de la imagen a una secuencia de tokens
 
@@ -192,7 +192,7 @@ A cada token se le suma un embedding posicional 2D (senos y cosenos, fijo, no en
 En cada imagen y en cada paso se sortean cuatro bloques objetivo y un bloque de contexto, al que se le quitan los parches que caen en algún objetivo para que la tarea no se reduzca a copiar. Los criterios de ese sorteo se discuten en la [sección 6](#sec-mascaras). Cada parche queda en uno de tres grupos:
 
 - **contexto** (verde): la única entrada del encoder de contexto;
-- **objetivo** (coral): los parches cuya representación hay que predecir;
+- **objetivo** (rojo): los parches cuya representación hay que predecir;
 - **ninguno** (gris): no entran al encoder de contexto ni se predicen, pero sí pasan por el encoder objetivo, que procesa la imagen entera.
 
 Los objetivos no son, entonces, todo lo que el contexto no ve, sino sólo los bloques sorteados.
@@ -313,7 +313,7 @@ El código oficial difiere en dos puntos. Los objetivos se normalizan con *layer
 <div class="ot-widget" data-widget="perdida" data-alt="Animación: para cada parche del bloque, barras de la predicción y del objetivo que se van acercando durante el entrenamiento, con la distancia de cada parche y la curva de la pérdida">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Paso 6: Ilustración con vectores de 8 números; en el modelo tienen cientos. Durante el entrenamiento las barras azules (predicción) se acercan a los contornos coral (objetivo).</p>
+<p class="leyenda">Paso 6: Ilustración con vectores de 8 números; en el modelo tienen cientos. Durante el entrenamiento las barras azules (predicción) se acercan a los contornos rojo (objetivo).</p>
 ```
 :::
 
@@ -380,7 +380,7 @@ El protocolo principal es la evaluación lineal. Terminado el preentrenamiento s
 <div class="ot-widget" data-widget="resultados" data-alt="Gráfico de puntos con los resultados reportados de I-JEPA y otros métodos en evaluación lineal, con 1 por ciento de etiquetas y en tareas de bajo nivel">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Números de las tablas 1, 2 y 4 de Assran et al. (2023); los de la tabla 2 (1 % de etiquetas) son con ajuste fino o evaluación lineal según lo que mejor funcione para cada método. En coral, I-JEPA; en azul, otros métodos sin aumentos de vista diseñados a mano; en gris, los que sí los usan. Las arquitecturas y cantidades de épocas difieren, tal como en el paper.</p>
+<p class="leyenda">Números de las tablas 1, 2 y 4 de Assran et al. (2023); los de la tabla 2 (1 % de etiquetas) son con ajuste fino o evaluación lineal según lo que mejor funcione para cada método. En rojo, I-JEPA; en azul, otros métodos sin aumentos de vista diseñados a mano; en gris, los que sí los usan. Las arquitecturas y cantidades de épocas difieren, tal como en el paper.</p>
 ```
 :::
 
