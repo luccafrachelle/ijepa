@@ -497,7 +497,7 @@
     const lin = (pts, color, a) => flecha(ctx, pts, alfa(color, a), { lw: 2, cabeza: 7 });
     function columna(k, cx, a, activo) {
       const T = [['Joint-embedding', 'compara dos representaciones'], ['Generativa', 'reconstruye y en píxeles'], ['JEPA', 'predice la representación de y']][k];
-      const EJ = ['SimCLR, DINO, iBOT…', 'MAE (autoencoder enmascarado)', 'I-JEPA'][k];
+      const EJ = ['SimCLR, DINO, iBOT…', 'MAE', 'I-JEPA'][k];
       const xl = cx - 78, xr = cx + 78, col = [C.blue, C.coralD, C.teal][k];
       text(ctx, T[0], cx, 30, { color: alfa(col, a), size: 20, weight: '600', align: 'center' });
       text(ctx, T[1], cx, 53, { color: alfa(C.grey2, a), size: 14.5, align: 'center' });

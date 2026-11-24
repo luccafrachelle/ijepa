@@ -74,7 +74,7 @@ La diferencia es el conocimiento previo de cómo funciona el mundo, y casi todo 
 
 <p class="leyenda">Los módulos de la arquitectura de LeCun (2022). Figura de Dawid y LeCun (2023), notas de Les Houches. </p>
 
-## El modelo del mundo, en concreto
+## El modelo del mundo
 
 ::: {.columns}
 ::: {.column width="55%"}
@@ -99,18 +99,18 @@ Resuelve sólo esa pieza, en imágenes estáticas: sin tiempo, sin acciones y si
 :::
 :::
 
-## Predecir lo que falta. ¿Pero en qué espacio?
+## Latentes y yo, mejores amigos
 
 ::: {.columns}
 ::: {.column width="50%"}
-**Opción directa: predecir el dato**
+**predecir el dato**
 
 - Predecir los píxeles que faltan.
-- Es lo que hace un autoencoder enmascarado (MAE).
+- Es lo que hace un MAE.
 - El objetivo es fijo y no hay colapso, pero lo aprendido suele ser de menor nivel semántico.
 :::
 ::: {.column width="50%"}
-**Propuesta de LeCun: predecir una representación**
+**predecir una representación**
 
 - Codificar lo que falta con un encoder.
 - Predecir esa representación.
