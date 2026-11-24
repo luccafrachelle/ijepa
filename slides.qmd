@@ -223,7 +223,7 @@ La energía $F(x, y)$ (en una JEPA, la distancia $D(\hat s_y, s_y)$) tiene que q
 <div class="ot-widget" data-widget="mapaJepa" data-paso="4" data-alt="Diagrama de I-JEPA con el paso 4 resaltado"><canvas width="300" height="500"></canvas></div>
 </div></div>
 
-<p class="leyenda">Procesa la imagen entera y recorta los bloques a la salida: cada $s_y$ ya incorpora el resto de la imagen.</p>
+<p class="leyenda">Procesa la imagen entera y recorta los bloques a la salida: cada \(s_y\) ya incorpora el resto de la imagen.</p>
 ```
 
 ## Paso 5: El predictor

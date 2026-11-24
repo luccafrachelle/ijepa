@@ -1193,7 +1193,7 @@ Assran, Duval, Misra, Bojanowski, Vincent, Rabbat, LeCun y Ballas · CVPR 2023
 <div class="ot-widget" data-widget="mapaJepa" data-paso="4" data-alt="Diagrama de I-JEPA con el paso 4 resaltado"><canvas width="300" height="500"></canvas></div>
 </div></div>
 
-<p class="leyenda">Procesa la imagen entera y recorta los bloques a la salida: cada $s_y$ ya incorpora el resto de la imagen.</p>
+<p class="leyenda">Procesa la imagen entera y recorta los bloques a la salida: cada \(s_y\) ya incorpora el resto de la imagen.</p>
 </section>
 <section id="paso-5-el-predictor" class="slide level2">
 <h2>Paso 5: El predictor</h2>
@@ -3667,13 +3667,19 @@ window.QuartoSupport = function () {
       K.register('mapaJepa', root => {
         const cv = root.querySelector('canvas'), { ctx, W, H } = setupCanvas(cv);
         const paso = +root.dataset.paso || 0;
+        // el resaltado se prende apenas la animación principal llega a su última parada (sin esperar a que
+        // termine de moverse: el último tramo dura hasta 2,6 s y al ritmo de una charla se pasaba de slide
+        // antes de verlo, así que sólo aparecía al volver para atrás). Al entrar a la slide arranca ya en su
+        // valor (apagado si se llega avanzando, prendido si se vuelve), sin arrastrar el de la visita anterior.
         let hl = 0;
+        Object.defineProperty(root, '_hl', { get: () => hl, configurable: true });
         const terminado = () => {
           const cm = root.closest('.con-mapa'), main = cm && cm.querySelector('.paso-main .ot-widget'), P = main && main._pasos;
-          return !P || (P.i >= P.stops.length - 1 && !P.dur);
+          return !P || P.i >= P.stops.length - 1;
         };
-        K.frame(root, () => {
-          hl += ((terminado() ? 1 : 0) - hl) * 0.12; if (Math.abs(hl - Math.round(hl)) < 0.01) hl = Math.round(hl);
+        root._entrar = () => { hl = terminado() ? 1 : 0; };
+        K.frame(root, (now, dt) => {
+          hl += ((terminado() ? 1 : 0) - hl) * (1 - Math.exp(-dt / 130)); if (Math.abs(hl - Math.round(hl)) < 0.01) hl = Math.round(hl);
           const act = {}; (ACT[paso] || []).forEach(k => { act[k] = hl; });
           ctx.clearRect(0, 0, W, H);
           MAPA.dibujar(ctx, 0, 0, act, { grilla: paso === 1 });
