@@ -24,6 +24,7 @@ format:
       - widgets/m-colapso.html
       - widgets/m-intro.html
       - widgets/m-datos.html
+      - widgets/m-dinamica.html
     html-math-method: katex
     embed-resources: true
     toc: true
@@ -349,6 +350,18 @@ El momento $m$ empieza en 0,996 y sube linealmente hasta 1 a lo largo del entren
 :::
 
 Con $m = 0$ el encoder objetivo es una copia del de contexto en cada paso. A medida que $m$ se acerca a 1, la trayectoria del encoder objetivo se vuelve más suave y más atrasada: con $m = 0{,}99$ promedia más o menos los últimos 100 pasos; con $m = 0{,}996$, los últimos 250. Los objetivos $s_y$ cambian despacio y el predictor no persigue un blanco que salta en cada paso.
+
+### Cómo se ve el entrenamiento
+
+Hay una sola pérdida, y la minimizan el encoder de contexto y el predictor. El encoder objetivo no la minimiza: lo arrastra el EMA. Por eso el blanco se mueve, y la curva de pérdida no se parece a la de un problema supervisado. En mis corridas (sección 11) cae enseguida, sube durante decenas de épocas mientras la representación se enriquece y recién después baja despacio. Sin EMA queda más baja todo el tiempo, con una representación mucho peor.
+
+::: {.column-page-right}
+```{=html}
+<div class="ot-widget" data-widget="dinamica" data-alt="Pérdida de predicción y rango efectivo por época en corridas propias: con EMA la pérdida cae, sube mientras el rango crece y baja despacio; sin EMA la pérdida es menor pero el rango se estanca en 28">
+  <canvas width="1100" height="470"></canvas>
+</div>
+```
+:::
 
 ### Una pasada completa
 

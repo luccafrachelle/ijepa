@@ -27,6 +27,7 @@ format:
       - widgets/m-colapso.html
       - widgets/m-intro.html
       - widgets/m-datos.html
+      - widgets/m-dinamica.html
     include-in-header:
       text: |
         <script type="text/x-mathjax-config">
@@ -151,9 +152,9 @@ Un modelo del mundo tiene que predecir en un espacio de representaciones, porque
 </div>
 ```
 
-## Evitar el colapso: contrastivo o regularizado
+## Evitar el colapso
 
-La energía $F(x, y)$ (en una JEPA, la distancia $D(\hat s_y, s_y)$) tiene que quedar baja sobre los datos y alta en el resto. LeCun distingue dos maneras; I-JEPA usa una tercera.
+La energía $F(x, y)$ (en JEPA, la distancia $D(\hat s_y, s_y)$) tiene que quedar baja sobre los datos y alta en el resto. LeCun distingue dos maneras; I-JEPA usa una tercera.
 
 ![](img/lecun-contrastivo-regularizado.png){style="max-height:500px; width:auto; display:block; margin:4px auto 0;" fig-alt="Tres paneles: (a) paisaje de energía con la región de baja energía y las muestras de entrenamiento; (b) método contrastivo, con muestras contrastivas fuera de la región; (c) método regularizado, con flechas que comprimen la región de baja energía"}
 
@@ -274,6 +275,14 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
   <canvas width="1100" height="430"></canvas>
 </div>
 <p class="leyenda">Tian et al. (2021) analizan esta dinámica en redes lineales. En el experimento del apéndice, I-JEPA sin EMA colapsó en parte: rango efectivo final 28, contra 102 con EMA.</p>
+```
+
+## Cómo se ve el entrenamiento
+
+```{=html}
+<div class="ot-widget" data-widget="dinamica" data-alt="Pérdida de predicción y rango efectivo por época en corridas propias: con EMA la pérdida cae, sube mientras el rango crece y baja despacio; sin EMA la pérdida es menor pero el rango se estanca en 28">
+  <canvas width="1100" height="470"></canvas>
+</div>
 ```
 
 ## Una pasada completa
