@@ -28,6 +28,7 @@ format:
       - widgets/m-intro.html
       - widgets/m-datos.html
       - widgets/m-dinamica.html
+      - widgets/m-latentes.html
     include-in-header:
       text: |
         <script type="text/x-mathjax-config">
@@ -112,26 +113,19 @@ Resuelve sólo esa pieza, en imágenes estáticas: sin tiempo ni acciones, y con
 
 ## Latentes y yo, mejores amigos
 
-::: {.columns}
-::: {.column width="50%"}
-**predecir el dato**
-
-- Predecir los píxeles que faltan (MAE).
-- Si lo que falta es incierto, el error cuadrático lleva a predecir el promedio: una imagen borrosa.
-- El objetivo es fijo: no colapsa mientras $z$ lleve poca información. Pero lo aprendido suele ser de menor nivel semántico.
-:::
-::: {.column width="50%"}
-**predecir una representación**
-
-- Codificar lo que falta con un encoder.
-- Predecir esa representación.
-- El encoder puede descartar el detalle de píxel innecesario.
-:::
-:::
+```{=html}
+<div class="ot-widget" data-widget="latentes" style="width: 88%; margin: 0 auto 10px" data-alt="A una escena le falta la copa de un árbol. Hay cuatro respuestas posibles, con las frutas en lugares distintos. En el espacio de píxeles son cuatro puntos lejanos y el promedio que elige el error cuadrático tiene frutas fantasma y, con muchos futuros, es una mancha. En el espacio de representaciones las cuatro caen casi en el mismo punto y la predicción acierta">
+  <canvas width="1100" height="430"></canvas>
+</div>
+```
 
 ::: {.caja .idea}
 <span class="tag">La tesis de LeCun</span>
 Un modelo del mundo tiene que predecir en un espacio de representaciones, porque buena parte de los detalles del mundo son impredecibles e irrelevantes.
+:::
+
+::: {.notes}
+Predecir el dato (MAE, píxeles): si lo que falta es incierto, el error cuadrático lleva al promedio, que no es ninguna respuesta real, y la red gasta capacidad en detalles imposibles de adivinar. El objetivo es fijo, así que no colapsa, pero lo aprendido suele ser de menor nivel semántico. Predecir una representación: un encoder describe lo que falta y puede descartar el detalle de píxel; el objetivo casi no varía y se puede acertar. El precio: si el encoder descarta todo, también se acierta. Ese es el colapso, que viene enseguida.
 :::
 
 ## Tres maneras de armar el problema
