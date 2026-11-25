@@ -117,6 +117,7 @@ Resuelve sólo esa pieza, en imágenes estáticas: sin tiempo ni acciones, y con
 
 - Predecir los píxeles que faltan.
 - Es lo que hace un MAE.
+- Si lo que falta es incierto, el error cuadrático lleva a predecir el promedio: una imagen borrosa.
 - El objetivo es fijo: no colapsa mientras $z$ lleve poca información. Pero lo aprendido suele ser de menor nivel semántico.
 :::
 ::: {.column width="50%"}
@@ -132,14 +133,6 @@ Resuelve sólo esa pieza, en imágenes estáticas: sin tiempo ni acciones, y con
 <span class="tag">La tesis de LeCun</span>
 Un modelo del mundo tiene que predecir en un espacio de representaciones, porque buena parte de los detalles del mundo son impredecibles e irrelevantes.
 :::
-
-## El problema de predecir píxeles
-
-```{=html}
-<div class="ot-widget" data-widget="pixlat" data-alt="Un futuro posible, la predicción promedio en píxeles y la predicción en representación">
-  <canvas width="1100" height="430"></canvas>
-</div>
-```
 
 ## Tres maneras de armar el problema
 

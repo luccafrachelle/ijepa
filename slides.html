@@ -1094,6 +1094,7 @@ s_{t+1} = \text{Pred}(s_t,\ a_t,\ z_t)
 <ul>
 <li>Predecir los píxeles que faltan.</li>
 <li>Es lo que hace un MAE.</li>
+<li>Si lo que falta es incierto, el error cuadrático lleva a predecir el promedio: una imagen borrosa.</li>
 <li>El objetivo es fijo: no colapsa mientras <span class="math inline">\(z\)</span> lleve poca información. Pero lo aprendido suele ser de menor nivel semántico.</li>
 </ul>
 </div><div class="column" style="width:50%;">
@@ -1106,12 +1107,6 @@ s_{t+1} = \text{Pred}(s_t,\ a_t,\ z_t)
 </div></div>
 <div class="caja idea">
 <p><span class="tag">La tesis de LeCun</span> Un modelo del mundo tiene que predecir en un espacio de representaciones, porque buena parte de los detalles del mundo son impredecibles e irrelevantes.</p>
-</div>
-</section>
-<section id="el-problema-de-predecir-píxeles" class="slide level2">
-<h2>El problema de predecir píxeles</h2>
-<div class="ot-widget" data-widget="pixlat" data-alt="Un futuro posible, la predicción promedio en píxeles y la predicción en representación">
-  <canvas width="1100" height="430"></canvas>
 </div>
 </section>
 <section id="tres-maneras-de-armar-el-problema" class="slide level2">
