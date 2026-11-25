@@ -10,8 +10,8 @@
      s6 viaja al batch; aparecen las otras imágenes · s7 promedio del batch: la pérdida L
      s8 el gradiente de L llega al predictor y al encoder de contexto; s_y no recibe gradiente
    ema — paradas:
-     s0 inicio · s1 θ se mueve por gradiente, con ruido · s2 la fórmula del promedio móvil, por piezas
-     s3 m = 0,9 · s4 m = 0,996 · s5 m de 0,996 a 1 (I-JEPA), con el recuadro de m durante el entrenamiento */
+     s0 inicio · s1 θ se mueve por gradiente y la fórmula del promedio móvil · s2 m = 0,9
+     s3 m de 0,996 a 1 (I-JEPA), con el recuadro de m durante el entrenamiento */
 (function () {
   const K = window.OTK, A = window.OTA, C = A.C, G = A.G;
   const el = A.el, tr = A.tr;
@@ -280,7 +280,7 @@
     const optimo = k => [0.62 * Math.cos(k / 260), 0.62 * Math.sin(k / 190)];
     for (let k = 1; k < T; k++) { const p = th[k - 1], o = optimo(k); th.push([0, 1].map(d => p[d] + 0.025 * (o[d] - p[d]) + 0.032 * K.gauss(rnd))); }
     const prom = mk => { const out = [th[0].slice()]; for (let k = 1; k < T; k++) { const m = mk(k); out.push([0, 1].map(d => m * out[k - 1][d] + (1 - m) * th[k][d])); } return out; };
-    const E90 = prom(() => 0.9), E996 = prom(() => 0.996), ESCH = prom(k => 0.996 + 0.004 * k / T);
+    const E90 = prom(() => 0.9), ESCH = prom(k => 0.996 + 0.004 * k / T);
 
     // ---------------------------------------------------------------- geometría
     const P = { x: 24, y: 64, s: 292 }, Q = { x: 420, y: 92, w: 836, h: 206 }, MS = { x: 1000, y: 372, w: 240, h: 64 };
@@ -291,10 +291,8 @@
 
     const head = A.encabezado(S, 7, [
       'El encoder objetivo no recibe gradiente: sus pesos se actualizan con un promedio móvil',
-      'Los pesos $\\theta$ del encoder de contexto se mueven por gradiente, con ruido',
-      'Promedio móvil: en cada paso, $\\bar\\theta$ se acerca un poco a $\\theta$',
+      'Los pesos $\\theta$ se mueven por gradiente; en cada paso, $\\bar\\theta$ se acerca un poco a $\\theta$',
       'Con $m = 0{,}9$ el promedio sigue de cerca a $\\theta$',
-      'Con $m = 0{,}996$ promedia unos 250 pasos: el objetivo cambia despacio',
       'En I-JEPA $m$ sube de 0,996 a 1: hacia el final el encoder objetivo casi no se mueve'
     ]);
     head.set(0);
@@ -334,14 +332,14 @@
       };
       return g;
     }
-    const cTh = capa(th, C.teal, 1.4), c90 = capa(E90, C.blue, 2.2), c996 = capa(E996, C.navy, 3), cSch = capa(ESCH, C.navy, 3.6);
+    const cTh = capa(th, C.teal, 1.4), c90 = capa(E90, C.blue, 2.2), cSch = capa(ESCH, C.navy, 3.6);
 
     // leyenda
     const LEY = [['$\\theta$: encoder de contexto', C.teal, 1.4], ['$\\bar\\theta$ con $m = 0{,}9$', C.blue, 2.2],
-      ['$\\bar\\theta$ con $m = 0{,}996$', C.navy, 3], ['$\\bar\\theta$ con $m$ de 0,996 a 1 (I-JEPA)', C.navy, 3.6]].map(([s, col, lw], i) => {
+      ['$\\bar\\theta$ con $m$ de 0,996 a 1 (I-JEPA)', C.navy, 3.6]].map(([s, col, lw], i) => {
       const g = el('g', {}, S), y = 356 + i * 30;
       el('line', { x1: Q.x, x2: Q.x + 26, y1: y - 6, y2: y - 6, stroke: col, 'stroke-width': lw + 0.6, 'stroke-linecap': 'round' }, g);
-      A.texto(g, s, Q.x + 38, y, { size: 18, weight: i === 3 ? '600' : '400', color: col });
+      A.texto(g, s, Q.x + 38, y, { size: 18, weight: i === 2 ? '600' : '400', color: col });
       g.style.opacity = 0; return g;
     });
 
@@ -361,7 +359,7 @@
       [[], ['tb', 'ar'], ['tb', 'ar', 'm', 'tb2'], ['tb', 'ar', 'm', 'tb2', 'pl', 'om', 'th']],
       { cx: FX, y: 436, size: 30, gap: { ar: 8, pl: 8, tb2: -2, m: 1 }, color: { tb: C.navy, tb2: C.navy, th: C.teal, m: C.text, om: C.text, ar: C.text, pl: C.text } });
     F.set(0);
-    const valM = A.rotulos(S, ['', 'con $m = 0{,}9$: un 10 % hacia $\\theta$ por paso', 'con $m = 0{,}996$: un 0,4 % por paso', '$m$ sube de 0,996 a 1'],
+    const valM = A.rotulos(S, ['', 'con $m = 0{,}9$: un 10 % hacia $\\theta$ por paso', '$m$ sube de 0,996 a 1'],
       { x: FX, y: 478, size: 18, color: C.grey2, anchor: 'middle' });
     valM.set(0);
 
@@ -370,37 +368,26 @@
     tl.addLabel('s0', 0);
     let at = 0;
 
-    // s1: θ se mueve por gradiente, con ruido
+    // s1: θ se mueve por gradiente y aparece la fórmula del promedio móvil, por piezas
     head.a(tl, 1, at);
     tl.to(LEY[0], { opacity: 1, duration: 0.5 }, at + 0.3);
     cTh.dibuja(tl, at + 0.5, 2.4);
+    F.a(tl, 1, at + 1.4, 0.8); F.a(tl, 2, at + 2.2, 0.8); F.a(tl, 3, at + 3.0, 0.8);
     at = tl.duration(); tl.addLabel('s1', at);
 
-    // s2: la fórmula del promedio móvil, por piezas
-    head.a(tl, 2, at);
-    F.a(tl, 1, at + 0.4, 0.8); F.a(tl, 2, at + 1.2, 0.8); F.a(tl, 3, at + 2.0, 0.8);
-    at = tl.duration(); tl.addLabel('s2', at);
-
-    // s3: m = 0,9
-    head.a(tl, 3, at); valM.a(tl, 1, at + 0.2);
+    // s2: m = 0,9
+    head.a(tl, 2, at); valM.a(tl, 1, at + 0.2);
     tl.to(cTh, { opacity: 0.45, duration: 0.6 }, at + 0.3).to(LEY[1], { opacity: 1, duration: 0.5 }, at + 0.4);
     c90.dibuja(tl, at + 0.7, 2.4);
-    at = tl.duration(); tl.addLabel('s3', at);
+    at = tl.duration(); tl.addLabel('s2', at);
 
-    // s4: m = 0,996
-    head.a(tl, 4, at); valM.a(tl, 2, at + 0.2);
+    // s3: m sube de 0,996 a 1 (I-JEPA)
+    head.a(tl, 3, at); valM.a(tl, 2, at + 0.2);
     tl.to(c90, { opacity: 0.25, duration: 0.6 }, at + 0.3).to(LEY[1], { opacity: 0.45, duration: 0.6 }, at + 0.3)
-      .to(LEY[2], { opacity: 1, duration: 0.5 }, at + 0.4);
-    c996.dibuja(tl, at + 0.7, 2.4);
-    at = tl.duration(); tl.addLabel('s4', at);
-
-    // s5: m sube de 0,996 a 1 (I-JEPA)
-    head.a(tl, 5, at); valM.a(tl, 3, at + 0.2);
-    tl.to(c996, { opacity: 0.3, duration: 0.6 }, at + 0.3).to(LEY[2], { opacity: 0.5, duration: 0.6 }, at + 0.3)
-      .to(LEY[3], { opacity: 1, duration: 0.5 }, at + 0.4).to(gM, { opacity: 1, duration: 0.5 }, at + 0.4);
+      .to(LEY[2], { opacity: 1, duration: 0.5 }, at + 0.4).to(gM, { opacity: 1, duration: 0.5 }, at + 0.4);
     cSch.dibuja(tl, at + 0.8, 2.6);
     tl.to(lineaM, { attr: { 'stroke-dashoffset': 0 }, duration: 2.6, ease: 'none' }, at + 0.8);
-    at = tl.duration(); tl.addLabel('s5', at);
+    at = tl.duration(); tl.addLabel('s3', at);
 
     A.pasos(root, tl);
   }

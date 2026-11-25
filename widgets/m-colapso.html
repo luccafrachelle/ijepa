@@ -3,7 +3,7 @@
    Reemplazan a los de widgets/ijepa.html con el mismo nombre:
      tres          tres familias de arquitecturas, una columna por vez        s0 … s4
      colapsoPasos  la pérdida no distingue la solución buena del colapso      s0 … s5
-     noColapsa     stop-gradient y EMA, escenario por escenario               s0 … s4
+     noColapsa     stop-gradient y EMA; escenario y movimiento en paradas aparte s0 … s9
      colapso       simulación real (encoder lineal 4→2, predictor 2×2), sólo en el blog;
                    se precalcula al construir y se anima por tramos           s0 … s4
    Los valores que dependen de un estado continuo (pérdida, dispersión, la nube de la simulación) se
@@ -411,23 +411,27 @@
     const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
     tl.addLabel('s0', 0);
     let at = 0;
+    // cada parte en su propia parada: primero el escenario (título y nota), después el movimiento
+    const parada = () => { at = tl.duration(); n += 1; tl.addLabel('s' + n, at); };
+    let n = 0;
     for (let k = 1; k <= 4; k++) {
+      // a) el escenario: título, nota y, desde el 2, vuelta a la configuración inicial
       head.a(tl, k, at);
-      if (k > 1) va(tl, PX, k - 1, k - 1 + VUELTA, at + 0.5, 1.0);
-      if (k === 4) tl.to(recta, { opacity: 1, duration: 0.8 }, at + 1.6);
-      let t0 = at + (k > 1 ? 1.6 : 0.6);
-      const tNota = t0 + 0.3;
-      if (k === 2) {                       // primero se ve el gradiente con el objetivo quieto, después se mueve
-        tl.to(quieto, { opacity: 1, duration: 0.5 }, t0);
-        GR.forEach((g, i) => { tl.set(g, { opacity: 1 }, t0 + 0.3 + 0.12 * i); A.trazar(tl, g, t0 + 0.3 + 0.12 * i, 0.7); });
-        t0 += 1.8;
-        tl.to(GR, { opacity: 0, duration: 0.6 }, t0 + 1.0);
-      }
+      if (k > 1) va(tl, PX, k - 1, k - 1 + VUELTA, at + 0.3, 1.0);
       if (k === 3) tl.to(quieto, { opacity: 0, duration: 0.4 }, at + 0.3);
-      va(tl, PX, k > 1 ? k - 1 + VUELTA : 0, k, t0, 2.2);
-      NOTA.a(tl, k, tNota);
-      if (k === 4) { /* la recta queda */ }
-      at = tl.duration(); tl.addLabel('s' + k, at);
+      NOTA.a(tl, k, at + 0.4);
+      parada();
+      // b) en el 2, el gradiente con el objetivo quieto
+      if (k === 2) {
+        tl.to(quieto, { opacity: 1, duration: 0.5 }, at + 0.2);
+        GR.forEach((g, i) => { tl.set(g, { opacity: 1 }, at + 0.4 + 0.12 * i); A.trazar(tl, g, at + 0.4 + 0.12 * i, 0.7); });
+        parada();
+        tl.to(GR, { opacity: 0, duration: 0.6 }, at + 1.2);
+      }
+      // c) el movimiento
+      if (k === 4) tl.to(recta, { opacity: 1, duration: 0.8 }, at + 0.2);
+      va(tl, PX, k > 1 ? k - 1 + VUELTA : 0, k, at + 0.2, 2.2);
+      parada();
     }
     A.pasos(root, tl);
   }
