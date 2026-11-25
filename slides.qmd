@@ -340,7 +340,7 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 ::: {#refs .refs-col}
 :::
 
-<p class="credito"><strong>Declaración de uso de IA.</strong> Usé un asistente de IA (Claude, de Anthropic) para programar las animaciones, autocompletar algunas fórmulas y otras tareas de apoyo. Los experimentos y su código también los hizo en su mayoría el asistente. Todo tuvo intervención humana: yo guié el proceso y revisé y corregí cada resultado.</p>
+<p class="credito ia"><strong>Declaración de uso de IA:</strong> Se usó Claude Opus 5.5 para programar las animaciones, autocompletar algunas fórmulas y otras tareas de apoyo. Los experimentos y su código también los hizo en su mayoría Claude. Todo el proceso tuvo intervención humana en todas sus partes.</p>
 
 ## Gracias por su atención {.section-break background-color="#0f3460"}
 
