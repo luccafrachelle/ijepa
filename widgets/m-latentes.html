@@ -1,0 +1,187 @@
+<script>
+/* m-latentes: «Latentes y yo» — por qué predecir en representación y no en píxeles (SVG + GSAP).
+   latentes (1100×430, ancho completo):
+     s0 contexto: falta la copa del árbol · s1 cuatro respuestas posibles (frutas en otro lugar)
+     s2 en el espacio de píxeles son cuatro puntos lejanos · s3 el error cuadrático elige el promedio: frutas fantasma
+     s4 con muchos futuros el promedio es una mancha · s5 un encoder: en representación caen juntas
+     s6 la predicción ŝ_y acierta: lo impredecible quedó afuera */
+(function () {
+  const K = window.OTK, A = window.OTA, C = A.C;
+  const el = A.el, tr = A.tr;
+  const ORO = '#d9a520', VERDE = '#4f8f5a', VERDE_O = '#3b7446', CIELO = '#e7eff6', TRONCO = '#8a6a4f';
+
+  K.register('latentes', root => {
+    const S = A.svg(root, 1100, 430);
+    A.cuandoFuentes(() => latentes(root, S));
+  });
+
+  function latentes(root, S) {
+    const r = K.mulberry(7);
+    // cada futuro: la misma copa, con hojas oscuras y cinco frutas en lugares al azar
+    const FUT = [0, 1, 2, 3].map(() => {
+      const punto = (rmax) => { const a = r() * 2 * Math.PI, d = Math.sqrt(r()) * rmax; return [Math.cos(a) * d, Math.sin(a) * d - 0.06]; };
+      return { hojas: [...Array(6)].map(() => punto(0.3)), frutas: [...Array(5)].map(() => punto(0.3)) };
+    });
+    // copa en un cuadrado de lado s con esquina en (x, y); f: índice del futuro, o 'media' (promedio de muchos)
+    function copa(padre, x, y, s, f) {
+      const g = el('g', {}, padre), cx = x + s / 2, cy = y + s * 0.44;
+      el('rect', { x, y, width: s, height: s, fill: CIELO }, g);
+      el('rect', { x: cx - s * 0.05, y: cy + s * 0.25, width: s * 0.1, height: s * 0.31, fill: TRONCO }, g);
+      if (f === 'media') {
+        el('circle', { cx, cy, r: s * 0.38, fill: '#6b9a4e', filter: `url(#${blur})` }, g);
+      } else {
+        el('circle', { cx, cy, r: s * 0.38, fill: VERDE }, g);
+        FUT[f].hojas.forEach(([u, v]) => el('circle', { cx: cx + u * s, cy: cy + v * s + s * 0.06, r: s * 0.07, fill: VERDE_O }, g));
+        FUT[f].frutas.forEach(([u, v]) => el('circle', { cx: cx + u * s, cy: cy + v * s + s * 0.06, r: s * 0.055, fill: ORO, stroke: '#a57a10', 'stroke-width': s * 0.01 }, g));
+      }
+      el('rect', { x, y, width: s, height: s, fill: 'none', stroke: C.grid, 'stroke-width': 1.5 }, g);
+      return g;
+    }
+    const blur = S.uid('blur');
+    const fb = el('filter', { id: blur, x: '-30%', y: '-30%', width: '160%', height: '160%' }, S.defs);
+    el('feGaussianBlur', { stdDeviation: 5 }, fb);
+
+    const oculto = (...els) => els.forEach(e => { e.style.opacity = 0; });
+    const aparece = (tl, e, at, dur = 0.55) =>
+      tl.fromTo(e, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: dur, immediateRender: false }, at);
+
+    const head = A.rotulos(S, [
+      'Falta un pedazo de la imagen: ¿qué va ahí?',
+      'Hay muchas respuestas posibles: que hay un árbol es seguro, dónde están las frutas no',
+      'En el espacio de píxeles, cada respuesta es un punto, lejos de las demás',
+      'El error cuadrático elige el promedio: frutas fantasma, no es ninguna de las cuatro',
+      'Con muchos futuros, el promedio es una mancha borrosa',
+      'Un encoder describe cada respuesta: en representación caen casi en el mismo lugar',
+      'Ahí el objetivo casi no varía: la predicción puede acertar'
+    ], { x: 0, y: 30, size: 22, weight: '600', color: C.navy });
+    head.set(0);
+
+    // -------------------------------------------------- contexto: escena con la copa tapada
+    const X0 = 0, Y0 = 62, E = 190, Q = { x: X0 + 40, y: Y0 + 12, s: 110 };
+    el('rect', { x: X0, y: Y0, width: E, height: E, fill: CIELO }, S);
+    el('rect', { x: X0, y: Y0 + E * 0.76, width: E, height: E * 0.24, fill: '#cfe3c4' }, S);
+    el('rect', { x: X0 + E / 2 - 6, y: Q.y + Q.s - 4, width: 12, height: Y0 + E * 0.8 - (Q.y + Q.s - 4), fill: TRONCO }, S);
+    el('circle', { cx: X0 + 160, cy: Y0 + 26, r: 13, fill: '#f2d27a' }, S);
+    el('rect', { x: Q.x, y: Q.y, width: Q.s, height: Q.s, fill: '#c9ccd6', stroke: C.grey, 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }, S);
+    A.texto(S, '?', Q.x + Q.s / 2, Q.y + Q.s / 2 + 14, { size: 40, weight: '600', color: '#fff', anchor: 'middle' });
+    el('rect', { x: X0, y: Y0, width: E, height: E, fill: 'none', stroke: C.grid, 'stroke-width': 1.5 }, S);
+    A.texto(S, 'contexto', X0, Y0 + E + 28, { size: 19, weight: '600', color: C.navy });
+    A.texto(S, 'lo gris es lo que', X0, Y0 + E + 54, { size: 18, color: C.grey2 });
+    A.texto(S, 'hay que predecir', X0, Y0 + E + 77, { size: 18, color: C.grey2 });
+
+    // -------------------------------------------------- columna de futuros posibles
+    const FX = 214, FS = 72, FY = k => 62 + k * 84;
+        const futs = [0, 1, 2, 3].map(k => copa(S, FX, FY(k), FS, k));
+    oculto(...futs);
+
+    // -------------------------------------------------- paneles
+    const panel = (x, titulo, sub, col) => {
+      const g = el('g', {}, S);
+      el('rect', { x, y: 54, width: 370, height: 336, rx: 12, fill: C.light, stroke: C.grid, 'stroke-width': 1.5 }, g);
+      A.texto(g, titulo, x + 16, 82, { size: 20, weight: '600', color: col });
+      A.texto(g, sub, x + 354, 82, { size: 17, color: C.grey2, anchor: 'end' });
+      return g;
+    };
+    const PP = { x: 314, cx: 499, cy: 240 }, PR = { x: 720, cx: 905, cy: 240 };
+    const panP = panel(PP.x, 'Píxeles', 'miles de dimensiones', C.coralD);
+    const panR = panel(PR.x, 'Representación', 'salida del encoder', C.teal);
+    oculto(panP, panR);
+
+    // en el panel de píxeles: los cuatro futuros, lejos entre sí
+    const ESQ = [[-118, -88], [118, -88], [-118, 92], [118, 92]], MS = 66;
+    const lineas = ESQ.map(([dx, dy]) => {
+      const L = Math.hypot(dx, dy), k = 46 / L, k2 = (L - 40) / L;
+      const l = el('line', { x1: PP.cx + dx * k, y1: PP.cy + dy * k, x2: PP.cx + dx * k2, y2: PP.cy + dy * k2, stroke: C.coralD, 'stroke-width': 2, 'stroke-dasharray': '6 5' }, S);
+      l.style.opacity = 0; return l;
+    });
+    // copias que viajan: centradas en el origen, se ubican con transform
+    const viaje = k => { const g = el('g', { transform: tr(FX + FS / 2, FY(k) + FS / 2, 1) }, S); copa(g, -FS / 2, -FS / 2, FS, k); g.style.opacity = 0; return g; };
+    const enP = [0, 1, 2, 3].map(viaje);
+    // el promedio de las cuatro (capa k con opacidad 1/(k+1)) y el de muchas
+    const capas = [0, 1, 2, 3].map(viaje);
+    const media = el('g', { transform: tr(PP.cx, PP.cy, 84 / FS) }, S); copa(media, -FS / 2, -FS / 2, FS, 'media'); media.style.opacity = 0;
+    const marcoM = el('rect', { x: PP.cx - 44, y: PP.cy - 44, width: 88, height: 88, rx: 3, fill: 'none', stroke: C.coralD, 'stroke-width': 3 }, S);
+    marcoM.style.opacity = 0;
+    const notaP = [A.texto(S, 'promedio de 4: frutas a medias', PP.x, 416, { size: 17, color: C.coralD }),
+                   A.texto(S, 'promedio de muchos: una mancha', PP.x, 416, { size: 17, color: C.coralD })];
+    oculto(...notaP);
+
+    // en el panel de representación: puntos casi juntos
+    const CL = [[-14, -8], [10, -12], [-8, 12], [14, 7]];
+    const enR = [0, 1, 2, 3].map(viaje);
+    const puntos = CL.map(([dx, dy]) => { const c = el('circle', { cx: PR.cx + dx, cy: PR.cy + dy, r: 7, fill: C.teal }, S); c.style.opacity = 0; return c; });
+    const desc = el('g', {}, S);
+    A.texto(desc, '«árbol, copa redonda,', PR.cx, PR.cy + 76, { size: 18, color: C.teal, anchor: 'middle' });
+    A.texto(desc, 'con frutas»', PR.cx, PR.cy + 100, { size: 18, color: C.teal, anchor: 'middle' });
+    const anillo = el('circle', { cx: PR.cx, cy: PR.cy, r: 34, fill: 'none', stroke: C.blue, 'stroke-width': 3 }, S);
+    const rotAn = el('g', {}, S); A.texto(rotAn, 'predicción $\\hat s_y$', PR.cx + 44, PR.cy - 38, { size: 19, weight: '600', color: C.blue });
+    const notaR = A.texto(S, 'dónde va cada fruta queda afuera', PR.x, 416, { size: 17, color: C.teal });
+    oculto(desc, anillo, rotAn, notaR);
+
+    // -------------------------------------------------- línea de tiempo
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
+    tl.addLabel('s0', 0);
+    let at = 0;
+
+    // s1: aparecen los futuros, uno por uno
+    head.a(tl, 1, at);
+    futs.forEach((f, k) => aparece(tl, f, at + 0.6 + 0.55 * k, 0.6));
+    at = tl.duration(); tl.addLabel('s1', at);
+
+    // s2: el panel de píxeles; cada futuro viaja a su esquina
+    head.a(tl, 2, at);
+    aparece(tl, panP, at + 0.3);
+    enP.forEach((g, k) => {
+      const t = at + 1.0 + 0.5 * k, [dx, dy] = ESQ[k];
+      tl.to(g, { opacity: 1, duration: 0.15 }, t)
+        .to(g, { attr: { transform: tr(PP.cx + dx, PP.cy + dy, MS / FS) }, duration: 1.0 }, t + 0.05);
+    });
+    at = tl.duration(); tl.addLabel('s2', at);
+
+    // s3: el promedio: una copia de cada futuro va al centro y se apila (resultado: el promedio exacto de las cuatro)
+    head.a(tl, 3, at);
+    capas.forEach((g, k) => {
+      const t = at + 0.5 + 0.6 * k, [dx, dy] = ESQ[k];
+      tl.set(g, { attr: { transform: tr(PP.cx + dx, PP.cy + dy, MS / FS) } }, t)
+        .to(g, { opacity: 1, duration: 0.15 }, t)
+        .to(g, { attr: { transform: tr(PP.cx, PP.cy, 84 / FS) }, duration: 0.9 }, t + 0.05)
+        .to(g, { opacity: 1 / (k + 1), duration: 0.4 }, t + 0.7);
+    });
+    tl.to(marcoM, { opacity: 1, duration: 0.4 }, at + 2.9);
+    lineas.forEach((l, k) => tl.to(l, { opacity: 1, duration: 0.4 }, at + 3.1 + 0.15 * k));
+    aparece(tl, notaP[0], at + 3.3);
+    at = tl.duration(); tl.addLabel('s3', at);
+
+    // s4: con muchos futuros, el promedio pierde las frutas y se vuelve una mancha
+    head.a(tl, 4, at);
+    tl.to(media, { opacity: 1, duration: 1.4 }, at + 0.4)
+      .to(capas, { opacity: 0, duration: 1.0 }, at + 0.9)
+      .to(notaP[0], { opacity: 0, duration: 0.35 }, at + 0.4);
+    aparece(tl, notaP[1], at + 0.8);
+    at = tl.duration(); tl.addLabel('s4', at);
+
+    // s5: el encoder: cada futuro viaja al panel de representación y se vuelve un punto
+    head.a(tl, 5, at);
+    aparece(tl, panR, at + 0.3);
+    enR.forEach((g, k) => {
+      const t = at + 1.0 + 0.5 * k, [dx, dy] = ESQ[k], [cx, cy] = CL[k];
+      tl.set(g, { attr: { transform: tr(PP.cx + dx, PP.cy + dy, MS / FS) } }, t)
+        .to(g, { opacity: 1, duration: 0.15 }, t)
+        .to(g, { attr: { transform: tr(PR.cx + cx, PR.cy + cy, 0.2) }, duration: 1.1 }, t + 0.05)
+        .to(g, { opacity: 0, duration: 0.25 }, t + 1.0)
+        .to(puntos[k], { opacity: 1, duration: 0.25 }, t + 1.0);
+    });
+    aparece(tl, desc, at + 3.2);
+    at = tl.duration(); tl.addLabel('s5', at);
+
+    // s6: la predicción en representación cae sobre los cuatro
+    head.a(tl, 6, at);
+    tl.fromTo(anillo, { opacity: 0, attr: { r: 70 } }, { opacity: 1, attr: { r: 34 }, duration: 0.9, immediateRender: false }, at + 0.4);
+    aparece(tl, rotAn, at + 1.0);
+    aparece(tl, notaR, at + 1.5);
+    at = tl.duration(); tl.addLabel('s6', at);
+
+    A.pasos(root, tl);
+  }
+})();
+</script>
