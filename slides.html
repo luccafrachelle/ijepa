@@ -1224,7 +1224,7 @@ Assran, Duval, Misra, Bojanowski, Vincent, Rabbat, LeCun y Ballas · CVPR 2023
 <div class="ot-widget" data-widget="noColapsa" data-alt="Cinco imágenes con su predicción y su objetivo: con gradiente por las dos ramas se juntan en un punto; con stop-gradient el objetivo queda fijo; con EMA se mueve despacio y sigue separado; sin EMA la nube se aplasta">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Tian et al. (2021) analizan esta dinámica en redes lineales. En el experimento del apéndice, I-JEPA sin EMA colapsó en parte: rango efectivo final 28, contra 102 con EMA.</p>
+
 </section>
 <section id="una-pasada-completa" class="slide level2">
 <h2>Una pasada completa</h2>
@@ -7317,10 +7317,10 @@ window.QuartoSupport = function () {
 
         const head = titulos(S, [
           ['Pesos al azar: las representaciones ya arrancan dispersas', C.navy],
-          ['Si el gradiente pasara por las dos ramas, ambas se juntan en un punto', C.coralD],
+          ['Si el gradiente pasara por las dos ramas, podrían terminar en un punto', C.coralD],
           ['Stop-gradient: en este paso el objetivo está quieto', C.teal],
           ['Después del paso, el EMA corre el objetivo un poquito', C.teal],
-          ['Sin EMA (m = 0), el objetivo cambia con cada paso y la nube se aplasta', C.coralD]
+          ['Sin EMA (m = 0), el objetivo cambia con cada paso y la nube se puede aplastar', C.coralD]
         ], { y: 32 });
         head.set(0);
 
@@ -7353,10 +7353,10 @@ window.QuartoSupport = function () {
         const V = filaY.map(y => texto0(S, RX, y + 34, { size: 27, weight: '600' }));
         const NOTA = seq([
           'Con pesos al azar, imágenes distintas ya dan representaciones distintas. La pérdida sólo pide que cada predicción caiga sobre su objetivo.',
-          'Mover las dos salidas hacia la misma constante es el camino más corto a pérdida cero: colapso.',
-          'El gradiente mueve θ suponiendo que θ̄ no se mueve. Lo mejor que puede hacer es acercar cada predicción a su objetivo, que ya está separado de los demás: nada tira hacia el colapso.',
+          'Una salida constante también da pérdida cero, y con gradiente por las dos ramas la pérdida no la descarta. La animación muestra ese caso posible, no una dinámica demostrada.',
+          'El gradiente mueve θ suponiendo que θ̄ no se mueve. Lo mejor que puede hacer es acercar cada predicción a su objetivo, que ya está separado de los demás: la pérdida no premia juntar los objetivos.',
           'El objetivo avanza una fracción 1 − m hacia el encoder de contexto. Se desplaza despacio y sigue separado: viene de un encoder que todavía distingue las imágenes.',
-          'Sin el promedio lento, predicción y objetivo se mueven juntos y la representación pierde dimensiones.'
+          'Sin el promedio lento, predicción y objetivo se mueven juntos y la representación puede perder dimensiones, como pasó en parte en el experimento del apéndice.'
         ].map(s => parrafo(S, s, RX, 324, 660, { size: 19, lh: 26, color: C.navy })));
         NOTA.set(0);
         A.texto(S, 'Esquema. La solución trivial sigue existiendo; hay resultados teóricos sobre por qué la dinámica la evita (Tian et al., 2021).', 0, 446, { size: 18, color: C.grey2 });
