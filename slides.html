@@ -1227,29 +1227,6 @@ Assran, Duval, Misra, Bojanowski, Vincent, Rabbat, LeCun y Ballas · CVPR 2023
 </div>
 <p class="leyenda">Tian et al. (2021) analizan esta dinámica en redes lineales. En el experimento del apéndice, I-JEPA sin EMA colapsó en parte: rango efectivo final 28, contra 102 con EMA.</p>
 </section>
-<section id="el-stop-gradient-con-el-tiempo-explícito" class="slide level2">
-<h2>El stop-gradient, con el tiempo explícito</h2>
-<p>En el paso <span class="math inline">\(t\)</span> la pérdida es <span class="math inline">\(L(\theta_t, \bar\theta_t)\)</span>, y el EMA da <span class="math display">\[
-\bar\theta_t = m\,\bar\theta_{t-1} + (1-m)\,\theta_{t-1}
-\]</span></p>
-<div class="columns">
-<div class="column" style="width:50%;">
-<div class="caja idea">
-<p><span class="tag">Lo que no se ignora</span> <span class="math inline">\(\bar\theta_t\)</span> depende de los <span class="math inline">\(\theta\)</span> del pasado, no de <span class="math inline">\(\theta_t\)</span>. Tratarlo como fijo al derivar respecto de <span class="math inline">\(\theta_t\)</span> es exacto en ese paso.</p>
-</div>
-</div><div class="column" style="width:50%;">
-<div class="caja prueba">
-<p><span class="tag">Lo que sí se ignora</span> El <span class="math inline">\(\theta_t\)</span> de hoy entra en el objetivo de mañana, <span class="math inline">\(\bar\theta_{t+1}\)</span>. La actualización es miope: como en las GAN, no hay una pérdida fija que se minimice en <span class="math inline">\(\theta\)</span> y <span class="math inline">\(\bar\theta\)</span> a la vez (Grill et al., 2020).</p>
-</div>
-</div></div>
-<p>Si el gradiente viera esa vía, el atajo sería llevar el objetivo a una constante: colapso. Cortarla deja como única salida predecir mejor contra objetivos que ya están dispersos.</p>
-</section>
-<section id="cómo-se-ve-el-entrenamiento" class="slide level2">
-<h2>Cómo se ve el entrenamiento</h2>
-<div class="ot-widget" data-widget="dinamica" data-alt="Pérdida de predicción y rango efectivo por época en corridas propias: con EMA la pérdida cae, sube mientras el rango crece y baja despacio; sin EMA la pérdida es menor pero el rango se estanca en 28">
-  <canvas width="1100" height="470"></canvas>
-</div>
-</section>
 <section id="una-pasada-completa" class="slide level2">
 <h2>Una pasada completa</h2>
 <div class="ot-widget" data-widget="pasada" data-alt="Diagrama de I-JEPA que se prende etapa por etapa: tokens, máscaras, encoder de contexto, encoder objetivo, predictor, pérdida, gradiente y EMA">
