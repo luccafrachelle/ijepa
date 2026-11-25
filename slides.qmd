@@ -54,6 +54,11 @@ format:
 </div>
 
 ## Intro
+![](img/lecun-eth.webp){style="max-height:480px; width:auto; display:block; margin:0 auto; border-radius:8px;" fig-alt="Yann LeCun en ETH Zürich frente a su slide «Recommendations to my fellow AI scientists»: abandonar los modelos generativos, los probabilísticos, los métodos contrastivos y el aprendizaje por refuerzo; y en rojo: «If you are interested in human-level AI, don't work on LLMs»"}
+
+<p class="credito">Yann LeCun, «World Models: Enabling the next AI revolution», ciclo Frontiers of Embodied AI, ETH Zürich, 2026.</p>
+
+## Intro
 
 ::: {.grande}
 Un adolescente aprende a manejar en unas 20 horas (a mí me llevó bastante más).
@@ -71,11 +76,7 @@ La diferencia es el conocimiento previo de cómo funciona el mundo, y casi todo 
 
 <p class="sub">LeCun (2022), *A Path Towards Autonomous Machine Intelligence*</p>
 
-## Mi historia con Yann LeCun
 
-![](img/lecun-eth.webp){style="max-height:480px; width:auto; display:block; margin:0 auto; border-radius:8px;" fig-alt="Yann LeCun en ETH Zürich frente a su slide «Recommendations to my fellow AI scientists»: abandonar los modelos generativos, los probabilísticos, los métodos contrastivos y el aprendizaje por refuerzo; y en rojo: «If you are interested in human-level AI, don't work on LLMs»"}
-
-<p class="credito">Yann LeCun, «World Models: Enabling the next AI revolution», ciclo Frontiers of Embodied AI, ETH Zürich, 2026.</p>
 
 ## Una arquitectura para un agente que predice
 
@@ -307,6 +308,17 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 </div>
 <p class="leyenda">Lo distintivo es el costo: un ViT-H/14 en menos de 72 h con 16 A100; una sola vista frente a iBOT, ~5× menos iteraciones que MAE. El 81,1 es a 448 px; el resto, a 224.</p>
 ```
+
+## Qué aprende el predictor
+
+![](img/predictor.webp){style="max-height:330px; width:auto; display:block; margin:0 auto;" fig-alt="Figura 6 del paper: para varias imágenes, la original, el contexto visible y varias muestras generadas a partir de la salida del predictor dentro de un recuadro verde"}
+
+<p class="credito">Figura 6 de Assran et al. (2023). Original, contexto visible y muestras de un decoder generativo (RCDM, entrenado aparte y sólo para visualizar) que lleva a píxeles la salida del predictor en el recuadro verde.</p>
+
+::: {style="font-size:0.78em"}
+- Lo que se repite entre muestras es lo que la predicción contiene: la parte del objeto y su pose (el lomo del pájaro, el techo del auto).
+- Lo que varía, el detalle fino y el fondo, queda afuera. Una sola predicción por bloque: no hay $z$ latente para varios desenlaces.
+:::
 
 ## Problemas y qué fue después
 

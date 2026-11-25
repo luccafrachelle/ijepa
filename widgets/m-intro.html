@@ -320,7 +320,7 @@
       A.texto(c, extra, RX2, y + 36, { size: 19, color: C.grey2, anchor: 'end' });
       oculto(g, c); return { g, c };
     };
-    const gObj = grupo(98, C.coralD, { fill: C.coral, op: 0.75, stroke: C.coralD }, ['4 bloques objetivo', 'escala 0,15–0,2 · aspecto 0,75–1,5', 'un tamaño por lote; pueden superponerse'], nObj, 'parches');
+    const gObj = grupo(98, C.coralD, { fill: C.coral, op: 0.75, stroke: C.coralD }, ['4 bloques objetivo', 'escala 0,15–0,2 · aspecto 0,75–1,5', 'un tamaño por batch; pueden superponerse'], nObj, 'parches');
     const gCtx = grupo(196, C.teal, { fill: C.teal, op: 0.35, stroke: C.teal }, ['1 bloque de contexto', 'escala 0,85–1, cuadrado', 'sin los parches objetivo'], nCtx, 'parches (' + Math.round(100 * nCtx / NT) + ' %)');
     const gGris = grupo(294, C.grey2, { fill: '#8c91a0', op: 0.8 }, ['ni contexto ni objetivo', 'sólo lo ve el encoder objetivo'], nGris, 'parches');
     const seps = [168, 266].map(y => { const l = el('line', { x1: RX, y1: y, x2: RX2, y2: y, stroke: C.grid, 'stroke-width': 1.2 }, S); l.style.opacity = 0; return l; });

@@ -121,7 +121,7 @@
   }
 
   // ============================================================ regularizadores, por arriba
-  // Paradas (las cuatro del texto del blog): s0 el lote · s1 qué hace cada término ·
+  // Paradas (las cuatro del texto del blog): s0 el batch · s1 qué hace cada término ·
   // s2 sombra sobre una dirección e histograma · s3 muchas direcciones
   K.register('regs', root => {
     const S = A.svg(root, 1100, 440);
@@ -161,7 +161,7 @@
       const x0 = 8 + j * 366, cx = x0 + 172, hx = x0 + 22;
       const G = el('g', {}, S);
       A.texto(G, pan.titulo, x0 + 8, 26, { size: 19, weight: '600', color: pan.col });
-      const sub = A.rotulos(G, ['el mismo lote de embeddings', pan.sub], { x: x0 + 8, y: 50, size: 15, color: C.grey2 }); sub.set(0);
+      const sub = A.rotulos(G, ['el mismo batch de embeddings', pan.sub], { x: x0 + 8, y: 50, size: 15, color: C.grey2 }); sub.set(0);
       const clip = S.uid('clip');
       el('rect', { x: x0 + 6, y: 60, width: 340, height: 200 }, el('clipPath', { id: clip }, S.defs));
       const Z = el('g', { 'clip-path': `url(#${clip})` }, G);
@@ -204,7 +204,7 @@
         curva = el('path', { d, fill: 'none', stroke: C.navy, 'stroke-width': 2 }, H);
         curva.style.opacity = 0;
       }
-      A.texto(H, j === 0 ? 'sombra del lote sobre la dirección' : 'sombra del lote (barras) y la buscada (línea)', hx - 4, HB.y + HB.h + 26, { size: 15, color: C.grey2 });
+      A.texto(H, j === 0 ? 'sombra del batch sobre la dirección' : 'sombra del batch (barras) y la buscada (línea)', hx - 4, HB.y + HB.h + 26, { size: 15, color: C.grey2 });
       const alturas = PHI.map(a => hist(FIN[j], a));
       return { j, cx, sub, forma, rastro, conect, dots, dir, recta, sombras, H, barras, curva, alturas };
     });
@@ -213,16 +213,16 @@
     el('rect', { x: 0, y: 384, width: 34, height: 32, rx: 8, fill: C.blue }, S);
     const num = A.rotulos(S, ['1', '2', '3', '4'], { x: 17, y: 407, size: 20, weight: '600', color: '#fff', anchor: 'middle' }); num.set(0);
     const nota = rotulos2(S, [
-      ['Cada punto es el embedding de una imagen del lote', 'Esquema en 2D; en el experimento, 256 dimensiones.'],
-      ['Sin regularizador nada impide el colapso dimensional;', 'cada regularizador empuja el lote hacia una forma fija.'],
-      ['Para medir la forma, el lote se proyecta sobre una dirección al azar', 'y esa sombra se compara con la de la forma buscada.'],
+      ['Cada punto es el embedding de una imagen del batch', 'Esquema en 2D; en el experimento, 256 dimensiones.'],
+      ['Sin regularizador nada impide el colapso dimensional;', 'cada regularizador empuja el batch hacia una forma fija.'],
+      ['Para medir la forma, el batch se proyecta sobre una dirección al azar', 'y esa sombra se compara con la de la forma buscada.'],
       ['Se repite con muchas direcciones (1024 por paso):', 'si todas las sombras coinciden, la distribución coincide.']
     ], { x: 48, y: 398, dy: 24, size: 17, color: C.navy });
     nota.set(0);
 
     const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
     tl.addLabel('s0', 0);
-    // s1: cada regularizador lleva el lote a su forma
+    // s1: cada regularizador lleva el batch a su forma
     let at = 0;
     num.a(tl, 1, at); nota.a(tl, 1, at);
     P.forEach(p => {

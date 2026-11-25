@@ -25,7 +25,7 @@ El detalle completo está en [`PLAN.md`](PLAN.md) (diseño, fijado antes de corr
 | Encoder | ViT-Tiny/16, 224 px, sin CLS |
 | Predictor | profundidad 6, ancho 192 |
 | Datos | ImageNet-100 (`clane9/imagenet-100`) |
-| Entrenamiento | 100 épocas, lote 256, AdamW |
+| Entrenamiento | 100 épocas, batch 256, AdamW |
 | Tasa de aprendizaje | pico 2,5e-4 |
 | EMA | 0,996 → 1 |
 | λ | 0,05 (barrido sin EMA) |

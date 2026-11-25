@@ -53,7 +53,7 @@ Las afirmaciones sobre el método se contrastaron con el paper (arXiv 2301.08243
 
 - La pérdida es L2 al cuadrado en el paper y smooth L1 en el código.
 - El código no usa *gradient clipping*.
-- El tamaño de los bloques de las máscaras se sortea una vez por lote.
+- El tamaño de los bloques de las máscaras se sortea una vez por batch.
 - Los resultados con 1 % de etiquetas se obtienen con ajuste fino.
 
 Los números del experimento se contrastaron con las corridas guardadas en `experimentos/ijepa-sphere/runs/`.

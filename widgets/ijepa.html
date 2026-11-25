@@ -802,7 +802,7 @@
         text(ctx, tit, LX + 40, y + 4, { color: on ? C.navy : ya ? alfa(C.navy, 0.6) : C.grey2, size: on ? 17 : 15, weight: on ? '700' : '600' });
         if (on) K.rich(ctx, DESC[n], LX + 40, y + 25, { color: C.navy, size: 14.5, align: 'left' });
       });
-      text(ctx, 'Se repite en cada lote, con máscaras nuevas.', LX, H - 12, { color: C.grey2, size: 13.5 });
+      text(ctx, 'Se repite en cada batch, con máscaras nuevas.', LX, H - 12, { color: C.grey2, size: 13.5 });
     };
     K.pasos(root, [0, 1, 2, 3, 4, 5, 6, 7], draw, { ms: 1400, max: 1400 });
   });

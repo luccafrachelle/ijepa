@@ -49,7 +49,7 @@
       PAN.forEach((P, j) => {
         const cx = P.x + 170, cy = SC.y;
         text(ctx, P.titulo, P.x + 8, 28, { color: P.col, size: 16.5, weight: '700' });
-        text(ctx, t < 0.01 ? 'el mismo lote de embeddings' : P.sub, P.x + 8, 48, { color: C.grey2, size: 13 });
+        text(ctx, t < 0.01 ? 'el mismo batch de embeddings' : P.sub, P.x + 8, 48, { color: C.grey2, size: 13 });
         ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.beginPath();
         ctx.moveTo(cx - 150, cy); ctx.lineTo(cx + 150, cy); ctx.moveTo(cx, cy - 104); ctx.lineTo(cx, cy + 104); ctx.stroke();
         // forma buscada
@@ -90,12 +90,12 @@
           }
           ctx.stroke();
         }
-        text(ctx, j === 0 ? 'sombra del lote sobre la dirección' : 'sombra del lote (barras) y la buscada (línea)', hx - 4, HB.y + HB.h + 22, { color: C.grey2, size: 12.5 });
+        text(ctx, j === 0 ? 'sombra del batch sobre la dirección' : 'sombra del batch (barras) y la buscada (línea)', hx - 4, HB.y + HB.h + 22, { color: C.grey2, size: 12.5 });
         ctx.globalAlpha = 1;
       });
-      const nota = tt < 0.01 ? 'Cada punto es el embedding de una imagen del lote (esquema en 2D; en el experimento, 256 dimensiones).'
-        : tt < 1.01 ? 'Sin regularizador nada impide el colapso dimensional; cada regularizador empuja el lote hacia una forma fija.'
-        : tt < 2.01 ? 'Para medir la forma, el lote se proyecta sobre una dirección al azar y esa sombra se compara con la de la forma buscada.'
+      const nota = tt < 0.01 ? 'Cada punto es el embedding de una imagen del batch (esquema en 2D; en el experimento, 256 dimensiones).'
+        : tt < 1.01 ? 'Sin regularizador nada impide el colapso dimensional; cada regularizador empuja el batch hacia una forma fija.'
+        : tt < 2.01 ? 'Para medir la forma, el batch se proyecta sobre una dirección al azar y esa sombra se compara con la de la forma buscada.'
         : 'Se repite con muchas direcciones (1024 por paso): si todas las sombras coinciden, la distribución coincide.';
       text(ctx, nota, 24, H - 10, { color: C.navy, size: 13.5, weight: '600' });
     };

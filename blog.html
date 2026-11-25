@@ -2509,7 +2509,7 @@ Una red puede aprender mucho sobre imágenes sin ninguna etiqueta: alcanza con t
 <li>Contexto: un solo bloque cuadrado con un área de entre el 85 % y el 100 % de la imagen, al que se le sacan los parches que caen en algún objetivo.</li>
 </ul>
 <p>Los parches que no son ni contexto ni objetivo (grises en la figura) existen porque el bloque de contexto no cubre toda la imagen. Con la escala de contexto (0,85; 1) son pocos, y aumentan a medida que la escala baja.</p>
-<p>El código de referencia tiene tres detalles que el paper no menciona. El tamaño y la forma de los bloques se sortean una vez por lote, y de una imagen a otra sólo cambia la posición. Con escala de contexto (0,85; 1), en la práctica el bloque de contexto termina siendo el cuadrado de 13 × 13 parches de arriba a la izquierda (en ViT-B/16): la última fila y la última columna nunca son ni contexto ni objetivo. Y todas las imágenes del lote usan la misma cantidad de parches de contexto, porque se recortan a la máscara más corta.</p>
+<p>El código de referencia tiene tres detalles que el paper no menciona. El tamaño y la forma de los bloques se sortean una vez por batch, y de una imagen a otra sólo cambia la posición. Con escala de contexto (0,85; 1), en la práctica el bloque de contexto termina siendo el cuadrado de 13 × 13 parches de arriba a la izquierda (en ViT-B/16): la última fila y la última columna nunca son ni contexto ni objetivo. Y todas las imágenes del batch usan la misma cantidad de parches de contexto, porque se recortan a la máscara más corta.</p>
 <div class="column-page-right">
 <div class="ot-widget" data-widget="mascaras" data-alt="Imagen con grilla de 14 por 14 parches donde se sortean cuatro bloques objetivo y un bloque de contexto, con los resultados de la ablación del paper">
   <canvas width="1100" height="430"></canvas>
@@ -2532,12 +2532,12 @@ Una red puede aprender mucho sobre imágenes sin ninguna etiqueta: alcanza con t
 \mathcal{L} \;=\; \frac{1}{M}\sum_{i=1}^{M}\;\sum_{j\in B_i}\bigl\lVert \hat s_{y_j} - s_{y_j}\bigr\rVert_2^2 .
 </span></p>
 </div>
-<p>El código oficial cambia dos cosas. Los objetivos se normalizan con layer norm (sin parámetros) antes de comparar, y la distancia es smooth L1 (con <span class="math inline">\beta = 1</span>: cuadrática para errores chicos y lineal para los grandes), promediada sobre el lote, los bloques, los parches y las coordenadas en vez de sumada sobre los parches.</p>
+<p>El código oficial cambia dos cosas. Los objetivos se normalizan con layer norm (sin parámetros) antes de comparar, y la distancia es smooth L1 (con <span class="math inline">\beta = 1</span>: cuadrática para errores chicos y lineal para los grandes), promediada sobre el batch, los bloques, los parches y las coordenadas en vez de sumada sobre los parches.</p>
 <div class="column-page-right">
 <div class="ot-widget" data-widget="perdida" data-alt="Animación: para cada parche del bloque, barras de la predicción y del objetivo que se van acercando durante el entrenamiento, con la distancia de cada parche y la curva de la pérdida">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Paso 6: la pérdida se arma por niveles. Una distancia por parche (vectores de 8 números en el dibujo; cientos en el modelo), que se promedia dentro de cada bloque, sobre los M bloques de cada imagen y sobre el lote. Los valores son ilustrativos.</p>
+<p class="leyenda">Paso 6: la pérdida se arma por niveles. Una distancia por parche (vectores de 8 números en el dibujo; cientos en el modelo), que se promedia dentro de cada bloque, sobre los M bloques de cada imagen y sobre el batch. Los valores son ilustrativos.</p>
 </div>
 <p>La pérdida no llega a cero, ni tiene por qué: parte de lo que hay en un bloque no se puede deducir del contexto.</p>
 <p>Los parámetros del encoder de contexto, <span class="math inline">\theta</span>, y del predictor, <span class="math inline">\phi</span>, se optimizan por descenso por gradiente sobre <span class="math inline">\mathcal{L}</span>. Los del encoder objetivo, <span class="math inline">\bar\theta</span>, no reciben gradiente por el stop-gradient: en el código, los objetivos se calculan dentro de <code>torch.no_grad()</code> y esos pesos tienen <code>requires_grad=False</code>. Arrancan como una copia de <span class="math inline">\theta</span> y después de cada paso se actualizan con un promedio móvil exponencial (EMA) de los pesos del encoder de contexto:</p>
@@ -2556,7 +2556,7 @@ Una red puede aprender mucho sobre imágenes sin ninguna etiqueta: alcanza con t
 <p>Con <span class="math inline">m = 0</span> el encoder objetivo es una copia del de contexto en cada paso. A medida que <span class="math inline">m</span> se acerca a 1, la trayectoria del encoder objetivo se vuelve más suave y más atrasada: con <span class="math inline">m = 0{,}99</span> promedia más o menos los últimos 100 pasos; con <span class="math inline">m = 0{,}996</span>, los últimos 250. Los objetivos <span class="math inline">s_y</span> cambian despacio y el predictor no persigue un blanco que salta en cada paso.</p>
 <section id="una-pasada-completa" class="level3 page-columns page-full" data-number="7.1">
 <h3 data-number="7.1" class="anchored" data-anchor-id="una-pasada-completa"><span class="header-section-number">7.1</span> Una pasada completa</h3>
-<p>Los siete pasos juntos son una iteración de entrenamiento, que se repite en cada lote con máscaras nuevas.</p>
+<p>Los siete pasos juntos son una iteración de entrenamiento, que se repite en cada batch con máscaras nuevas.</p>
 <div class="column-page-right">
 <div class="ot-widget" data-widget="pasada" data-alt="Diagrama de I-JEPA que se prende etapa por etapa: tokens, máscaras, encoder de contexto, encoder objetivo, predictor, pérdida, gradiente y EMA">
   <canvas width="1100" height="430"></canvas>
@@ -2670,24 +2670,24 @@ Una red puede aprender mucho sobre imágenes sin ninguna etiqueta: alcanza con t
 <section id="sec-experimentos" class="level2 page-columns page-full" data-number="11">
 <h2 data-number="11" class="anchored" data-anchor-id="sec-experimentos"><span class="header-section-number">11</span> Un experimento propio: ¿se puede reemplazar el EMA?</h2>
 <p>I-JEPA evita el colapso con una combinación de recursos (predictor en una sola rama, stop-gradient, encoder objetivo por EMA) que funciona sin una justificación teórica (sección 7). LeJEPA <span class="citation" data-cites="balestriero2025lejepa">(<a href="#ref-balestriero2025lejepa" role="doc-biblioref">Balestriero y LeCun 2025</a>)</span>, de Balestriero y LeCun (2025), y SPHERE-JEPA <span class="citation" data-cites="nicollier2026spherejepa">(<a href="#ref-nicollier2026spherejepa" role="doc-biblioref">Nicollier et al. 2026</a>)</span>, de Nicollier y otros, entre ellos Pablo Musé (2026), proponen otra salida: en vez de una asimetría entre ramas, un término de la pérdida que fija la forma de la distribución de los embeddings. Si ese término alcanza para evitar el colapso, el EMA estaría de más.</p>
-<p>Que eso valga para I-JEPA no es obvio, por dos motivos. Los dos trabajos se evaluaron con vistas aumentadas, dentro del marco de invariancia de la sección 4, y ninguno con las máscaras de I-JEPA. Y aun en ese marco el EMA no sobra: en la tabla 3 de SPHERE-JEPA (ViT-B/14, ImageNet-1K, 100 épocas), sacarlo le cuesta entre 8 y 12 puntos a cada método, con el regularizador puesto. Los autores lo atribuyen, sin aislarlo, a que el EMA da objetivos que cambian despacio, algo que un término sobre la distribución del lote no controla.</p>
+<p>Que eso valga para I-JEPA no es obvio, por dos motivos. Los dos trabajos se evaluaron con vistas aumentadas, dentro del marco de invariancia de la sección 4, y ninguno con las máscaras de I-JEPA. Y aun en ese marco el EMA no sobra: en la tabla 3 de SPHERE-JEPA (ViT-B/14, ImageNet-1K, 100 épocas), sacarlo le cuesta entre 8 y 12 puntos a cada método, con el regularizador puesto. Los autores lo atribuyen, sin aislarlo, a que el EMA da objetivos que cambian despacio, algo que un término sobre la distribución del batch no controla.</p>
 <section id="dos-regularizadores-por-arriba" class="level3 page-columns page-full" data-number="11.1">
 <h3 data-number="11.1" class="anchored" data-anchor-id="dos-regularizadores-por-arriba"><span class="header-section-number">11.1</span> Dos regularizadores, por arriba</h3>
-<p>Los dos regularizadores miran el lote entero, no cada imagen por separado. Toman los embeddings de las imágenes del lote, los tratan como una muestra de una distribución y penalizan que esa distribución se aleje de una forma fijada de antemano. Si esa forma ocupa todas las dimensiones, el lote no puede concentrarse en un punto ni en un subespacio chico, que es justamente el colapso.</p>
+<p>Los dos regularizadores miran el batch entero, no cada imagen por separado. Toman los embeddings de las imágenes del batch, los tratan como una muestra de una distribución y penalizan que esa distribución se aleje de una forma fijada de antemano. Si esa forma ocupa todas las dimensiones, el batch no puede concentrarse en un punto ni en un subespacio chico, que es justamente el colapso.</p>
 <ul>
 <li>SIGReg (LeJEPA) usa como forma una gaussiana isótropa: una nube redonda, igual de ancha en todas las direcciones.</li>
 <li>SUSReg (SPHERE-JEPA) primero normaliza cada embedding, así que todos quedan sobre una esfera, y usa como forma la distribución uniforme sobre esa esfera. Los autores la justifican con un argumento de peor caso: la uniforme sobre la variedad es óptima para k-NN, y la uniforme sobre la esfera, para regresión ridge con kernel.</li>
 </ul>
 <p>La figura de abajo recorre el mecanismo en cuatro pasos, en dos dimensiones para poder dibujarlo.</p>
 <ol type="1">
-<li>El lote: cada punto es el embedding de una imagen. Los tres paneles arrancan del mismo lote, alargado y casi apoyado sobre una recta.</li>
-<li>Qué hace cada término: sin regularizador, nada impide que el lote termine sobre una recta y use una sola de las dos dimensiones (colapso dimensional). Con SIGReg toma forma de gaussiana redonda; con SUSReg queda sobre el círculo, repartido parejo.</li>
+<li>El batch: cada punto es el embedding de una imagen. Los tres paneles arrancan del mismo batch, alargado y casi apoyado sobre una recta.</li>
+<li>Qué hace cada término: sin regularizador, nada impide que el batch termine sobre una recta y use una sola de las dos dimensiones (colapso dimensional). Con SIGReg toma forma de gaussiana redonda; con SUSReg queda sobre el círculo, repartido parejo.</li>
 <li>Cómo se mide la forma: comparar una nube de 256 dimensiones con una distribución de referencia no es práctico. Lo que sí se puede comparar es una proyección: se elige una dirección al azar, se proyecta cada punto sobre ella (su «sombra» sobre la recta punteada) y queda una distribución en una dimensión. Esa sombra se compara con la que tendría la forma buscada: una campana para la gaussiana y, para el círculo en dos dimensiones, una distribución que se acumula en los bordes.</li>
 <li>Muchas direcciones: una sola sombra no alcanza, porque una nube aplastada puede tener la sombra correcta en alguna dirección. Por el teorema de Cramér–Wold, una distribución queda determinada por todas sus proyecciones unidimensionales, así que se repite con muchas direcciones: 1024 por paso, sorteadas de nuevo cada vez. La penalización es el promedio sobre todas.</li>
 </ol>
 <p>En la figura las sombras se dibujan como histogramas para que se vean. En el código, cada comparación la hace el estadístico de Epps–Pulley, que mide la distancia entre la función característica empírica de la proyección y la de la referencia en una grilla de frecuencias. En el experimento usé las implementaciones oficiales de SPHERE-JEPA, sin modificar.</p>
 <div class="column-page-right">
-<div class="ot-widget" data-widget="regs" data-alt="Cuatro pasos: el mismo lote de puntos en tres paneles; sin regularizador el lote se aplasta sobre una recta, con SIGReg se vuelve una gaussiana redonda y con SUSReg queda repartido sobre un círculo; después se proyecta el lote sobre una dirección al azar y su histograma se compara con la forma buscada; por último se repite con varias direcciones">
+<div class="ot-widget" data-widget="regs" data-alt="Cuatro pasos: el mismo batch de puntos en tres paneles; sin regularizador el batch se aplasta sobre una recta, con SIGReg se vuelve una gaussiana redonda y con SUSReg queda repartido sobre un círculo; después se proyecta el batch sobre una dirección al azar y su histograma se compara con la forma buscada; por último se repite con varias direcciones">
   <canvas width="1100" height="430"></canvas>
 </div>
 <p class="leyenda">Esquema en dos dimensiones; en el experimento los embeddings tienen 256. En 256 dimensiones, la sombra de una esfera uniforme ya no se acumula en los bordes y se parece mucho a una campana.</p>
@@ -2695,7 +2695,7 @@ Una red puede aprender mucho sobre imágenes sin ninguna etiqueta: alcanza con t
 </section>
 <section id="cómo-entran-en-i-jepa" class="level3" data-number="11.2">
 <h3 data-number="11.2" class="anchored" data-anchor-id="cómo-entran-en-i-jepa"><span class="header-section-number">11.2</span> Cómo entran en I-JEPA</h3>
-<p>En cada paso, los tokens visibles que produce el encoder de contexto se promedian en un vector de 192 dimensiones por imagen. Ese vector pasa por una cabeza de proyección: un MLP 192 → 2048 → 2048 → 256 con BatchNorm y GELU, el mismo de SPHERE-JEPA, de unos 5 M de parámetros (del orden del ViT-Tiny entero). El regularizador se calcula sobre las 256 salidas de la cabeza para el lote de 256 imágenes, y la pérdida total es</p>
+<p>En cada paso, los tokens visibles que produce el encoder de contexto se promedian en un vector de 192 dimensiones por imagen. Ese vector pasa por una cabeza de proyección: un MLP 192 → 2048 → 2048 → 256 con BatchNorm y GELU, el mismo de SPHERE-JEPA, de unos 5 M de parámetros (del orden del ViT-Tiny entero). El regularizador se calcula sobre las 256 salidas de la cabeza para el batch de 256 imágenes, y la pérdida total es</p>
 <p><span class="math display">L = L_\text{pred} + \lambda\, L_\text{reg},</span></p>
 <p>donde <span class="math inline">L_\text{pred}</span> es la pérdida de I-JEPA sin cambios (smooth L1 contra los objetivos normalizados con layer norm). El gradiente de <span class="math inline">L_\text{reg}</span> llega al encoder de contexto a través de la cabeza, que sólo existe en las celdas con regularizador y no interviene en la evaluación.</p>
 <p>«Sin EMA» quiere decir que el encoder objetivo es el propio encoder de contexto, con los mismos pesos, aplicado a la imagen completa y con stop-gradient; equivale a <span class="math inline">m = 0</span>. En esas celdas, el encoder que se evalúa es el mismo que se entrena.</p>
@@ -2734,7 +2734,7 @@ Una red puede aprender mucho sobre imágenes sin ninguna etiqueta: alcanza con t
 <li>P3. ¿EMA y regularizador se suman? C3 y C5 contra C1.</li>
 </ul>
 <p>C2 es el control: sin EMA ni regularizador, I-JEPA debería colapsar, y C4 y C6 muestran si el regularizador lo evita.</p>
-<p><strong>Configuración.</strong> ViT-Tiny/16 (192 dimensiones, 12 capas, predictor de 6 capas) sobre ImageNet-100 a 224 px, 100 épocas, lote de 256 y 3 semillas por celda (C2: 1); es la escala de la tabla 7 de SPHERE-JEPA. Las máscaras, el optimizador (AdamW con los cronogramas oficiales de I-JEPA) y el cronograma del EMA (de 0,996 a 1) son los mismos en todas las celdas. La grilla son 16 corridas y unas 40 h de GPU en una RTX 5090 Laptop (24 GB); los barridos llevaron otras ~7 h y la calibración, ~32 h.</p>
+<p><strong>Configuración.</strong> ViT-Tiny/16 (192 dimensiones, 12 capas, predictor de 6 capas) sobre ImageNet-100 a 224 px, 100 épocas, batch de 256 y 3 semillas por celda (C2: 1); es la escala de la tabla 7 de SPHERE-JEPA. Las máscaras, el optimizador (AdamW con los cronogramas oficiales de I-JEPA) y el cronograma del EMA (de 0,996 a 1) son los mismos en todas las celdas. La grilla son 16 corridas y unas 40 h de GPU en una RTX 5090 Laptop (24 GB); los barridos llevaron otras ~7 h y la calibración, ~32 h.</p>
 <p><strong>Barridos.</strong> Los hiperparámetros salieron de corridas de 30 épocas con semilla 0, evaluadas con k-NN sobre un split interno de 12 669 imágenes apartadas del train, nunca sobre el val oficial. La tasa de aprendizaje la barrí en C1 (<span class="math inline">2{,}5 \times 10^{-4}</span>, <span class="math inline">5 \times 10^{-4}</span>, <span class="math inline">10^{-3}</span>) y ganó <span class="math inline">2{,}5 \times 10^{-4}</span>. A <span class="math inline">\lambda</span> lo barrí por separado en C4 y C6 (0,01, 0,05 y 0,2) y en los dos casos ganó 0,05, el valor por defecto de LeJEPA; con 0,2 el k-NN cae de ~18 a 10,7 (C4) y 7,4 (C6). Ese <span class="math inline">\lambda</span> lo reusé en las celdas con EMA.</p>
 <p><strong>Evaluación.</strong> La del código de SPHERE-JEPA: encoder objetivo congelado, promedio de tokens y encima un clasificador lineal (SGD, 90 épocas) o k-NN (coseno, <span class="math inline">k = 20</span>, <span class="math inline">T = 0{,}07</span>), con precisión top-1 sobre el val oficial. Cada celda se reporta como media ± desvío estándar muestral entre semillas. Antes de correr fijé que una diferencia cuenta como distinguible si supera dos desvíos de la celda más variable o si un test t pareado por semilla da <span class="math inline">p &lt; 0{,}05</span>. Contra C2, que tiene una sola semilla, no hay test.</p>
 <p><strong>Calibración.</strong> Antes de la grilla corrí el código oficial de SPHERE-JEPA, sin modificar, sobre los mismos datos: 72,8 en evaluación lineal y 70,6 en k-NN, contra 71,9 y 69,0 publicados, dentro del margen de ±2 puntos que había fijado de antemano. Esto valida los datos y la evaluación, no mi implementación del entrenamiento de I-JEPA.</p>
@@ -4399,7 +4399,7 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
         text(ctx, tit, LX + 40, y + 4, { color: on ? C.navy : ya ? alfa(C.navy, 0.6) : C.grey2, size: on ? 17 : 15, weight: on ? '700' : '600' });
         if (on) K.rich(ctx, DESC[n], LX + 40, y + 25, { color: C.navy, size: 14.5, align: 'left' });
       });
-      text(ctx, 'Se repite en cada lote, con máscaras nuevas.', LX, H - 12, { color: C.grey2, size: 13.5 });
+      text(ctx, 'Se repite en cada batch, con máscaras nuevas.', LX, H - 12, { color: C.grey2, size: 13.5 });
     };
     K.pasos(root, [0, 1, 2, 3, 4, 5, 6, 7], draw, { ms: 1400, max: 1400 });
   });
@@ -4842,7 +4842,7 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
   // ============================================================ 5. la pérdida
   K.register('perdida', root => {
     const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
-    // por parche → por bloque → por imagen → por lote: en cada nivel, un promedio
+    // por parche → por bloque → por imagen → por batch: en cada nivel, un promedio
     const OB = OBJK[0], r = mulberry(21);
     const T = OB.map(k => VAL2[k]);
     const P = T.map(v => v.map(x => clamp(x + (r() - 0.5) * 0.5, 0, 1)));
@@ -4852,14 +4852,14 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
     const LOTE = [mI, ...[...Array(11)].map(() => 0.16 + 0.22 * r())], mL = prom(LOTE);
     const n2 = v => v.toFixed(2).replace('.', ',');
     const COL = [{ x: 24, w: 232 }, { x: 296, w: 220 }, { x: 556, w: 230 }, { x: 826, w: 250 }];
-    const TIT = ['un parche', 'un bloque', 'una imagen', 'el lote'];
+    const TIT = ['un parche', 'un bloque', 'una imagen', 'el batch'];
     const draw = t => {
       ctx.clearRect(0, 0, W, H);
       const n = Math.round(t);
       encabezado(ctx, 6, ['Por parche: la distancia entre el vector predicho y su objetivo',
         'Por bloque: se promedian las distancias de sus parches',
         'Por imagen: se promedian los M bloques objetivo (4 en el paper)',
-        'Por lote: se promedia sobre todas las imágenes. Ese número es la pérdida'][n]);
+        'Por batch: se promedia sobre todas las imágenes. Ese número es la pérdida'][n]);
       const ap = k => (k === 0 ? 1 : clamp(t - k + 1, 0, 1));
       const op = k => ap(k) * (k === n ? 1 : 0.5);
       COL.forEach((c, k) => {
@@ -4911,7 +4911,7 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
         tx(ctx, 'promedio de los 4 bloques', x0, y0 + s + 28, { color: alfa(C.grey2, a), size: 13 });
         tx(ctx, '= ' + n2(mI), x0, y0 + s + 54, { color: alfa(C.navy, a), size: 17, weight: '700' });
       }
-      // 4. el lote
+      // 4. el batch
       if (ap(3) > 0.01) {
         const a = op(3), c = COL[3], s = 52, x0 = c.x + 10, y0 = 106;
         LOTE.forEach((v, b) => {
@@ -4920,12 +4920,12 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
           caja(ctx, x, y, s, s, { r: 4, stroke: alfa(b === 0 ? C.coralD : C.grid, a), lw: b === 0 ? 2.4 : 1.2 });
           tx(ctx, n2(v), x + s / 2, y + s / 2 + 5, { color: alfa(C.navy, a), size: 13, weight: '700', align: 'center' });
         });
-        tx(ctx, '… una imagen por ejemplo del lote', x0, y0 + 3 * (s + 6) + 16, { color: alfa(C.grey2, a), size: 12.5 });
+        tx(ctx, '… una imagen por ejemplo del batch', x0, y0 + 3 * (s + 6) + 16, { color: alfa(C.grey2, a), size: 12.5 });
         caja(ctx, x0 - 4, y0 + 3 * (s + 6) + 30, 236, 40, { r: 10, fill: alfa(C.navy, a) });
         tx(ctx, 'pérdida  L = ' + n2(mL), x0 + 114, y0 + 3 * (s + 6) + 56, { color: alfa('#ffffff', a), size: 17, weight: '700', align: 'center' });
       }
-      tx(ctx, n < 3 ? 'Como el código arma bloques del mismo tamaño en todo el lote, equivale a promediar todos los parches objetivo.'
-        : 'Un solo número por lote. Su gradiente llega al predictor y al encoder de contexto; $s_y$ no recibe gradiente.', 24, H - 12, { color: C.grey2, size: 13.5 });
+      tx(ctx, n < 3 ? 'Como el código arma bloques del mismo tamaño en todo el batch, equivale a promediar todos los parches objetivo.'
+        : 'Un solo número por batch. Su gradiente llega al predictor y al encoder de contexto; $s_y$ no recibe gradiente.', 24, H - 12, { color: C.grey2, size: 13.5 });
     };
     K.pasos(root, [0, 1, 2, 3], draw, { ms: 1800, max: 1800 });
   });
@@ -5317,7 +5317,7 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
       PAN.forEach((P, j) => {
         const cx = P.x + 170, cy = SC.y;
         text(ctx, P.titulo, P.x + 8, 28, { color: P.col, size: 16.5, weight: '700' });
-        text(ctx, t < 0.01 ? 'el mismo lote de embeddings' : P.sub, P.x + 8, 48, { color: C.grey2, size: 13 });
+        text(ctx, t < 0.01 ? 'el mismo batch de embeddings' : P.sub, P.x + 8, 48, { color: C.grey2, size: 13 });
         ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.beginPath();
         ctx.moveTo(cx - 150, cy); ctx.lineTo(cx + 150, cy); ctx.moveTo(cx, cy - 104); ctx.lineTo(cx, cy + 104); ctx.stroke();
         // forma buscada
@@ -5358,12 +5358,12 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
           }
           ctx.stroke();
         }
-        text(ctx, j === 0 ? 'sombra del lote sobre la dirección' : 'sombra del lote (barras) y la buscada (línea)', hx - 4, HB.y + HB.h + 22, { color: C.grey2, size: 12.5 });
+        text(ctx, j === 0 ? 'sombra del batch sobre la dirección' : 'sombra del batch (barras) y la buscada (línea)', hx - 4, HB.y + HB.h + 22, { color: C.grey2, size: 12.5 });
         ctx.globalAlpha = 1;
       });
-      const nota = tt < 0.01 ? 'Cada punto es el embedding de una imagen del lote (esquema en 2D; en el experimento, 256 dimensiones).'
-        : tt < 1.01 ? 'Sin regularizador nada impide el colapso dimensional; cada regularizador empuja el lote hacia una forma fija.'
-        : tt < 2.01 ? 'Para medir la forma, el lote se proyecta sobre una dirección al azar y esa sombra se compara con la de la forma buscada.'
+      const nota = tt < 0.01 ? 'Cada punto es el embedding de una imagen del batch (esquema en 2D; en el experimento, 256 dimensiones).'
+        : tt < 1.01 ? 'Sin regularizador nada impide el colapso dimensional; cada regularizador empuja el batch hacia una forma fija.'
+        : tt < 2.01 ? 'Para medir la forma, el batch se proyecta sobre una dirección al azar y esa sombra se compara con la de la forma buscada.'
         : 'Se repite con muchas direcciones (1024 por paso): si todas las sombras coinciden, la distribución coincide.';
       text(ctx, nota, 24, H - 10, { color: C.navy, size: 13.5, weight: '600' });
     };
@@ -6339,7 +6339,7 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
      s0 un parche: vector predicho y objetivo · s1 la distancia D(ŝ_y, s_y)
      s2 su valor viaja al bloque; aparecen los otros 5 parches · s3 promedio del bloque
      s4 viaja a la imagen; aparecen los otros 3 bloques · s5 promedio de la imagen
-     s6 viaja al lote; aparecen las otras imágenes · s7 promedio del lote: la pérdida L
+     s6 viaja al batch; aparecen las otras imágenes · s7 promedio del batch: la pérdida L
      s8 el gradiente de L llega al predictor y al encoder de contexto; s_y no recibe gradiente
    ema — paradas:
      s0 inicio · s1 θ se mueve por gradiente, con ruido · s2 la fórmula del promedio móvil, por piezas
@@ -6384,15 +6384,15 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
       'Por bloque: se promedian las distancias de sus parches',
       'Por imagen: cada uno de los M bloques objetivo aporta su promedio (4 en el paper)',
       'Por imagen: se promedian los M bloques objetivo',
-      'Por lote: cada imagen del lote aporta su valor',
-      'Por lote: se promedia sobre todas las imágenes. Ese número es la pérdida',
-      'La pérdida $L$ es un solo número por lote: de ahí sale el gradiente'
+      'Por batch: cada imagen del batch aporta su valor',
+      'Por batch: se promedia sobre todas las imágenes. Ese número es la pérdida',
+      'La pérdida $L$ es un solo número por batch: de ahí sale el gradiente'
     ]);
     head.set(0);
 
     const cols = CX.map(() => el('g', {}, S));
     cols.forEach((g, k) => { if (k) g.style.opacity = 0; });
-    const TIT = ['un parche', 'un bloque', 'una imagen', 'el lote'];
+    const TIT = ['un parche', 'un bloque', 'una imagen', 'el batch'];
     CX.forEach((x, k) => {
       el('rect', { x, y: 70, width: 28, height: 28, rx: 7, fill: C.blue }, cols[k]);
       const t = el('text', { x: x + 14, y: 90, 'text-anchor': 'middle', 'font-size': 18, 'font-weight': 600, fill: '#fff' }, cols[k]); t.textContent = k + 1;
@@ -6455,7 +6455,7 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
     const cap3 = A.texto(g3, 'promedio de los $M = 4$ bloques', X3, 346, { size: 18, color: C.grey2 });
     const R3x = X3 + IS / 2;
 
-    // ---- 4. el lote
+    // ---- 4. el batch
     const g4 = cols[3], X4 = CX[3], TS = 60;
     const items4 = LOTE.map((v, b) => {
       const x = X4 + (b % 4) * (TS + 7), y = 116 + Math.floor(b / 4) * (TS + 7), g = el('g', {}, g4);
@@ -6465,7 +6465,7 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
       if (b > 0) g.style.opacity = 0; else n.style.opacity = 0;
       return { g, n };
     });
-    const cap4 = A.texto(g4, '… una imagen por ejemplo del lote', X4, 346, { size: 18, color: C.grey2 });
+    const cap4 = A.texto(g4, '… una imagen por ejemplo del batch', X4, 346, { size: 18, color: C.grey2 });
     const LB = { x: X4 - 4, y: 356, w: 4 * TS + 3 * 7 + 8, h: 46 };
     const caja4 = el('rect', { x: LB.x, y: LB.y, width: LB.w, height: LB.h, rx: 10, fill: C.navy }, g4);
     const txtL = A.texto(g4, 'pérdida $L$ =', LB.x + 22, YR, { size: 22, weight: '600', color: '#fff' });
@@ -6500,8 +6500,8 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
     [...nab, cruz].forEach(e => { e.style.opacity = 0; });
 
     // nota al pie
-    const notas = A.rotulos(S, ['Como el código arma bloques del mismo tamaño en todo el lote, equivale a promediar todos los parches objetivo.',
-      'Un solo número por lote. Su gradiente llega al predictor y al encoder de contexto; $s_y$ no recibe gradiente.'], { x: 20, y: 488, size: 18, color: C.grey2 });
+    const notas = A.rotulos(S, ['Como el código arma bloques del mismo tamaño en todo el batch, equivale a promediar todos los parches objetivo.',
+      'Un solo número por batch. Su gradiente llega al predictor y al encoder de contexto; $s_y$ no recibe gradiente.'], { x: 20, y: 488, size: 18, color: C.grey2 });
     notas.set(0);
 
     // copias que viajan
@@ -6574,10 +6574,10 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
     absorbe(tl, items3.map(i => i.n), res3.n, at + 0.7);
     at = tl.duration(); tl.addLabel('s5', at);
 
-    // s6: el valor de la imagen viaja al lote; aparecen las otras imágenes
+    // s6: el valor de la imagen viaja al batch; aparecen las otras imágenes
     head.a(tl, 6, at); aporta(3, res3.n, items4);
     at = tl.duration(); tl.addLabel('s6', at);
-    // s7: promedio del lote: la pérdida L
+    // s7: promedio del batch: la pérdida L
     head.a(tl, 7, at);
     tl.to(cap4, { opacity: 1, duration: 0.5 }, at + 0.3)
       .to([caja4, txtL], { opacity: 1, duration: 0.6 }, at + 0.5);
@@ -7236,7 +7236,7 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
       g.setAttribute('transform', tr(0, 0)); g.style.opacity = n === 0 ? 1 : 0;
       return g;
     });
-    A.texto(S, 'Se repite en cada lote, con máscaras nuevas.', LX, 486, { size: 17, color: C.grey2 });
+    A.texto(S, 'Se repite en cada batch, con máscaras nuevas.', LX, 486, { size: 17, color: C.grey2 });
 
     // estado inicial: etapa 1 (grilla de parches)
     D.variante(true);
@@ -8191,7 +8191,7 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
       A.texto(c, extra, RX2, y + 36, { size: 19, color: C.grey2, anchor: 'end' });
       oculto(g, c); return { g, c };
     };
-    const gObj = grupo(98, C.coralD, { fill: C.coral, op: 0.75, stroke: C.coralD }, ['4 bloques objetivo', 'escala 0,15–0,2 · aspecto 0,75–1,5', 'un tamaño por lote; pueden superponerse'], nObj, 'parches');
+    const gObj = grupo(98, C.coralD, { fill: C.coral, op: 0.75, stroke: C.coralD }, ['4 bloques objetivo', 'escala 0,15–0,2 · aspecto 0,75–1,5', 'un tamaño por batch; pueden superponerse'], nObj, 'parches');
     const gCtx = grupo(196, C.teal, { fill: C.teal, op: 0.35, stroke: C.teal }, ['1 bloque de contexto', 'escala 0,85–1, cuadrado', 'sin los parches objetivo'], nCtx, 'parches (' + Math.round(100 * nCtx / NT) + ' %)');
     const gGris = grupo(294, C.grey2, { fill: '#8c91a0', op: 0.8 }, ['ni contexto ni objetivo', 'sólo lo ve el encoder objetivo'], nGris, 'parches');
     const seps = [168, 266].map(y => { const l = el('line', { x1: RX, y1: y, x2: RX2, y2: y, stroke: C.grid, 'stroke-width': 1.2 }, S); l.style.opacity = 0; return l; });
@@ -8484,7 +8484,7 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
   }
 
   // ============================================================ regularizadores, por arriba
-  // Paradas (las cuatro del texto del blog): s0 el lote · s1 qué hace cada término ·
+  // Paradas (las cuatro del texto del blog): s0 el batch · s1 qué hace cada término ·
   // s2 sombra sobre una dirección e histograma · s3 muchas direcciones
   K.register('regs', root => {
     const S = A.svg(root, 1100, 440);
@@ -8524,7 +8524,7 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
       const x0 = 8 + j * 366, cx = x0 + 172, hx = x0 + 22;
       const G = el('g', {}, S);
       A.texto(G, pan.titulo, x0 + 8, 26, { size: 19, weight: '600', color: pan.col });
-      const sub = A.rotulos(G, ['el mismo lote de embeddings', pan.sub], { x: x0 + 8, y: 50, size: 15, color: C.grey2 }); sub.set(0);
+      const sub = A.rotulos(G, ['el mismo batch de embeddings', pan.sub], { x: x0 + 8, y: 50, size: 15, color: C.grey2 }); sub.set(0);
       const clip = S.uid('clip');
       el('rect', { x: x0 + 6, y: 60, width: 340, height: 200 }, el('clipPath', { id: clip }, S.defs));
       const Z = el('g', { 'clip-path': `url(#${clip})` }, G);
@@ -8567,7 +8567,7 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
         curva = el('path', { d, fill: 'none', stroke: C.navy, 'stroke-width': 2 }, H);
         curva.style.opacity = 0;
       }
-      A.texto(H, j === 0 ? 'sombra del lote sobre la dirección' : 'sombra del lote (barras) y la buscada (línea)', hx - 4, HB.y + HB.h + 26, { size: 15, color: C.grey2 });
+      A.texto(H, j === 0 ? 'sombra del batch sobre la dirección' : 'sombra del batch (barras) y la buscada (línea)', hx - 4, HB.y + HB.h + 26, { size: 15, color: C.grey2 });
       const alturas = PHI.map(a => hist(FIN[j], a));
       return { j, cx, sub, forma, rastro, conect, dots, dir, recta, sombras, H, barras, curva, alturas };
     });
@@ -8576,16 +8576,16 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
     el('rect', { x: 0, y: 384, width: 34, height: 32, rx: 8, fill: C.blue }, S);
     const num = A.rotulos(S, ['1', '2', '3', '4'], { x: 17, y: 407, size: 20, weight: '600', color: '#fff', anchor: 'middle' }); num.set(0);
     const nota = rotulos2(S, [
-      ['Cada punto es el embedding de una imagen del lote', 'Esquema en 2D; en el experimento, 256 dimensiones.'],
-      ['Sin regularizador nada impide el colapso dimensional;', 'cada regularizador empuja el lote hacia una forma fija.'],
-      ['Para medir la forma, el lote se proyecta sobre una dirección al azar', 'y esa sombra se compara con la de la forma buscada.'],
+      ['Cada punto es el embedding de una imagen del batch', 'Esquema en 2D; en el experimento, 256 dimensiones.'],
+      ['Sin regularizador nada impide el colapso dimensional;', 'cada regularizador empuja el batch hacia una forma fija.'],
+      ['Para medir la forma, el batch se proyecta sobre una dirección al azar', 'y esa sombra se compara con la de la forma buscada.'],
       ['Se repite con muchas direcciones (1024 por paso):', 'si todas las sombras coinciden, la distribución coincide.']
     ], { x: 48, y: 398, dy: 24, size: 17, color: C.navy });
     nota.set(0);
 
     const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
     tl.addLabel('s0', 0);
-    // s1: cada regularizador lleva el lote a su forma
+    // s1: cada regularizador lleva el batch a su forma
     let at = 0;
     num.a(tl, 1, at); nota.a(tl, 1, at);
     P.forEach(p => {

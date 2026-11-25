@@ -282,7 +282,7 @@ Buena parte del método está en una decisión que parece de implementación: qu
 
 Los parches que no son ni contexto ni objetivo (grises en la figura) existen porque el bloque de contexto no cubre toda la imagen. Con la escala de contexto (0,85; 1) son pocos, y aumentan a medida que la escala baja.
 
-El código de referencia tiene tres detalles que el paper no menciona. El tamaño y la forma de los bloques se sortean una vez por lote, y de una imagen a otra sólo cambia la posición. Con escala de contexto (0,85; 1), en la práctica el bloque de contexto termina siendo el cuadrado de 13 × 13 parches de arriba a la izquierda (en ViT-B/16): la última fila y la última columna nunca son ni contexto ni objetivo. Y todas las imágenes del lote usan la misma cantidad de parches de contexto, porque se recortan a la máscara más corta.
+El código de referencia tiene tres detalles que el paper no menciona. El tamaño y la forma de los bloques se sortean una vez por batch, y de una imagen a otra sólo cambia la posición. Con escala de contexto (0,85; 1), en la práctica el bloque de contexto termina siendo el cuadrado de 13 × 13 parches de arriba a la izquierda (en ViT-B/16): la última fila y la última columna nunca son ni contexto ni objetivo. Y todas las imágenes del batch usan la misma cantidad de parches de contexto, porque se recortan a la máscara más corta.
 
 ::: {.column-page-right}
 ```{=html}
@@ -316,14 +316,14 @@ $$
 $$
 :::
 
-El código oficial cambia dos cosas. Los objetivos se normalizan con layer norm (sin parámetros) antes de comparar, y la distancia es smooth L1 (con $\beta = 1$: cuadrática para errores chicos y lineal para los grandes), promediada sobre el lote, los bloques, los parches y las coordenadas en vez de sumada sobre los parches.
+El código oficial cambia dos cosas. Los objetivos se normalizan con layer norm (sin parámetros) antes de comparar, y la distancia es smooth L1 (con $\beta = 1$: cuadrática para errores chicos y lineal para los grandes), promediada sobre el batch, los bloques, los parches y las coordenadas en vez de sumada sobre los parches.
 
 ::: {.column-page-right}
 ```{=html}
 <div class="ot-widget" data-widget="perdida" data-alt="Animación: para cada parche del bloque, barras de la predicción y del objetivo que se van acercando durante el entrenamiento, con la distancia de cada parche y la curva de la pérdida">
   <canvas width="1100" height="430"></canvas>
 </div>
-<p class="leyenda">Paso 6: la pérdida se arma por niveles. Una distancia por parche (vectores de 8 números en el dibujo; cientos en el modelo), que se promedia dentro de cada bloque, sobre los M bloques de cada imagen y sobre el lote. Los valores son ilustrativos.</p>
+<p class="leyenda">Paso 6: la pérdida se arma por niveles. Una distancia por parche (vectores de 8 números en el dibujo; cientos en el modelo), que se promedia dentro de cada bloque, sobre los M bloques de cada imagen y sobre el batch. Los valores son ilustrativos.</p>
 ```
 :::
 
@@ -352,7 +352,7 @@ Con $m = 0$ el encoder objetivo es una copia del de contexto en cada paso. A med
 
 ### Una pasada completa
 
-Los siete pasos juntos son una iteración de entrenamiento, que se repite en cada lote con máscaras nuevas.
+Los siete pasos juntos son una iteración de entrenamiento, que se repite en cada batch con máscaras nuevas.
 
 ::: {.column-page-right}
 ```{=html}
@@ -478,19 +478,19 @@ V-JEPA 2 incorpora tiempo y acciones, que era lo que faltaba para acercarse al m
 
 I-JEPA evita el colapso con una combinación de recursos (predictor en una sola rama, stop-gradient, encoder objetivo por EMA) que funciona sin una justificación teórica (sección 7). LeJEPA [@balestriero2025lejepa], de Balestriero y LeCun (2025), y SPHERE-JEPA [@nicollier2026spherejepa], de Nicollier y otros, entre ellos Pablo Musé (2026), proponen otra salida: en vez de una asimetría entre ramas, un término de la pérdida que fija la forma de la distribución de los embeddings. Si ese término alcanza para evitar el colapso, el EMA estaría de más.
 
-Que eso valga para I-JEPA no es obvio, por dos motivos. Los dos trabajos se evaluaron con vistas aumentadas, dentro del marco de invariancia de la sección 4, y ninguno con las máscaras de I-JEPA. Y aun en ese marco el EMA no sobra: en la tabla 3 de SPHERE-JEPA (ViT-B/14, ImageNet-1K, 100 épocas), sacarlo le cuesta entre 8 y 12 puntos a cada método, con el regularizador puesto. Los autores lo atribuyen, sin aislarlo, a que el EMA da objetivos que cambian despacio, algo que un término sobre la distribución del lote no controla.
+Que eso valga para I-JEPA no es obvio, por dos motivos. Los dos trabajos se evaluaron con vistas aumentadas, dentro del marco de invariancia de la sección 4, y ninguno con las máscaras de I-JEPA. Y aun en ese marco el EMA no sobra: en la tabla 3 de SPHERE-JEPA (ViT-B/14, ImageNet-1K, 100 épocas), sacarlo le cuesta entre 8 y 12 puntos a cada método, con el regularizador puesto. Los autores lo atribuyen, sin aislarlo, a que el EMA da objetivos que cambian despacio, algo que un término sobre la distribución del batch no controla.
 
 ### Dos regularizadores, por arriba
 
-Los dos regularizadores miran el lote entero, no cada imagen por separado. Toman los embeddings de las imágenes del lote, los tratan como una muestra de una distribución y penalizan que esa distribución se aleje de una forma fijada de antemano. Si esa forma ocupa todas las dimensiones, el lote no puede concentrarse en un punto ni en un subespacio chico, que es justamente el colapso.
+Los dos regularizadores miran el batch entero, no cada imagen por separado. Toman los embeddings de las imágenes del batch, los tratan como una muestra de una distribución y penalizan que esa distribución se aleje de una forma fijada de antemano. Si esa forma ocupa todas las dimensiones, el batch no puede concentrarse en un punto ni en un subespacio chico, que es justamente el colapso.
 
 - SIGReg (LeJEPA) usa como forma una gaussiana isótropa: una nube redonda, igual de ancha en todas las direcciones.
 - SUSReg (SPHERE-JEPA) primero normaliza cada embedding, así que todos quedan sobre una esfera, y usa como forma la distribución uniforme sobre esa esfera. Los autores la justifican con un argumento de peor caso: la uniforme sobre la variedad es óptima para k-NN, y la uniforme sobre la esfera, para regresión ridge con kernel.
 
 La figura de abajo recorre el mecanismo en cuatro pasos, en dos dimensiones para poder dibujarlo.
 
-1. El lote: cada punto es el embedding de una imagen. Los tres paneles arrancan del mismo lote, alargado y casi apoyado sobre una recta.
-2. Qué hace cada término: sin regularizador, nada impide que el lote termine sobre una recta y use una sola de las dos dimensiones (colapso dimensional). Con SIGReg toma forma de gaussiana redonda; con SUSReg queda sobre el círculo, repartido parejo.
+1. El batch: cada punto es el embedding de una imagen. Los tres paneles arrancan del mismo batch, alargado y casi apoyado sobre una recta.
+2. Qué hace cada término: sin regularizador, nada impide que el batch termine sobre una recta y use una sola de las dos dimensiones (colapso dimensional). Con SIGReg toma forma de gaussiana redonda; con SUSReg queda sobre el círculo, repartido parejo.
 3. Cómo se mide la forma: comparar una nube de 256 dimensiones con una distribución de referencia no es práctico. Lo que sí se puede comparar es una proyección: se elige una dirección al azar, se proyecta cada punto sobre ella (su «sombra» sobre la recta punteada) y queda una distribución en una dimensión. Esa sombra se compara con la que tendría la forma buscada: una campana para la gaussiana y, para el círculo en dos dimensiones, una distribución que se acumula en los bordes.
 4. Muchas direcciones: una sola sombra no alcanza, porque una nube aplastada puede tener la sombra correcta en alguna dirección. Por el teorema de Cramér–Wold, una distribución queda determinada por todas sus proyecciones unidimensionales, así que se repite con muchas direcciones: 1024 por paso, sorteadas de nuevo cada vez. La penalización es el promedio sobre todas.
 
@@ -498,7 +498,7 @@ En la figura las sombras se dibujan como histogramas para que se vean. En el có
 
 ::: {.column-page-right}
 ```{=html}
-<div class="ot-widget" data-widget="regs" data-alt="Cuatro pasos: el mismo lote de puntos en tres paneles; sin regularizador el lote se aplasta sobre una recta, con SIGReg se vuelve una gaussiana redonda y con SUSReg queda repartido sobre un círculo; después se proyecta el lote sobre una dirección al azar y su histograma se compara con la forma buscada; por último se repite con varias direcciones">
+<div class="ot-widget" data-widget="regs" data-alt="Cuatro pasos: el mismo batch de puntos en tres paneles; sin regularizador el batch se aplasta sobre una recta, con SIGReg se vuelve una gaussiana redonda y con SUSReg queda repartido sobre un círculo; después se proyecta el batch sobre una dirección al azar y su histograma se compara con la forma buscada; por último se repite con varias direcciones">
   <canvas width="1100" height="430"></canvas>
 </div>
 <p class="leyenda">Esquema en dos dimensiones; en el experimento los embeddings tienen 256. En 256 dimensiones, la sombra de una esfera uniforme ya no se acumula en los bordes y se parece mucho a una campana.</p>
@@ -507,7 +507,7 @@ En la figura las sombras se dibujan como histogramas para que se vean. En el có
 
 ### Cómo entran en I-JEPA
 
-En cada paso, los tokens visibles que produce el encoder de contexto se promedian en un vector de 192 dimensiones por imagen. Ese vector pasa por una cabeza de proyección: un MLP 192 → 2048 → 2048 → 256 con BatchNorm y GELU, el mismo de SPHERE-JEPA, de unos 5 M de parámetros (del orden del ViT-Tiny entero). El regularizador se calcula sobre las 256 salidas de la cabeza para el lote de 256 imágenes, y la pérdida total es
+En cada paso, los tokens visibles que produce el encoder de contexto se promedian en un vector de 192 dimensiones por imagen. Ese vector pasa por una cabeza de proyección: un MLP 192 → 2048 → 2048 → 256 con BatchNorm y GELU, el mismo de SPHERE-JEPA, de unos 5 M de parámetros (del orden del ViT-Tiny entero). El regularizador se calcula sobre las 256 salidas de la cabeza para el batch de 256 imágenes, y la pérdida total es
 
 $$L = L_\text{pred} + \lambda\, L_\text{reg},$$
 
@@ -536,7 +536,7 @@ Cada pregunta es una comparación entre celdas:
 
 C2 es el control: sin EMA ni regularizador, I-JEPA debería colapsar, y C4 y C6 muestran si el regularizador lo evita.
 
-**Configuración.** ViT-Tiny/16 (192 dimensiones, 12 capas, predictor de 6 capas) sobre ImageNet-100 a 224 px, 100 épocas, lote de 256 y 3 semillas por celda (C2: 1); es la escala de la tabla 7 de SPHERE-JEPA. Las máscaras, el optimizador (AdamW con los cronogramas oficiales de I-JEPA) y el cronograma del EMA (de 0,996 a 1) son los mismos en todas las celdas. La grilla son 16 corridas y unas 40 h de GPU en una RTX 5090 Laptop (24 GB); los barridos llevaron otras ~7 h y la calibración, ~32 h.
+**Configuración.** ViT-Tiny/16 (192 dimensiones, 12 capas, predictor de 6 capas) sobre ImageNet-100 a 224 px, 100 épocas, batch de 256 y 3 semillas por celda (C2: 1); es la escala de la tabla 7 de SPHERE-JEPA. Las máscaras, el optimizador (AdamW con los cronogramas oficiales de I-JEPA) y el cronograma del EMA (de 0,996 a 1) son los mismos en todas las celdas. La grilla son 16 corridas y unas 40 h de GPU en una RTX 5090 Laptop (24 GB); los barridos llevaron otras ~7 h y la calibración, ~32 h.
 
 **Barridos.** Los hiperparámetros salieron de corridas de 30 épocas con semilla 0, evaluadas con k-NN sobre un split interno de 12 669 imágenes apartadas del train, nunca sobre el val oficial. La tasa de aprendizaje la barrí en C1 ($2{,}5 \times 10^{-4}$, $5 \times 10^{-4}$, $10^{-3}$) y ganó $2{,}5 \times 10^{-4}$. A $\lambda$ lo barrí por separado en C4 y C6 (0,01, 0,05 y 0,2) y en los dos casos ganó 0,05, el valor por defecto de LeJEPA; con 0,2 el k-NN cae de ~18 a 10,7 (C4) y 7,4 (C6). Ese $\lambda$ lo reusé en las celdas con EMA.
 

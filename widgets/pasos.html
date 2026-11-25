@@ -299,7 +299,7 @@
   // ============================================================ 5. la pérdida
   K.register('perdida', root => {
     const { ctx, W, H } = setupCanvas(root.querySelector('canvas'));
-    // por parche → por bloque → por imagen → por lote: en cada nivel, un promedio
+    // por parche → por bloque → por imagen → por batch: en cada nivel, un promedio
     const OB = OBJK[0], r = mulberry(21);
     const T = OB.map(k => VAL2[k]);
     const P = T.map(v => v.map(x => clamp(x + (r() - 0.5) * 0.5, 0, 1)));
@@ -309,14 +309,14 @@
     const LOTE = [mI, ...[...Array(11)].map(() => 0.16 + 0.22 * r())], mL = prom(LOTE);
     const n2 = v => v.toFixed(2).replace('.', ',');
     const COL = [{ x: 24, w: 232 }, { x: 296, w: 220 }, { x: 556, w: 230 }, { x: 826, w: 250 }];
-    const TIT = ['un parche', 'un bloque', 'una imagen', 'el lote'];
+    const TIT = ['un parche', 'un bloque', 'una imagen', 'el batch'];
     const draw = t => {
       ctx.clearRect(0, 0, W, H);
       const n = Math.round(t);
       encabezado(ctx, 6, ['Por parche: la distancia entre el vector predicho y su objetivo',
         'Por bloque: se promedian las distancias de sus parches',
         'Por imagen: se promedian los M bloques objetivo (4 en el paper)',
-        'Por lote: se promedia sobre todas las imágenes. Ese número es la pérdida'][n]);
+        'Por batch: se promedia sobre todas las imágenes. Ese número es la pérdida'][n]);
       const ap = k => (k === 0 ? 1 : clamp(t - k + 1, 0, 1));
       const op = k => ap(k) * (k === n ? 1 : 0.5);
       COL.forEach((c, k) => {
@@ -368,7 +368,7 @@
         tx(ctx, 'promedio de los 4 bloques', x0, y0 + s + 28, { color: alfa(C.grey2, a), size: 13 });
         tx(ctx, '= ' + n2(mI), x0, y0 + s + 54, { color: alfa(C.navy, a), size: 17, weight: '700' });
       }
-      // 4. el lote
+      // 4. el batch
       if (ap(3) > 0.01) {
         const a = op(3), c = COL[3], s = 52, x0 = c.x + 10, y0 = 106;
         LOTE.forEach((v, b) => {
@@ -377,12 +377,12 @@
           caja(ctx, x, y, s, s, { r: 4, stroke: alfa(b === 0 ? C.coralD : C.grid, a), lw: b === 0 ? 2.4 : 1.2 });
           tx(ctx, n2(v), x + s / 2, y + s / 2 + 5, { color: alfa(C.navy, a), size: 13, weight: '700', align: 'center' });
         });
-        tx(ctx, '… una imagen por ejemplo del lote', x0, y0 + 3 * (s + 6) + 16, { color: alfa(C.grey2, a), size: 12.5 });
+        tx(ctx, '… una imagen por ejemplo del batch', x0, y0 + 3 * (s + 6) + 16, { color: alfa(C.grey2, a), size: 12.5 });
         caja(ctx, x0 - 4, y0 + 3 * (s + 6) + 30, 236, 40, { r: 10, fill: alfa(C.navy, a) });
         tx(ctx, 'pérdida  L = ' + n2(mL), x0 + 114, y0 + 3 * (s + 6) + 56, { color: alfa('#ffffff', a), size: 17, weight: '700', align: 'center' });
       }
-      tx(ctx, n < 3 ? 'Como el código arma bloques del mismo tamaño en todo el lote, equivale a promediar todos los parches objetivo.'
-        : 'Un solo número por lote. Su gradiente llega al predictor y al encoder de contexto; $s_y$ no recibe gradiente.', 24, H - 12, { color: C.grey2, size: 13.5 });
+      tx(ctx, n < 3 ? 'Como el código arma bloques del mismo tamaño en todo el batch, equivale a promediar todos los parches objetivo.'
+        : 'Un solo número por batch. Su gradiente llega al predictor y al encoder de contexto; $s_y$ no recibe gradiente.', 24, H - 12, { color: C.grey2, size: 13.5 });
     };
     K.pasos(root, [0, 1, 2, 3], draw, { ms: 1800, max: 1800 });
   });
