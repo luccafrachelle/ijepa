@@ -464,7 +464,7 @@ Separo lo que sale de los números del propio paper de lo que es lectura mía. P
 - *Sensibilidad a la máscara.* Las ablaciones de la sección 6 muestran saltos de decenas de puntos por cambios chicos en la escala o en la cantidad de bloques: el método depende de una configuración bien afinada.
 - *No gana en todo.* En iNaturalist queda detrás de DINO e iBOT; en conteo, detrás de MAE; con fine-tuning completo en ImageNet saca 87,1 contra 87,8 de MAE, aunque con 5,3 veces menos épocas.
 - *Comparaciones no controladas.* Las tablas enfrentan arquitecturas, resoluciones y cantidades de épocas distintas. Es lo habitual en el área, pero así no se aísla el efecto del método.
-- *Sin garantía contra el colapso.* Se evita con un diseño que funciona en la práctica; el paper remite a análisis en escenarios simplificados.
+- *El colapso.* Hay resultados teóricos que explican por qué la asimetría lo evita [@tian2021understanding], obtenidos en redes lineales; el paper remite a ese tipo de análisis.
 
 Y lo que es lectura mía:
 
@@ -487,11 +487,11 @@ La línea siguió en dos direcciones: hacia el video y las acciones, y hacia una
 <p class="credito">Resúmenes a partir de los resúmenes publicados de cada trabajo [@garrido2024iwm; @bardes2024vjepa; @assran2025vjepa2; @balestriero2025lejepa; @nicollier2026spherejepa].</p>
 ```
 
-V-JEPA 2 incorpora tiempo y acciones, que era lo que faltaba para acercarse al modelo del mundo de 2022. LeJEPA y SPHERE-JEPA buscan cambiar las heurísticas contra el colapso por un criterio con fundamento, pero ninguno de los dos se probó con las máscaras de I-JEPA. Eso es lo que hago en la sección siguiente.
+V-JEPA 2 incorpora tiempo y acciones, que era lo que faltaba para acercarse al modelo del mundo de 2022. LeJEPA y SPHERE-JEPA buscan reemplazar la asimetría por un regularizador explícito sobre la distribución de los embeddings, pero ninguno de los dos se probó con las máscaras de I-JEPA. Eso es lo que hago en la sección siguiente.
 
 ## Un experimento propio: ¿se puede reemplazar el EMA? {#sec-experimentos}
 
-I-JEPA evita el colapso con una combinación de recursos (predictor en una sola rama, stop-gradient, encoder objetivo por EMA) que funciona sin una justificación teórica (sección 7). LeJEPA [@balestriero2025lejepa], de Balestriero y LeCun (2025), y SPHERE-JEPA [@nicollier2026spherejepa], de Nicollier y otros, entre ellos Pablo Musé (2026), proponen otra salida: en vez de una asimetría entre ramas, un término de la pérdida que fija la forma de la distribución de los embeddings. Si ese término alcanza para evitar el colapso, el EMA estaría de más.
+I-JEPA evita el colapso con una combinación de recursos (predictor en una sola rama, stop-gradient, encoder objetivo por EMA) que funciona en la práctica y tiene resultados teóricos en redes lineales [@tian2021understanding] (sección 7). LeJEPA [@balestriero2025lejepa], de Balestriero y LeCun (2025), y SPHERE-JEPA [@nicollier2026spherejepa], de Nicollier y otros, entre ellos Pablo Musé (2026), proponen otra salida: en vez de una asimetría entre ramas, un término de la pérdida que fija la forma de la distribución de los embeddings. Si ese término alcanza para evitar el colapso, el EMA estaría de más.
 
 Que eso valga para I-JEPA no es obvio, por dos motivos. Los dos trabajos se evaluaron con vistas aumentadas, dentro del marco de invariancia de la sección 4, y ninguno con las máscaras de I-JEPA. Y aun en ese marco el EMA no sobra: en la tabla 3 de SPHERE-JEPA (ViT-B/14, ImageNet-1K, 100 épocas), sacarlo le cuesta entre 8 y 12 puntos a cada método, con el regularizador puesto. Los autores lo atribuyen, sin aislarlo, a que el EMA da objetivos que cambian despacio, algo que un término sobre la distribución del batch no controla.
 
@@ -626,7 +626,7 @@ Escala chica (ViT-Tiny, ImageNet-100, 100 épocas), lejos del régimen en el que
 2. JEPA lleva la predicción al espacio de representaciones, donde el propio modelo puede descartar lo impredecible.
 3. En I-JEPA un encoder ve una parte de la imagen, otro la ve entera, y un predictor angosto, condicionado por la posición, conecta los dos.
 4. Que la representación sea semántica depende sobre todo de la máscara: bloques objetivo grandes y un contexto informativo y repartido.
-5. El colapso se evita con asimetría (stop-gradient y EMA), una solución empírica que motivó la búsqueda de regularizadores con fundamento.
+5. El colapso se evita con asimetría (stop-gradient y EMA), con resultados teóricos en redes lineales; LeJEPA y SPHERE-JEPA proponen en cambio regularizadores explícitos.
 6. En mi experimento, SIGReg y SUSReg evitaron el colapso dimensional de I-JEPA sin EMA, pero no recuperaron su rendimiento, y sumados al EMA lo empeoraron (al menos con el $\lambda$ elegido); la geometría esférica no superó a la gaussiana.
 
 ## Referencias {.unnumbered}

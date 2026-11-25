@@ -381,7 +381,7 @@
       'Sin el promedio lento, predicción y objetivo se mueven juntos y la representación pierde dimensiones.'
     ].map(s => parrafo(S, s, RX, 324, 660, { size: 19, lh: 26, color: C.navy })));
     NOTA.set(0);
-    A.texto(S, 'Esquema. La solución trivial sigue existiendo: lo que la evita es la dinámica del entrenamiento, sin garantía.', 0, 446, { size: 18, color: C.grey2 });
+    A.texto(S, 'Esquema. La solución trivial sigue existiendo; hay resultados teóricos sobre por qué la dinámica la evita (Tian et al., 2021).', 0, 446, { size: 18, color: C.grey2 });
 
     const pon = (e, a, b) => { e.setAttribute('x1', a[0]); e.setAttribute('y1', a[1]); e.setAttribute('x2', b[0]); e.setAttribute('y2', b[1]); };
     const dibuja = v => {

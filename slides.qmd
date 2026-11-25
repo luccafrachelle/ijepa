@@ -116,8 +116,7 @@ Resuelve sólo esa pieza, en imágenes estáticas: sin tiempo ni acciones, y con
 ::: {.column width="50%"}
 **predecir el dato**
 
-- Predecir los píxeles que faltan.
-- Es lo que hace un MAE.
+- Predecir los píxeles que faltan (MAE).
 - Si lo que falta es incierto, el error cuadrático lleva a predecir el promedio: una imagen borrosa.
 - El objetivo es fijo: no colapsa mientras $z$ lleve poca información. Pero lo aprendido suele ser de menor nivel semántico.
 :::
@@ -320,7 +319,7 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 ::: {.column width="48%"}
 - Muy sensible a la máscara, que también es diseño a mano.
 - No gana en todo: iNaturalist (47,6 contra 57,3 de iBOT), conteo (86,7 contra 90,5 de MAE), fine-tuning.
-- Nada garantiza que no colapse: EMA y stop-gradient funcionan en la práctica, sin una explicación completa.
+- Colapso: hay resultados teóricos sobre por qué EMA y stop-gradient lo evitan (Tian et al., 2021), obtenidos en redes lineales.
 - Sin tiempo, sin acciones y sin variable latente para varios desenlaces: lejos del programa de 2022.
 
 :::
@@ -329,7 +328,7 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 <table class="ruta">
 <tr><td>2024 · V-JEPA</td><td>El mismo principio en video.</td></tr>
 <tr><td>2025 · V-JEPA 2</td><td>Modelo del mundo condicionado por acciones, usado para planificar con un brazo robótico.</td></tr>
-<tr><td>2025 · LeJEPA</td><td>SIGReg: un regularizador que lleva los embeddings a una gaussiana isótropa, en lugar de las heurísticas contra el colapso.</td></tr>
+<tr><td>2025 · LeJEPA</td><td>SIGReg: un regularizador que lleva los embeddings a una gaussiana isótropa, en lugar de EMA y stop-gradient.</td></tr>
 <tr><td>2026 · SPHERE-JEPA</td><td>SUSReg: la misma idea, con la distribución uniforme sobre la esfera.</td></tr>
 </table>
 ```
@@ -349,14 +348,14 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 
 ## Apéndice: experimentos de juguete {.section-break background-color="#0f3460"}
 
-<p class="sub">Material de respaldo, por si sobra tiempo</p>
+<p class="sub">Por si sobra tiempo</p>
 
 
 ## La pregunta
 
 ::: {.columns}
 ::: {.column width="52%"}
-- I-JEPA evita el colapso con una heurística: EMA y stop-gradient.
+- I-JEPA evita el colapso con asimetría: EMA y stop-gradient, con resultados teóricos en redes lineales (Tian et al., 2021).
 - **LeJEPA** (Balestriero y LeCun, 2025) y SPHERE-JEPA (Nicollier y otros, entre ellos Musé, 2026) usan un regularizador que fija la forma de la distribución de los embeddings.
 - Ambos se probaron con vistas aumentadas, no con máscaras; y aun ahí, sin EMA pierden 8 a 12 puntos.
 - **¿Reemplazan al EMA dentro de I-JEPA?**

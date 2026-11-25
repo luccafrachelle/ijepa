@@ -1092,8 +1092,7 @@ s_{t+1} = \text{Pred}(s_t,\ a_t,\ z_t)
 <div class="column" style="width:50%;">
 <p><strong>predecir el dato</strong></p>
 <ul>
-<li>Predecir los píxeles que faltan.</li>
-<li>Es lo que hace un MAE.</li>
+<li>Predecir los píxeles que faltan (MAE).</li>
 <li>Si lo que falta es incierto, el error cuadrático lleva a predecir el promedio: una imagen borrosa.</li>
 <li>El objetivo es fijo: no colapsa mientras <span class="math inline">\(z\)</span> lleve poca información. Pero lo aprendido suele ser de menor nivel semántico.</li>
 </ul>
@@ -1267,7 +1266,7 @@ Figura 6 de Assran et al. (2023). Original, contexto visible y muestras de un d
 <ul>
 <li>Muy sensible a la máscara, que también es diseño a mano.</li>
 <li>No gana en todo: iNaturalist (47,6 contra 57,3 de iBOT), conteo (86,7 contra 90,5 de MAE), fine-tuning.</li>
-<li>Nada garantiza que no colapse: EMA y stop-gradient funcionan en la práctica, sin una explicación completa.</li>
+<li>Colapso: hay resultados teóricos sobre por qué EMA y stop-gradient lo evitan (Tian et al., 2021), obtenidos en redes lineales.</li>
 <li>Sin tiempo, sin acciones y sin variable latente para varios desenlaces: lejos del programa de 2022.</li>
 </ul>
 </div><div class="column" style="width:52%;">
@@ -1283,7 +1282,7 @@ Figura 6 de Assran et al. (2023). Original, contexto visible y muestras de un d
 </tr>
 <tr class="odd">
 <td>2025 · LeJEPA</td>
-<td>SIGReg: un regularizador que lleva los embeddings a una gaussiana isótropa, en lugar de las heurísticas contra el colapso.</td>
+<td>SIGReg: un regularizador que lleva los embeddings a una gaussiana isótropa, en lugar de EMA y stop-gradient.</td>
 </tr>
 <tr class="even">
 <td>2026 · SPHERE-JEPA</td>
@@ -1355,7 +1354,7 @@ Tian, Yuandong, Xinlei Chen, y Surya Ganguli. 2021. <span>«Understanding Self-S
 <section id="apéndice-experimentos-de-juguete" class="slide level2 section-break" data-background-color="#0f3460">
 <h2>Apéndice: experimentos de juguete</h2>
 <p class="sub">
-Material de respaldo, por si sobra tiempo
+Por si sobra tiempo
 </p>
 </section>
 <section id="la-pregunta" class="slide level2">
@@ -1363,7 +1362,7 @@ Material de respaldo, por si sobra tiempo
 <div class="columns">
 <div class="column" style="width:52%;">
 <ul>
-<li>I-JEPA evita el colapso con una heurística: EMA y stop-gradient.</li>
+<li>I-JEPA evita el colapso con asimetría: EMA y stop-gradient, con resultados teóricos en redes lineales (Tian et al., 2021).</li>
 <li><strong>LeJEPA</strong> (Balestriero y LeCun, 2025) y SPHERE-JEPA (Nicollier y otros, entre ellos Musé, 2026) usan un regularizador que fija la forma de la distribución de los embeddings.</li>
 <li>Ambos se probaron con vistas aumentadas, no con máscaras; y aun ahí, sin EMA pierden 8 a 12 puntos.</li>
 <li><strong>¿Reemplazan al EMA dentro de I-JEPA?</strong></li>
@@ -7373,7 +7372,7 @@ window.QuartoSupport = function () {
           'Sin el promedio lento, predicción y objetivo se mueven juntos y la representación pierde dimensiones.'
         ].map(s => parrafo(S, s, RX, 324, 660, { size: 19, lh: 26, color: C.navy })));
         NOTA.set(0);
-        A.texto(S, 'Esquema. La solución trivial sigue existiendo: lo que la evita es la dinámica del entrenamiento, sin garantía.', 0, 446, { size: 18, color: C.grey2 });
+        A.texto(S, 'Esquema. La solución trivial sigue existiendo; hay resultados teóricos sobre por qué la dinámica la evita (Tian et al., 2021).', 0, 446, { size: 18, color: C.grey2 });
 
         const pon = (e, a, b) => { e.setAttribute('x1', a[0]); e.setAttribute('y1', a[1]); e.setAttribute('x2', b[0]); e.setAttribute('y2', b[1]); };
         const dibuja = v => {

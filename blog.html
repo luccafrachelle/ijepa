@@ -2637,7 +2637,7 @@ Una red puede aprender mucho sobre imágenes sin ninguna etiqueta: alcanza con t
 <li><em>Sensibilidad a la máscara.</em> Las ablaciones de la sección 6 muestran saltos de decenas de puntos por cambios chicos en la escala o en la cantidad de bloques: el método depende de una configuración bien afinada.</li>
 <li><em>No gana en todo.</em> En iNaturalist queda detrás de DINO e iBOT; en conteo, detrás de MAE; con fine-tuning completo en ImageNet saca 87,1 contra 87,8 de MAE, aunque con 5,3 veces menos épocas.</li>
 <li><em>Comparaciones no controladas.</em> Las tablas enfrentan arquitecturas, resoluciones y cantidades de épocas distintas. Es lo habitual en el área, pero así no se aísla el efecto del método.</li>
-<li><em>Sin garantía contra el colapso.</em> Se evita con un diseño que funciona en la práctica; el paper remite a análisis en escenarios simplificados.</li>
+<li><em>El colapso.</em> Hay resultados teóricos que explican por qué la asimetría lo evita <span class="citation" data-cites="tian2021understanding">(<a href="#ref-tian2021understanding" role="doc-biblioref">Tian, Chen, y Ganguli 2021</a>)</span>, obtenidos en redes lineales; el paper remite a ese tipo de análisis.</li>
 </ul>
 <p>Y lo que es lectura mía:</p>
 <ul>
@@ -2675,11 +2675,11 @@ Una red puede aprender mucho sobre imágenes sin ninguna etiqueta: alcanza con t
 </table>
 
 <p class="credito">Resúmenes a partir de los resúmenes publicados de cada trabajo [@garrido2024iwm; @bardes2024vjepa; @assran2025vjepa2; @balestriero2025lejepa; @nicollier2026spherejepa].</p>
-<p>V-JEPA 2 incorpora tiempo y acciones, que era lo que faltaba para acercarse al modelo del mundo de 2022. LeJEPA y SPHERE-JEPA buscan cambiar las heurísticas contra el colapso por un criterio con fundamento, pero ninguno de los dos se probó con las máscaras de I-JEPA. Eso es lo que hago en la sección siguiente.</p>
+<p>V-JEPA 2 incorpora tiempo y acciones, que era lo que faltaba para acercarse al modelo del mundo de 2022. LeJEPA y SPHERE-JEPA buscan reemplazar la asimetría por un regularizador explícito sobre la distribución de los embeddings, pero ninguno de los dos se probó con las máscaras de I-JEPA. Eso es lo que hago en la sección siguiente.</p>
 </section>
 <section id="sec-experimentos" class="level2 page-columns page-full" data-number="11">
 <h2 data-number="11" class="anchored" data-anchor-id="sec-experimentos"><span class="header-section-number">11</span> Un experimento propio: ¿se puede reemplazar el EMA?</h2>
-<p>I-JEPA evita el colapso con una combinación de recursos (predictor en una sola rama, stop-gradient, encoder objetivo por EMA) que funciona sin una justificación teórica (sección 7). LeJEPA <span class="citation" data-cites="balestriero2025lejepa">(<a href="#ref-balestriero2025lejepa" role="doc-biblioref">Balestriero y LeCun 2025</a>)</span>, de Balestriero y LeCun (2025), y SPHERE-JEPA <span class="citation" data-cites="nicollier2026spherejepa">(<a href="#ref-nicollier2026spherejepa" role="doc-biblioref">Nicollier et al. 2026</a>)</span>, de Nicollier y otros, entre ellos Pablo Musé (2026), proponen otra salida: en vez de una asimetría entre ramas, un término de la pérdida que fija la forma de la distribución de los embeddings. Si ese término alcanza para evitar el colapso, el EMA estaría de más.</p>
+<p>I-JEPA evita el colapso con una combinación de recursos (predictor en una sola rama, stop-gradient, encoder objetivo por EMA) que funciona en la práctica y tiene resultados teóricos en redes lineales <span class="citation" data-cites="tian2021understanding">(<a href="#ref-tian2021understanding" role="doc-biblioref">Tian, Chen, y Ganguli 2021</a>)</span> (sección 7). LeJEPA <span class="citation" data-cites="balestriero2025lejepa">(<a href="#ref-balestriero2025lejepa" role="doc-biblioref">Balestriero y LeCun 2025</a>)</span>, de Balestriero y LeCun (2025), y SPHERE-JEPA <span class="citation" data-cites="nicollier2026spherejepa">(<a href="#ref-nicollier2026spherejepa" role="doc-biblioref">Nicollier et al. 2026</a>)</span>, de Nicollier y otros, entre ellos Pablo Musé (2026), proponen otra salida: en vez de una asimetría entre ramas, un término de la pérdida que fija la forma de la distribución de los embeddings. Si ese término alcanza para evitar el colapso, el EMA estaría de más.</p>
 <p>Que eso valga para I-JEPA no es obvio, por dos motivos. Los dos trabajos se evaluaron con vistas aumentadas, dentro del marco de invariancia de la sección 4, y ninguno con las máscaras de I-JEPA. Y aun en ese marco el EMA no sobra: en la tabla 3 de SPHERE-JEPA (ViT-B/14, ImageNet-1K, 100 épocas), sacarlo le cuesta entre 8 y 12 puntos a cada método, con el regularizador puesto. Los autores lo atribuyen, sin aislarlo, a que el EMA da objetivos que cambian despacio, algo que un término sobre la distribución del batch no controla.</p>
 <section id="dos-regularizadores-por-arriba" class="level3 page-columns page-full" data-number="11.1">
 <h3 data-number="11.1" class="anchored" data-anchor-id="dos-regularizadores-por-arriba"><span class="header-section-number">11.1</span> Dos regularizadores, por arriba</h3>
@@ -2847,7 +2847,7 @@ Una red puede aprender mucho sobre imágenes sin ninguna etiqueta: alcanza con t
 <li>JEPA lleva la predicción al espacio de representaciones, donde el propio modelo puede descartar lo impredecible.</li>
 <li>En I-JEPA un encoder ve una parte de la imagen, otro la ve entera, y un predictor angosto, condicionado por la posición, conecta los dos.</li>
 <li>Que la representación sea semántica depende sobre todo de la máscara: bloques objetivo grandes y un contexto informativo y repartido.</li>
-<li>El colapso se evita con asimetría (stop-gradient y EMA), una solución empírica que motivó la búsqueda de regularizadores con fundamento.</li>
+<li>El colapso se evita con asimetría (stop-gradient y EMA), con resultados teóricos en redes lineales; LeJEPA y SPHERE-JEPA proponen en cambio regularizadores explícitos.</li>
 <li>En mi experimento, SIGReg y SUSReg evitaron el colapso dimensional de I-JEPA sin EMA, pero no recuperaron su rendimiento, y sumados al EMA lo empeoraron (al menos con el <span class="math inline">\lambda</span> elegido); la geometría esférica no superó a la gaussiana.</li>
 </ol>
 </section>
@@ -7673,7 +7673,7 @@ window.OTK_TEX = {"(":{"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"
       'Sin el promedio lento, predicción y objetivo se mueven juntos y la representación pierde dimensiones.'
     ].map(s => parrafo(S, s, RX, 324, 660, { size: 19, lh: 26, color: C.navy })));
     NOTA.set(0);
-    A.texto(S, 'Esquema. La solución trivial sigue existiendo: lo que la evita es la dinámica del entrenamiento, sin garantía.', 0, 446, { size: 18, color: C.grey2 });
+    A.texto(S, 'Esquema. La solución trivial sigue existiendo; hay resultados teóricos sobre por qué la dinámica la evita (Tian et al., 2021).', 0, 446, { size: 18, color: C.grey2 });
 
     const pon = (e, a, b) => { e.setAttribute('x1', a[0]); e.setAttribute('y1', a[1]); e.setAttribute('x2', b[0]); e.setAttribute('y2', b[1]); };
     const dibuja = v => {
