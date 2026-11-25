@@ -277,6 +277,30 @@ Junto con el stop-gradient, esta asimetría es lo que evita el colapso en I-JEPA
 <p class="leyenda">Tian et al. (2021) analizan esta dinámica en redes lineales. En el experimento del apéndice, I-JEPA sin EMA colapsó en parte: rango efectivo final 28, contra 102 con EMA.</p>
 ```
 
+## El stop-gradient, con el tiempo explícito
+
+En el paso $t$ la pérdida es $L(\theta_t, \bar\theta_t)$, y el EMA da
+$$
+\bar\theta_t = m\,\bar\theta_{t-1} + (1-m)\,\theta_{t-1}
+$$
+
+::: {.columns}
+::: {.column width="50%"}
+::: {.caja .idea}
+<span class="tag">Lo que no se ignora</span>
+$\bar\theta_t$ depende de los $\theta$ del pasado, no de $\theta_t$. Tratarlo como fijo al derivar respecto de $\theta_t$ es exacto en ese paso.
+:::
+:::
+::: {.column width="50%"}
+::: {.caja .prueba}
+<span class="tag">Lo que sí se ignora</span>
+El $\theta_t$ de hoy entra en el objetivo de mañana, $\bar\theta_{t+1}$. La actualización es miope: como en las GAN, no hay una pérdida fija que se minimice en $\theta$ y $\bar\theta$ a la vez (Grill et al., 2020).
+:::
+:::
+:::
+
+Si el gradiente viera esa vía, el atajo sería llevar el objetivo a una constante: colapso. Cortarla deja como única salida predecir mejor contra objetivos que ya están dispersos.
+
 ## Cómo se ve el entrenamiento
 
 ```{=html}

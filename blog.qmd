@@ -351,6 +351,8 @@ El momento $m$ empieza en 0,996 y sube linealmente hasta 1 a lo largo del entren
 
 Con $m = 0$ el encoder objetivo es una copia del de contexto en cada paso. A medida que $m$ se acerca a 1, la trayectoria del encoder objetivo se vuelve más suave y más atrasada: con $m = 0{,}99$ promedia más o menos los últimos 100 pasos; con $m = 0{,}996$, los últimos 250. Los objetivos $s_y$ cambian despacio y el predictor no persigue un blanco que salta en cada paso.
 
+Con el tiempo explícito se ve por qué cortar el gradiente no es un error. En el paso $t$ la pérdida es $L(\theta_t, \bar\theta_t)$ y el EMA da $\bar\theta_t = m\,\bar\theta_{t-1} + (1-m)\,\theta_{t-1}$: el objetivo de hoy depende de los $\theta$ del pasado, no de $\theta_t$. Tratarlo como fijo al derivar es exacto para ese paso. Lo que sí se ignora es el futuro: el $\theta_t$ que elijo ahora entra en $\bar\theta_{t+1}$. La actualización es miope y, como en las GAN, no hay una pérdida fija que se minimice en $\theta$ y $\bar\theta$ a la vez [@grill2020byol]. Y está bien que lo sea: si el gradiente viera esa vía, el atajo sería llevar el objetivo a una constante. Cortarla deja como única salida acercar cada predicción a un objetivo que, con pesos al azar, ya arranca separado de los demás.
+
 ### Cómo se ve el entrenamiento
 
 Hay una sola pérdida, y la minimizan el encoder de contexto y el predictor. El encoder objetivo no la minimiza: lo arrastra el EMA. Por eso el blanco se mueve, y la curva de pérdida no se parece a la de un problema supervisado. En mis corridas (sección 11) cae enseguida, sube durante decenas de épocas mientras la representación se enriquece y recién después baja despacio. Sin EMA queda más baja todo el tiempo, con una representación mucho peor.

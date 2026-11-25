@@ -1227,6 +1227,23 @@ Assran, Duval, Misra, Bojanowski, Vincent, Rabbat, LeCun y Ballas · CVPR 2023
 </div>
 <p class="leyenda">Tian et al. (2021) analizan esta dinámica en redes lineales. En el experimento del apéndice, I-JEPA sin EMA colapsó en parte: rango efectivo final 28, contra 102 con EMA.</p>
 </section>
+<section id="el-stop-gradient-con-el-tiempo-explícito" class="slide level2">
+<h2>El stop-gradient, con el tiempo explícito</h2>
+<p>En el paso <span class="math inline">\(t\)</span> la pérdida es <span class="math inline">\(L(\theta_t, \bar\theta_t)\)</span>, y el EMA da <span class="math display">\[
+\bar\theta_t = m\,\bar\theta_{t-1} + (1-m)\,\theta_{t-1}
+\]</span></p>
+<div class="columns">
+<div class="column" style="width:50%;">
+<div class="caja idea">
+<p><span class="tag">Lo que no se ignora</span> <span class="math inline">\(\bar\theta_t\)</span> depende de los <span class="math inline">\(\theta\)</span> del pasado, no de <span class="math inline">\(\theta_t\)</span>. Tratarlo como fijo al derivar respecto de <span class="math inline">\(\theta_t\)</span> es exacto en ese paso.</p>
+</div>
+</div><div class="column" style="width:50%;">
+<div class="caja prueba">
+<p><span class="tag">Lo que sí se ignora</span> El <span class="math inline">\(\theta_t\)</span> de hoy entra en el objetivo de mañana, <span class="math inline">\(\bar\theta_{t+1}\)</span>. La actualización es miope: como en las GAN, no hay una pérdida fija que se minimice en <span class="math inline">\(\theta\)</span> y <span class="math inline">\(\bar\theta\)</span> a la vez (Grill et al., 2020).</p>
+</div>
+</div></div>
+<p>Si el gradiente viera esa vía, el atajo sería llevar el objetivo a una constante: colapso. Cortarla deja como única salida predecir mejor contra objetivos que ya están dispersos.</p>
+</section>
 <section id="cómo-se-ve-el-entrenamiento" class="slide level2">
 <h2>Cómo se ve el entrenamiento</h2>
 <div class="ot-widget" data-widget="dinamica" data-alt="Pérdida de predicción y rango efectivo por época en corridas propias: con EMA la pérdida cae, sube mientras el rango crece y baja despacio; sin EMA la pérdida es menor pero el rango se estanca en 28">
@@ -7336,10 +7353,10 @@ window.QuartoSupport = function () {
         }
 
         const head = titulos(S, [
-          ['Dos salidas por imagen: la predicción y el objetivo', C.navy],
+          ['Pesos al azar: las representaciones ya arrancan dispersas', C.navy],
           ['Si el gradiente pasara por las dos ramas, ambas se juntan en un punto', C.coralD],
-          ['Con stop-gradient, la pérdida no puede mover el objetivo', C.teal],
-          ['Con EMA, el objetivo sigue al encoder de contexto, despacio', C.teal],
+          ['Stop-gradient: en este paso el objetivo está quieto', C.teal],
+          ['Después del paso, el EMA corre el objetivo un poquito', C.teal],
           ['Sin EMA (m = 0), el objetivo cambia con cada paso y la nube se aplasta', C.coralD]
         ], { y: 32 });
         head.set(0);
@@ -7355,6 +7372,15 @@ window.QuartoSupport = function () {
           o: el('circle', { r: 8.5, fill: '#fff', stroke: col, 'stroke-width': 2.9 }, S),
           p: el('circle', { r: 6.5, fill: col }, S)
         }));
+        // escenario 2: flechas del gradiente (cada predicción hacia su objetivo) y el objetivo quieto
+        const GR = CEN.map((c, i) => {
+          const p0 = [c[0] + OFF[i][0], c[1] + OFF[i][1]], a = [mx(p0[0]), my(p0[1])], o = [mx(c[0]), my(c[1])];
+          const b = [a[0] + (o[0] - a[0]) * 0.72, a[1] + (o[1] - a[1]) * 0.72];
+          const fl = A.flecha(S, [a, b], C.navy, { lw: 2.4 }); fl.style.opacity = 0; return fl;
+        });
+        const quieto = el('g', {}, S); quieto.style.opacity = 0;
+        el('rect', { x: P.x + P.s - 150, y: P.y + 8, width: 142, height: 30, rx: 8, fill: '#fff', stroke: C.teal, 'stroke-width': 1.6 }, quieto);
+        A.texto(quieto, 'objetivo quieto', P.x + P.s - 79, P.y + 29, { size: 16, weight: '600', color: C.teal, anchor: 'middle' });
         const LY = P.y + P.s + 30;
         el('circle', { cx: P.x + 10, cy: LY - 6, r: 6, fill: C.grey2 }, S); A.texto(S, 'predicción $\\hat s_y$', P.x + 24, LY, { size: 18, color: C.grey2 });
         el('circle', { cx: P.x + 188, cy: LY - 6, r: 6.5, fill: '#fff', stroke: C.grey2, 'stroke-width': 2.4 }, S); A.texto(S, 'objetivo $s_y$', P.x + 202, LY, { size: 18, color: C.grey2 });
@@ -7363,10 +7389,10 @@ window.QuartoSupport = function () {
         ['pérdida (distancia predicción–objetivo)', 'dispersión de los objetivos', 'ancho en la dirección más angosta'].forEach((s, j) => A.texto(S, s, RX, filaY[j], { size: 18, color: C.grey2 }));
         const V = filaY.map(y => texto0(S, RX, y + 34, { size: 27, weight: '600' }));
         const NOTA = seq([
-          'La pérdida sólo pide que cada predicción caiga sobre su objetivo.',
+          'Con pesos al azar, imágenes distintas ya dan representaciones distintas. La pérdida sólo pide que cada predicción caiga sobre su objetivo.',
           'Mover las dos salidas hacia la misma constante es el camino más corto a pérdida cero: colapso.',
-          'El objetivo queda fijo durante el paso; para bajar la pérdida, la única salida es predecir bien.',
-          'Los objetivos se desplazan, pero siguen separados: vienen de un encoder que todavía distingue las imágenes.',
+          'El gradiente mueve θ suponiendo que θ̄ no se mueve. Lo mejor que puede hacer es acercar cada predicción a su objetivo, que ya está separado de los demás: nada tira hacia el colapso.',
+          'El objetivo avanza una fracción 1 − m hacia el encoder de contexto. Se desplaza despacio y sigue separado: viene de un encoder que todavía distingue las imágenes.',
           'Sin el promedio lento, predicción y objetivo se mueven juntos y la representación pierde dimensiones.'
         ].map(s => parrafo(S, s, RX, 324, 660, { size: 19, lh: 26, color: C.navy })));
         NOTA.set(0);
@@ -7404,9 +7430,17 @@ window.QuartoSupport = function () {
           head.a(tl, k, at);
           if (k > 1) va(tl, PX, k - 1, k - 1 + VUELTA, at + 0.5, 1.0);
           if (k === 4) tl.to(recta, { opacity: 1, duration: 0.8 }, at + 1.6);
-          const t0 = at + (k > 1 ? 1.6 : 0.6);
+          let t0 = at + (k > 1 ? 1.6 : 0.6);
+          const tNota = t0 + 0.3;
+          if (k === 2) {                       // primero se ve el gradiente con el objetivo quieto, después se mueve
+            tl.to(quieto, { opacity: 1, duration: 0.5 }, t0);
+            GR.forEach((g, i) => { tl.set(g, { opacity: 1 }, t0 + 0.3 + 0.12 * i); A.trazar(tl, g, t0 + 0.3 + 0.12 * i, 0.7); });
+            t0 += 1.8;
+            tl.to(GR, { opacity: 0, duration: 0.6 }, t0 + 1.0);
+          }
+          if (k === 3) tl.to(quieto, { opacity: 0, duration: 0.4 }, at + 0.3);
           va(tl, PX, k > 1 ? k - 1 + VUELTA : 0, k, t0, 2.2);
-          NOTA.a(tl, k, t0 + 0.3);
+          NOTA.a(tl, k, tNota);
           if (k === 4) { /* la recta queda */ }
           at = tl.duration(); tl.addLabel('s' + k, at);
         }
