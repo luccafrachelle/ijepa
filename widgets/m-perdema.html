@@ -10,8 +10,8 @@
      s6 viaja al batch; aparecen las otras imágenes · s7 promedio del batch: la pérdida L
      s8 el gradiente de L llega al predictor y al encoder de contexto; s_y no recibe gradiente
    ema — paradas:
-     s0 inicio · s1 θ se mueve por gradiente y la fórmula del promedio móvil · s2 m = 0,9
-     s3 m de 0,996 a 1 (I-JEPA), con el recuadro de m durante el entrenamiento */
+     s0 inicio · s1–s4 de cerca: gradiente, EMA, gradiente (con el θ̄ nuevo), EMA: uno y uno
+     s5 miles de pasos con m = 0,9, θ y θ̄ a la par · s6 m de 0,996 a 1 (I-JEPA), con el recuadro de m durante el entrenamiento */
 (function () {
   const K = window.OTK, A = window.OTA, C = A.C, G = A.G;
   const el = A.el, tr = A.tr;
@@ -291,18 +291,60 @@
 
     const head = A.encabezado(S, 7, [
       'El encoder objetivo no recibe gradiente: sus pesos se actualizan con un promedio móvil',
-      'Los pesos $\\theta$ se mueven por gradiente; en cada paso, $\\bar\\theta$ se acerca un poco a $\\theta$',
-      'Con $m = 0{,}9$ el promedio sigue de cerca a $\\theta$',
+      'Primero, un paso de gradiente mueve $\\theta$; $\\bar\\theta$ queda quieto',
+      'Después, un paso de EMA acerca $\\bar\\theta$ a $\\theta$, un poco; ahora $\\theta$ queda quieto',
+      'El gradiente siguiente usa el $\\bar\\theta$ nuevo: el EMA cambia el objetivo, aunque sea poco',
+      'Y otra vez EMA: van uno y uno, nunca a la vez',
+      'Miles de pasos así, con $m = 0{,}9$: el promedio sigue de cerca a $\\theta$',
       'En I-JEPA $m$ sube de 0,996 a 1: hacia el final el encoder objetivo casi no se mueve'
     ]);
     head.set(0);
 
     // panel 2D y gráfico de una coordenada
-    el('rect', { x: P.x, y: P.y, width: P.s, height: P.s, rx: 10, fill: '#fafafc', stroke: C.grid, 'stroke-width': 1.2 }, S);
-    A.texto(S, 'pesos de la red (esquema en 2D)', P.x + P.s / 2, P.y + P.s + 26, { size: 18, color: C.grey2, anchor: 'middle' });
-    for (let g = 0; g <= 4; g++) el('line', { x1: Q.x, x2: Q.x + Q.w, y1: Q.y + Q.h * g / 4, y2: Q.y + Q.h * g / 4, stroke: C.grid, 'stroke-width': 1 }, S);
-    A.texto(S, 'una coordenada de los pesos a lo largo del entrenamiento', Q.x, Q.y - 18, { size: 19, weight: '600', color: C.navy });
-    A.texto(S, 'pasos →', Q.x + Q.w, Q.y + Q.h + 24, { size: 17, color: C.grey2, anchor: 'end' });
+    const gFondo = el('g', {}, S); gFondo.style.opacity = 0;
+    el('rect', { x: P.x, y: P.y, width: P.s, height: P.s, rx: 10, fill: '#fafafc', stroke: C.grid, 'stroke-width': 1.2 }, gFondo);
+    A.texto(gFondo, 'pesos de la red (esquema en 2D)', P.x + P.s / 2, P.y + P.s + 26, { size: 18, color: C.grey2, anchor: 'middle' });
+    for (let g = 0; g <= 4; g++) el('line', { x1: Q.x, x2: Q.x + Q.w, y1: Q.y + Q.h * g / 4, y2: Q.y + Q.h * g / 4, stroke: C.grid, 'stroke-width': 1 }, gFondo);
+    A.texto(gFondo, 'una coordenada de los pesos a lo largo del entrenamiento', Q.x, Q.y - 18, { size: 19, weight: '600', color: C.navy });
+    A.texto(gFondo, 'pasos →', Q.x + Q.w, Q.y + Q.h + 24, { size: 17, color: C.grey2, anchor: 'end' });
+
+    // ---- zoom: los primeros pasos, uno y uno (una coordenada; m = 0,9)
+    const Z = el('g', {}, S); Z.style.opacity = 0;
+    const TH = [0.5, 0.9, 0.9, 0.7, 0.7], TB = [0.5, 0.5, 0.54, 0.54, 0.556];
+    const ZX = k => Q.x + 70 + k * 185, ZY = v => Q.y + Q.h + 10 - (v - 0.4) / 0.6 * (Q.h - 10);
+    A.texto(Z, 'los primeros pasos, de cerca (una coordenada de los pesos, $m = 0{,}9$)', Q.x, Q.y - 18, { size: 19, weight: '600', color: C.navy });
+    el('line', { x1: Q.x + 40, x2: Q.x + Q.w - 20, y1: Q.y + Q.h + 30, y2: Q.y + Q.h + 30, stroke: C.grid, 'stroke-width': 1.5 }, Z);
+    const SUB = [['paso de gradiente', C.teal], ['paso de EMA', C.navy], ['paso de gradiente', C.teal], ['paso de EMA', C.navy]];
+    // cada sub-paso: el que se mueve va en diagonal, el otro en horizontal
+    const tramos = SUB.map(([s, col], k) => {
+      const g = el('g', {}, Z);
+      const a = A.flecha(g, [[ZX(k), ZY(TH[k])], [ZX(k + 1), ZY(TH[k + 1])]], C.teal, { lw: TH[k] === TH[k + 1] ? 2 : 3.4, punta: false });
+      const b = A.flecha(g, [[ZX(k), ZY(TB[k])], [ZX(k + 1), ZY(TB[k + 1])]], C.navy, { lw: TB[k] === TB[k + 1] ? 2 : 3.4, punta: false });
+      [a, b].forEach(f => { f.setAttribute('stroke-dasharray', '1 1'); f.setAttribute('stroke-dashoffset', 1); });
+      const pT = el('circle', { cx: ZX(k + 1), cy: ZY(TH[k + 1]), r: 6, fill: C.teal }, g), pB = el('circle', { cx: ZX(k + 1), cy: ZY(TB[k + 1]), r: 6.5, fill: C.navy }, g);
+      const et = el('g', {}, g); A.texto(et, s, (ZX(k) + ZX(k + 1)) / 2, Q.y + Q.h + 56, { size: 17, weight: '600', color: col, anchor: 'middle' });
+      const quieto = el('g', {}, g); const fijo = k % 2 ? TH[k] : TB[k];
+      A.texto(quieto, 'quieto', (ZX(k) + ZX(k + 1)) / 2, ZY(fijo) + (k % 2 ? -12 : 24), { size: 16, color: C.grey2, anchor: 'middle' });
+      [pT, pB, et, quieto].forEach(e => { e.style.opacity = 0; });
+      return { a, b, pT, pB, et, quieto };
+    });
+    const ini = el('g', {}, Z);
+    el('circle', { cx: ZX(0), cy: ZY(TH[0]), r: 6.5, fill: C.navy }, ini);
+    el('circle', { cx: ZX(0), cy: ZY(TH[0]), r: 3.5, fill: C.teal }, ini);
+    A.texto(ini, '$\\theta$', ZX(1) + 14, ZY(TH[1]) + 6, { size: 21, color: C.teal });
+    A.texto(ini, '$\\bar\\theta$', ZX(0) - 14, ZY(TB[0]) + 6, { size: 21, color: C.navy, anchor: 'end' });
+    ini.style.opacity = 0;
+    // el θ̄ nuevo entra en el gradiente siguiente
+    const usa = el('g', {}, Z); usa.style.opacity = 0;
+    const fu = A.flecha(usa, `M${ZX(2) + 8},${ZY(TB[2]) - 4} C${ZX(2) + 70},${ZY(TB[2]) - 40} ${ZX(2) + 80},${ZY(0.82) + 30} ${(ZX(2) + ZX(3)) / 2 + 6},${ZY(0.8) + 12}`, C.blue, { lw: 2.2, dash: '5 4' });
+    A.texto(usa, 'objetivo nuevo', ZX(2) - 12, ZY(TB[2]) - 26, { size: 16, weight: '600', color: C.blue, anchor: 'end' });
+    // fórmulas de cada paso, a la izquierda
+    const fGr = el('g', {}, S), fEm = el('g', {}, S);
+    A.texto(fGr, 'paso de gradiente', P.x + P.s / 2, 140, { size: 18, weight: '600', color: C.teal, anchor: 'middle' });
+    A.texto(fGr, '$\\theta \\leftarrow \\theta - \\eta\\,\\nabla_\\theta L(\\theta, \\bar\\theta)$', P.x + P.s / 2, 182, { size: 24, color: C.text, anchor: 'middle' });
+    A.texto(fEm, 'paso de EMA', P.x + P.s / 2, 250, { size: 18, weight: '600', color: C.navy, anchor: 'middle' });
+    A.texto(fEm, '$\\bar\\theta \\leftarrow m\\bar\\theta + (1-m)\\theta$', P.x + P.s / 2, 292, { size: 24, color: C.text, anchor: 'middle' });
+    fGr.style.opacity = 0; fEm.style.opacity = 0;
 
     // una trayectoria: trazo en el plano (se dibuja por índice, con fotogramas de stroke-dashoffset), trazo en el tiempo
     // (recortado por un rectángulo que crece) y un punto en la punta de cada uno
@@ -368,26 +410,47 @@
     tl.addLabel('s0', 0);
     let at = 0;
 
-    // s1: θ se mueve por gradiente y aparece la fórmula del promedio móvil, por piezas
+    const sub = (k, at) => {   // un sub-paso del zoom: se trazan los dos tramos, el que se mueve y el que queda quieto
+      const T = tramos[k];
+      A.trazar(tl, T.a, at + 0.3, 1.0); A.trazar(tl, T.b, at + 0.3, 1.0);
+      tl.to([T.pT, T.pB], { opacity: 1, duration: 0.3 }, at + 1.1)
+        .to(T.et, { opacity: 1, duration: 0.4 }, at + 0.2).to(T.quieto, { opacity: 1, duration: 0.4 }, at + 1.2);
+    };
+    // s1: paso de gradiente
     head.a(tl, 1, at);
-    tl.to(LEY[0], { opacity: 1, duration: 0.5 }, at + 0.3);
-    cTh.dibuja(tl, at + 0.5, 2.4);
-    F.a(tl, 1, at + 1.4, 0.8); F.a(tl, 2, at + 2.2, 0.8); F.a(tl, 3, at + 3.0, 0.8);
+    tl.to(Z, { opacity: 1, duration: 0.4 }, at + 0.2).to(ini, { opacity: 1, duration: 0.4 }, at + 0.3).to(fGr, { opacity: 1, duration: 0.5 }, at + 0.3);
+    sub(0, at + 0.6);
     at = tl.duration(); tl.addLabel('s1', at);
-
-    // s2: m = 0,9
-    head.a(tl, 2, at); valM.a(tl, 1, at + 0.2);
-    tl.to(cTh, { opacity: 0.45, duration: 0.6 }, at + 0.3).to(LEY[1], { opacity: 1, duration: 0.5 }, at + 0.4);
-    c90.dibuja(tl, at + 0.7, 2.4);
+    // s2: paso de EMA
+    head.a(tl, 2, at);
+    tl.to(fEm, { opacity: 1, duration: 0.5 }, at + 0.3);
+    sub(1, at + 0.6);
     at = tl.duration(); tl.addLabel('s2', at);
+    // s3: el gradiente siguiente usa el θ̄ nuevo
+    head.a(tl, 3, at);
+    tl.to(usa, { opacity: 1, duration: 0.2 }, at + 0.3); A.trazar(tl, fu, at + 0.3, 0.9);
+    sub(2, at + 1.4);
+    at = tl.duration(); tl.addLabel('s3', at);
+    // s4: otra vez EMA
+    head.a(tl, 4, at);
+    sub(3, at + 0.4);
+    at = tl.duration(); tl.addLabel('s4', at);
 
-    // s3: m sube de 0,996 a 1 (I-JEPA)
-    head.a(tl, 3, at); valM.a(tl, 2, at + 0.2);
+    // s5: miles de pasos con m = 0,9: θ y θ̄ se dibujan a la par
+    head.a(tl, 5, at); valM.a(tl, 1, at + 0.6);
+    tl.to([Z, fGr, fEm], { opacity: 0, duration: 0.5 }, at + 0.2).to(gFondo, { opacity: 1, duration: 0.5 }, at + 0.6)
+      .to([LEY[0], LEY[1]], { opacity: 1, duration: 0.5 }, at + 0.8);
+    F.a(tl, 1, at + 0.6, 0.4); F.a(tl, 2, at + 0.9, 0.4); F.a(tl, 3, at + 1.2, 0.4);
+    cTh.dibuja(tl, at + 1.1, 2.8); c90.dibuja(tl, at + 1.1, 2.8);
+    at = tl.duration(); tl.addLabel('s5', at);
+
+    // s6: m sube de 0,996 a 1 (I-JEPA)
+    head.a(tl, 6, at); valM.a(tl, 2, at + 0.2);
     tl.to(c90, { opacity: 0.25, duration: 0.6 }, at + 0.3).to(LEY[1], { opacity: 0.45, duration: 0.6 }, at + 0.3)
       .to(LEY[2], { opacity: 1, duration: 0.5 }, at + 0.4).to(gM, { opacity: 1, duration: 0.5 }, at + 0.4);
     cSch.dibuja(tl, at + 0.8, 2.6);
     tl.to(lineaM, { attr: { 'stroke-dashoffset': 0 }, duration: 2.6, ease: 'none' }, at + 0.8);
-    at = tl.duration(); tl.addLabel('s3', at);
+    at = tl.duration(); tl.addLabel('s6', at);
 
     A.pasos(root, tl);
   }

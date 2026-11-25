@@ -3,7 +3,7 @@
    Reemplazan a los de widgets/ijepa.html con el mismo nombre:
      tres          tres familias de arquitecturas, una columna por vez        s0 … s4
      colapsoPasos  la pérdida no distingue la solución buena del colapso      s0 … s5
-     noColapsa     stop-gradient y EMA; escenario y movimiento en paradas aparte s0 … s9
+     noColapsa     gradiente por las dos ramas; stop-gradient y EMA alternados paso a paso; sin EMA   s0 … s10
      colapso       simulación real (encoder lineal 4→2, predictor 2×2), sólo en el blog;
                    se precalcula al construir y se anima por tramos           s0 … s4
    Los valores que dependen de un estado continuo (pérdida, dispersión, la nube de la simulación) se
@@ -316,32 +316,35 @@
     const proy = p => { const d = p[0] * LN[0] + p[1] * LN[1]; return [d * LN[0], d * LN[1]]; };
     const P = { x: 30, y: 74, s: 300 }, RX = 410;
     const mx = v => P.x + P.s / 2 + v * P.s * 0.42, my = v => P.y + P.s / 2 - v * P.s * 0.42;
-    // escenario n (1..4) en avance u (la timeline pone la curva de velocidad)
-    function estado(n, u) {
-      return CEN.map((c, i) => {
-        const p0 = [c[0] + OFF[i][0], c[1] + OFF[i][1]];
-        if (n === 0) return { p: p0, o: c, tr: null };
-        if (n === 1) { const k = 1 - 0.97 * u; return { p: lerp2(p0, c, u).map(v => v * k), o: c.map(v => v * k), tr: null }; }
-        if (n === 2) return { p: lerp2(p0, c, u), o: c, tr: null };
-        if (n === 3) { const o = [c[0] + DR[i][0] * u, c[1] + DR[i][1] * u]; return { p: lerp2(p0, o, u), o, tr: u > 0 ? c : null }; }
-        const o = lerp2(c, proy(c), u); return { p: lerp2(p0, o, Math.min(1, u * 1.3)), o, tr: null };
-      });
-    }
-    // v ∈ [0, 4]: tramo k-1..k = escenario k; desde el 2, el primer 30 % vuelve a la configuración inicial
-    const VUELTA = 0.3;
+
+    // ---------------------------------------------------------------- estados clave
+    // p: predicciones (encoder de contexto + predictor), o: objetivos (encoder objetivo), g: dónde estaba el objetivo antes del EMA
+    const P0 = CEN.map((c, i) => [c[0] + OFF[i][0], c[1] + OFF[i][1]]);
+    const hacia = (a, b, u) => a.map((x, i) => lerp2(x, b[i], u));
+    const K0 = { p: P0, o: CEN };
+    const K1 = { p: CEN.map(c => c.map(v => v * 0.03)), o: CEN.map(c => c.map(v => v * 0.03)) };       // las dos ramas se juntan
+    const K2 = { p: hacia(P0, CEN, 0.6), o: CEN };                                                    // gradiente 1
+    const O1 = CEN.map((c, i) => [c[0] + DR[i][0] * 0.8, c[1] + DR[i][1] * 0.8]);
+    const K3 = { p: K2.p, o: O1, g: CEN };                                                            // EMA 1
+    const K4 = { p: hacia(K2.p, O1, 0.6), o: O1 };                                                    // gradiente 2
+    const O2 = CEN.map((c, i) => [c[0] + DR[i][0] * 1.6, c[1] + DR[i][1] * 1.6]);
+    const K5 = { p: K4.p, o: O2, g: O1 };                                                             // EMA 2
+    const K7 = { p: CEN.map(proy), o: CEN.map(proy) };                                                // sin EMA: se aplasta
+    const KS = [K0, K1, K0, K0, K2, K3, K4, K5, K0, K7];
     function enV(v) {
-      if (v <= 1) return estado(1, Math.max(0, v));
-      const k = Math.min(4, Math.ceil(v - 1e-9)), f = v - (k - 1);
-      if (f >= VUELTA) return estado(k, (f - VUELTA) / (1 - VUELTA));
-      const a = estado(k - 1, 1), b = estado(0, 0), w = f / VUELTA;
-      return a.map((e, i) => ({ p: lerp2(e.p, b[i].p, w), o: lerp2(e.o, b[i].o, w), tr: null }));
+      const a = Math.max(0, Math.min(KS.length - 2, Math.floor(v))), u = A.clamp(v - a, 0, 1), A0 = KS[a], B0 = KS[a + 1];
+      return CEN.map((_, i) => ({ p: lerp2(A0.p[i], B0.p[i], u), o: lerp2(A0.o[i], B0.o[i], u),
+        g: B0.g ? B0.g[i] : (A0.g && u < 0.5 ? A0.g[i] : null) }));
     }
 
     const head = titulos(S, [
       ['Pesos al azar: las representaciones ya arrancan dispersas', C.navy],
       ['Si el gradiente pasara por las dos ramas, podrían terminar en un punto', C.coralD],
-      ['Stop-gradient: en este paso el objetivo está quieto', C.teal],
-      ['Después del paso, el EMA corre el objetivo un poquito', C.teal],
+      ['Stop-gradient: el objetivo no recibe gradiente', C.teal],
+      ['Paso de gradiente: cada predicción se acerca a su objetivo, que está quieto', C.teal],
+      ['Paso de EMA: el objetivo se corre un poco ($\\bar\\theta$ se acerca a $\\theta$)', C.blue],
+      ['Otro paso de gradiente: las predicciones van hacia el objetivo nuevo', C.teal],
+      ['Otro paso de EMA: el objetivo se vuelve a correr, despacio', C.blue],
       ['Sin EMA (m = 0), el objetivo cambia con cada paso y la nube se puede aplastar', C.coralD]
     ], { y: 32 });
     head.set(0);
@@ -351,21 +354,23 @@
     const recta = el('line', { x1: mx(-LN[0]), y1: my(-LN[1]), x2: mx(LN[0]), y2: my(LN[1]), stroke: C.coralD, 'stroke-opacity': 0.4, 'stroke-width': 1.6, 'stroke-dasharray': '5 4' }, S);
     recta.style.opacity = 0;
     const E = COL.map(col => ({
-      fant: el('circle', { r: 8, fill: 'none', stroke: col, 'stroke-opacity': 0.35, 'stroke-width': 2 }, S),
-      est: el('line', { stroke: col, 'stroke-opacity': 0.5, 'stroke-width': 2.2, 'stroke-dasharray': '2 3' }, S),
+      fant: el('circle', { r: 8, fill: 'none', stroke: col, 'stroke-opacity': 0.35, 'stroke-width': 2, 'stroke-dasharray': '3 3' }, S),
+      est: el('line', { stroke: col, 'stroke-opacity': 0.6, 'stroke-width': 2.2, 'stroke-dasharray': '2 3' }, S),
       ln: el('line', { stroke: C.grey2, 'stroke-opacity': 0.6, 'stroke-width': 1.3, 'stroke-dasharray': '3 3' }, S),
       o: el('circle', { r: 8.5, fill: '#fff', stroke: col, 'stroke-width': 2.9 }, S),
       p: el('circle', { r: 6.5, fill: col }, S)
     }));
-    // escenario 2: flechas del gradiente (cada predicción hacia su objetivo) y el objetivo quieto
+    // flechas del gradiente (cada predicción hacia su objetivo), para el primer paso
     const GR = CEN.map((c, i) => {
-      const p0 = [c[0] + OFF[i][0], c[1] + OFF[i][1]], a = [mx(p0[0]), my(p0[1])], o = [mx(c[0]), my(c[1])];
+      const a = [mx(P0[i][0]), my(P0[i][1])], o = [mx(c[0]), my(c[1])];
       const b = [a[0] + (o[0] - a[0]) * 0.72, a[1] + (o[1] - a[1]) * 0.72];
       const fl = A.flecha(S, [a, b], C.navy, { lw: 2.4 }); fl.style.opacity = 0; return fl;
     });
-    const quieto = el('g', {}, S); quieto.style.opacity = 0;
-    el('rect', { x: P.x + P.s - 150, y: P.y + 8, width: 142, height: 30, rx: 8, fill: '#fff', stroke: C.teal, 'stroke-width': 1.6 }, quieto);
-    A.texto(quieto, 'objetivo quieto', P.x + P.s - 79, P.y + 29, { size: 16, weight: '600', color: C.teal, anchor: 'middle' });
+    // etiqueta del paso, arriba a la derecha del panel
+    const pill = (s, col) => { const g = el('g', {}, S), w = A.medir(s, 16, '600') + 24;
+      el('rect', { x: P.x + P.s - 8 - w, y: P.y + 8, width: w, height: 30, rx: 8, fill: '#fff', stroke: col, 'stroke-width': 1.6 }, g);
+      A.texto(g, s, P.x + P.s - 8 - w / 2, P.y + 29, { size: 16, weight: '600', color: col, anchor: 'middle' }); return g; };
+    const PILL = seq([pill('gradiente: objetivo quieto', C.teal), pill('EMA: se mueve el objetivo', C.blue)]);
     const LY = P.y + P.s + 30;
     el('circle', { cx: P.x + 10, cy: LY - 6, r: 6, fill: C.grey2 }, S); A.texto(S, 'predicción $\\hat s_y$', P.x + 24, LY, { size: 18, color: C.grey2 });
     el('circle', { cx: P.x + 188, cy: LY - 6, r: 6.5, fill: '#fff', stroke: C.grey2, 'stroke-width': 2.4 }, S); A.texto(S, 'objetivo $s_y$', P.x + 202, LY, { size: 18, color: C.grey2 });
@@ -376,8 +381,11 @@
     const NOTA = seq([
       'Con pesos al azar, imágenes distintas ya dan representaciones distintas. La pérdida sólo pide que cada predicción caiga sobre su objetivo.',
       'Una salida constante también da pérdida cero, y con gradiente por las dos ramas la pérdida no la descarta. La animación muestra ese caso posible, no una dinámica demostrada.',
-      'El gradiente mueve θ suponiendo que θ̄ no se mueve. Lo mejor que puede hacer es acercar cada predicción a su objetivo, que ya está separado de los demás: la pérdida no premia juntar los objetivos.',
-      'El objetivo avanza una fracción 1 − m hacia el encoder de contexto. Se desplaza despacio y sigue separado: viene de un encoder que todavía distingue las imágenes.',
+      'El gradiente actualiza θ (encoder de contexto y predictor) y trata a θ̄ como fijo. Los objetivos, los círculos vacíos, no se mueven en ese paso.',
+      'Lo mejor que puede hacer el gradiente es acercar cada predicción a su objetivo, que ya está separado de los demás: la pérdida no premia juntar los objetivos.',
+      'Después del paso de gradiente, θ̄ ← m θ̄ + (1 − m) θ. Los objetivos se desplazan una fracción chica; el rastro punteado marca dónde estaban.',
+      'Las predicciones vuelven a acercarse, ahora al objetivo corrido. El objetivo se mueve, pero más despacio que la predicción.',
+      'Gradiente y EMA se alternan en cada iteración. El objetivo viene de un encoder que todavía distingue las imágenes, así que sigue separado.',
       'Sin el promedio lento, predicción y objetivo se mueven juntos y la representación puede perder dimensiones, como pasó en parte en el experimento del apéndice.'
     ].map(s => parrafo(S, s, RX, 324, 660, { size: 19, lh: 26, color: C.navy })));
     NOTA.set(0);
@@ -390,8 +398,8 @@
         const p = [mx(s.p[0]), my(s.p[1])], o = [mx(s.o[0]), my(s.o[1])], e = E[i];
         e.p.setAttribute('cx', p[0]); e.p.setAttribute('cy', p[1]); e.o.setAttribute('cx', o[0]); e.o.setAttribute('cy', o[1]);
         pon(e.ln, p, o);
-        if (s.tr) { const t = [mx(s.tr[0]), my(s.tr[1])]; pon(e.est, t, o); e.fant.setAttribute('cx', t[0]); e.fant.setAttribute('cy', t[1]); }
-        e.est.style.opacity = e.fant.style.opacity = s.tr ? 1 : 0;
+        if (s.g) { const t = [mx(s.g[0]), my(s.g[1])]; pon(e.est, t, o); e.fant.setAttribute('cx', t[0]); e.fant.setAttribute('cy', t[1]); }
+        e.est.style.opacity = e.fant.style.opacity = s.g ? 1 : 0;
       });
       const perd = st.reduce((a, e) => a + Math.hypot(e.p[0] - e.o[0], e.p[1] - e.o[1]), 0) / NI;
       const mu = [0, 1].map(d => st.reduce((a, e) => a + e.o[d], 0) / NI);
@@ -402,37 +410,37 @@
       V[1].textContent = num(Math.sqrt(tra)); V[1].setAttribute('fill', tra < 0.05 ? C.coralD : C.teal);
       V[2].textContent = num(Math.sqrt(l2)); V[2].setAttribute('fill', l2 < 0.01 ? C.coralD : C.teal);
     };
-    // estado inicial (s0): configuración de partida
     const PX = proxy(dibuja);
-    const dib0 = () => { const st = estado(0, 0); const o = enV; dibuja.__ = 1; return st; };
-    dib0();
-    (function inicial() { const keep = enV; dibuja(0); })();
-    // v = 0 en enV es el escenario 1 sin avance, que coincide con la configuración inicial
+    dibuja(0);
+
+    // ---------------------------------------------------------------- línea de tiempo: cada parte, una parada
     const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' } });
     tl.addLabel('s0', 0);
-    let at = 0;
-    // cada parte en su propia parada: primero el escenario (título y nota), después el movimiento
+    let at = 0, n = 0;
     const parada = () => { at = tl.duration(); n += 1; tl.addLabel('s' + n, at); };
-    let n = 0;
-    for (let k = 1; k <= 4; k++) {
-      // a) el escenario: título, nota y, desde el 2, vuelta a la configuración inicial
-      head.a(tl, k, at);
-      if (k > 1) va(tl, PX, k - 1, k - 1 + VUELTA, at + 0.3, 1.0);
-      if (k === 3) tl.to(quieto, { opacity: 0, duration: 0.4 }, at + 0.3);
-      NOTA.a(tl, k, at + 0.4);
-      parada();
-      // b) en el 2, el gradiente con el objetivo quieto
-      if (k === 2) {
-        tl.to(quieto, { opacity: 1, duration: 0.5 }, at + 0.2);
-        GR.forEach((g, i) => { tl.set(g, { opacity: 1 }, at + 0.4 + 0.12 * i); A.trazar(tl, g, at + 0.4 + 0.12 * i, 0.7); });
-        parada();
-        tl.to(GR, { opacity: 0, duration: 0.6 }, at + 1.2);
-      }
-      // c) el movimiento
-      if (k === 4) tl.to(recta, { opacity: 1, duration: 0.8 }, at + 0.2);
-      va(tl, PX, k > 1 ? k - 1 + VUELTA : 0, k, at + 0.2, 2.2);
-      parada();
-    }
+    const texto = (k, t = 0) => { head.a(tl, k, at + t); NOTA.a(tl, k, at + t + 0.1); };
+
+    // s1–s2: gradiente por las dos ramas
+    texto(1); parada();
+    va(tl, PX, 0, 1, at + 0.2, 2.2); parada();
+    // s3: stop-gradient: vuelta al inicio
+    texto(2); va(tl, PX, 1, 2, at + 0.3, 1.0); PILL.a(tl, 0, at + 0.8); parada();
+    // s4: las flechas del gradiente
+    texto(3);
+    GR.forEach((g, i) => { tl.set(g, { opacity: 1 }, at + 0.5 + 0.12 * i); A.trazar(tl, g, at + 0.5 + 0.12 * i, 0.7); });
+    parada();
+    // s5: paso de gradiente 1: se mueven las predicciones
+    va(tl, PX, 3, 4, at + 0.2, 1.8); tl.to(GR, { opacity: 0, duration: 0.6 }, at + 1.2); parada();
+    // s6: paso de EMA 1: se mueve el objetivo
+    texto(4); PILL.a(tl, 1, at + 0.2); va(tl, PX, 4, 5, at + 0.9, 1.6); parada();
+    // s7: paso de gradiente 2
+    texto(5); PILL.a(tl, 0, at + 0.2); va(tl, PX, 5, 6, at + 0.9, 1.6); parada();
+    // s8: paso de EMA 2
+    texto(6); PILL.a(tl, 1, at + 0.2); va(tl, PX, 6, 7, at + 0.9, 1.6); parada();
+    // s9: sin EMA: vuelta al inicio
+    texto(7); tl.to(PILL.items, { opacity: 0, duration: 0.4 }, at + 0.2); va(tl, PX, 7, 8, at + 0.3, 1.0); parada();
+    // s10: la nube se aplasta
+    tl.to(recta, { opacity: 1, duration: 0.8 }, at + 0.2); va(tl, PX, 8, 9, at + 0.2, 2.2); parada();
     A.pasos(root, tl);
   }
 
